@@ -1,4 +1,82 @@
-// YouTube Metadata & Thumbnail Prompt AI Engine
+// YouTube Metadata & Thumbnail Prompt AI Engine (Bulletproof JSON Parsing)
+
+function safeParseAIJson(rawText) {
+  if (!rawText) return null;
+
+  // 1. Strip markdown code blocks
+  let cleaned = rawText.replace(/```(?:json)?/gi, '').replace(/```/g, '').trim();
+
+  // 2. Extract object bounded by first '{' and last '}'
+  const startIdx = cleaned.indexOf('{');
+  const endIdx = cleaned.lastIndexOf('}');
+  if (startIdx !== -1 && endIdx !== -1 && endIdx > startIdx) {
+    cleaned = cleaned.substring(startIdx, endIdx + 1);
+  }
+
+  // 3. Direct JSON parse
+  try {
+    return JSON.parse(cleaned);
+  } catch (e1) {
+    // 4. Sanitize trailing commas and control characters inside string literals
+    try {
+      const sanitized = cleaned
+        .replace(/,\s*([\}\]])/g, '$1') // Fix trailing commas
+        .replace(/\n/g, '\\n')           // Escape raw newlines
+        .replace(/\r/g, '\\r')
+        .replace(/\t/g, '\\t');
+      return JSON.parse(sanitized);
+    } catch (e2) {
+      console.warn('JSON Repair Attempt 1 failed:', e2);
+    }
+
+    // 5. Advanced string literal repair
+    try {
+      const sanitized2 = cleaned
+        .replace(/(["'])(?:(?=(\\?))\2[\s\S])*?\1/g, (str) => {
+          return str.replace(/\n/g, '\\n').replace(/\r/g, '\\r');
+        })
+        .replace(/,\s*([\}\]])/g, '$1');
+      return JSON.parse(sanitized2);
+    } catch (e3) {
+      console.warn('JSON Repair Attempt 2 failed:', e3);
+    }
+  }
+
+  // 6. Regex Fallback Extractor if JSON structure is severely broken
+  try {
+    const titles = [];
+    const titleRegex = /"titles"\s*:\s*\[([\s\S]*?)\]/i;
+    const titleMatch = rawText.match(titleRegex);
+    if (titleMatch) {
+      const matches = titleMatch[1].match(/"([^"\\]*(?:\\.[^"\\]*)*)"/g);
+      if (matches) {
+        matches.forEach(m => titles.push(m.replace(/^"|"$/g, '').replace(/\\"/g, '"')));
+      }
+    }
+
+    const descMatch = rawText.match(/"description"\s*:\s*"([\s\S]*?)"(?=\s*,\s*"|\s*\})/i);
+    const promptEnMatch = rawText.match(/"imagePromptEn"\s*:\s*"([\s\S]*?)"(?=\s*,\s*"|\s*\})/i);
+    const promptViMatch = rawText.match(/"imagePromptVi"\s*:\s*"([\s\S]*?)"(?=\s*,\s*"|\s*\})/i);
+    const tagsMatch = rawText.match(/"tags"\s*:\s*"([\s\S]*?)"(?=\s*,\s*"|\s*\})/i);
+
+    if (titles.length > 0) {
+      return {
+        titles,
+        thumbnailTexts: [
+          { line1: 'TÔ SƯ HUYNH XUYÊN KHÔNG VỀ THỜI TIÊN CỔ', line2: 'TOÀN GIA BỊ TỐNG VÀO NGỤC TỤC' }
+        ],
+        imagePromptEn: promptEnMatch ? promptEnMatch[1].replace(/\\n/g, '\n') : '',
+        imagePromptVi: promptViMatch ? promptViMatch[1].replace(/\\n/g, '\n') : '',
+        description: descMatch ? descMatch[1].replace(/\\n/g, '\n') : '',
+        tags: tagsMatch ? tagsMatch[1] : ''
+      };
+    }
+  } catch (e4) {
+    console.error('Regex Fallback Extractor failed:', e4);
+  }
+
+  return null;
+}
 
 export async function generateYoutubeContent({
   selectedFiles = [],
@@ -7,7 +85,7 @@ export async function generateYoutubeContent({
   aiProvider = 'orimise',
   apiKey,
   baseUrl = 'https://api.orimise.com/v1',
-  model = 'gemini-2.5-flash'
+  model = 'claude-sonnet-5'
 }) {
   if (!apiKey) {
     throw new Error('Chưa nhập API Key trong Cấu Hình AI!');
@@ -38,41 +116,23 @@ export async function generateYoutubeContent({
     .map(s => s.translatedText || s.originalText)
     .join('\n');
 
-  const systemPrompt = `You are a World-Class YouTube Growth Expert, Film Marketer, and Midjourney/Flux Prompt Engineer.
-YOUR TASK: Analyze the combined movie subtitle transcript across ${selectedFiles.length} episode(s) and generate a high-CTR YouTube Publishing Pack with 2-Line High-Impact Text Thumbnails & AI Image Generation Prompts.
+  const systemPrompt = `You are a World-Class YouTube Growth Expert and AI Prompt Engineer.
+YOUR TASK: Analyze the movie transcript and output ONLY a raw JSON object (NO markdown, NO intro, NO outro).
 
-GENRE: ${genre}
-CONTENT TYPE: ${contentType}
-FILES ANALYZED (${selectedFiles.length}): ${fileNames}
-
-CRITICAL RULES FOR THUMBNAIL TEXTS & PROMPTS:
-1. "thumbnailTexts": Generate 5 pairs of 2-LINE THUMBNAIL TEXTS. They MUST be longer, extremely punchy, emotional, dramatic, and directly tied to the main video Titles.
-   - Line 1: Main hook / protagonist action (3-6 words, UPPERCASE).
-   - Line 2: Big climax / shocker / stakes (3-6 words, UPPERCASE).
-   Example:
-   Line 1: "TÔ SƯ HUYNH XUYÊN KHÔNG VỀ THỜI TIÊN CỔ"
-   Line 2: "TOÀN GIA BỊ TỐNG VÀO NGỤC TỤC MẠNG NGƯỜI NHƯ CỎ RÁC"
-
-2. "imagePromptEn": The AI Image Prompt MUST explicitly integrate and visually match the story plot AND the 2-Line Thumbnail Text concept. Describe:
-   - Character appearance (ancient cultivator robes, armor, hair, glowing eyes, intense furious/shocked expression).
-   - Scene environment (ancient sect ruins, forbidden dungeon, magical array, thunderous sky).
-   - Lighting & FX (epic glowing aura, cyan and gold particle effects, volumetric cinematic lighting, octane render, 8k, 16:9 ratio --ar 16:9).
-   - Composition (framed left/right to allow bold 3D text overlay in the center).
-
-REQUIRED OUTPUT FORMAT:
-You MUST output ONLY a single valid JSON object with the following exact keys:
+CRITICAL FORMAT REQUIREMENT:
+Return ONLY a valid JSON object matching this schema. All string values MUST escape quotes and newlines:
 {
   "titles": [
-    "Tiêu đề 1 (Giật gân, cuốn hút, chuẩn SEO Tu Tiên / Huyền Huyễn)",
-    "Tiêu đề 2 (Gây tò mò kịch tính, nhấn mạnh diễn biến chính)",
-    "Tiêu đề 3 (Bá đạo, phong cách review tóm tắt phim)",
+    "Tiêu đề 1 (Giật gân, chuẩn SEO Tu Tiên)",
+    "Tiêu đề 2 (Gây tò mò kịch tính)",
+    "Tiêu đề 3 (Bá đạo, phong cách review)",
     "Tiêu đề 4 (Tiêu đề ngắn 50 ký tự chuẩn CTR)",
-    "Tiêu đề 5 (Xoay quanh nhân vật chính & bí mật bị tiết lộ)"
+    "Tiêu đề 5 (Bí mật nhân vật chính)"
   ],
   "thumbnailTexts": [
     {
       "line1": "TÔ SƯ HUYNH XUYÊN KHÔNG VỀ THỜI TIÊN CỔ",
-      "line2": "TOÀN GIA BỊ TỐNG VÀO NGỤC TỤC MẠNG NGƯỜI NHƯ CỎ RÁC"
+      "line2": "TOÀN GIA BỊ TỐNG VÀO NGỤC TỤC"
     },
     {
       "line1": "ĐỘT PHÁ KIM ĐAN KỲ VÔ THƯỢNG NĂNG LƯỢNG",
@@ -81,23 +141,15 @@ You MUST output ONLY a single valid JSON object with the following exact keys:
     {
       "line1": "MẠNG NGƯỜI NHƯ CỎ RÁC TẠI ĐẠI ĐƯỜNG VƯƠNG TRIỀU",
       "line2": "VỪA MỞ MẮT GẶP ĐỈNH CẤP ĐẠI YÊU VƯƠNG"
-    },
-    {
-      "line1": "ANH HÙNG TRỌNG SINH NẮM GIỮ HỆ THỐNG BÁ ĐẠO",
-      "line2": "MỘT TAY CHE TRỜI SAN BẰNG MỌI CƯỜNG ĐỊCH"
-    },
-    {
-      "line1": "THẦN THOẠI TRỞ LẠI PHÁ BỎ MỌI PHONG ẤN VƯƠNG TRIỀU",
-      "line2": "CHIẾN THẦN XUYÊN KHÔNG XONG VÀO NẠO TÔNG MÔN"
     }
   ],
-  "imagePromptEn": "Detailed Midjourney / DALL-E / Flux English image prompt matching the plot and 2-line thumbnail text (include character armor/robe, glowing eyes, magic aura, ancient Chinese sect background, dramatic lighting, cinematic 8k, octane render, 16:9 ratio --ar 16:9)",
-  "imagePromptVi": "Mô tả ý tưởng ảnh Thumbnail bằng tiếng Việt (bố cục nhân vật, màu sắc, vị trí đặt chữ 2 dòng)",
-  "description": "Mô tả video YouTube hoàn chỉnh (Hook đầu giật gân, Tóm tắt diễn biến kịch tính các tập phim, Khung mốc thời gian, Lời kêu gọi đăng ký kênh, Hashtags #...)",
-  "tags": "tu tiên, phim tiên hiệp, xuyên không, review phim tu tiên, phim ngắn tu tiên, ..."
+  "imagePromptEn": "Detailed Midjourney/Flux prompt with character armor, glowing eyes, magic aura, ancient Chinese background, octane render 8k --ar 16:9",
+  "imagePromptVi": "Mô tả ý tưởng ảnh Thumbnail tiếng Việt",
+  "description": "Mô tả video YouTube hoàn chỉnh",
+  "tags": "tu tiên, phim tiên hiệp, xuyên không, review phim..."
 }`;
 
-  const userMessage = `HÃY PHÂN TÍCH TỔNG HỢP ${selectedFiles.length} TẬP PHIM NÀY VÀ XUẤT BỘ NỘI DUNG YOUTUBE VỚI CHỮ THUMBNAIL 2 DÒNG DÀI HƠN KỊCH TÍNH THEO TITLE & PROMPT ẢNH KÈM THUMBNAIL TEXT:\n\n${sampledText.substring(0, 6000)}`;
+  const userMessage = `GENRE: ${genre}\nCONTENT TYPE: ${contentType}\nFILES ANALYZED: ${fileNames}\n\nHÃY PHÂN TÍCH TỔNG HỢP VÀ XUẤT NGUYÊN BẢN 1 CẤU TRÚC JSON ĐÚNG CÚ PHÁP:\n\n${sampledText.substring(0, 5000)}`;
 
   let rawText = '';
 
@@ -106,20 +158,27 @@ You MUST output ONLY a single valid JSON object with the following exact keys:
       ? baseUrl
       : `${baseUrl.replace(/\/$/, '')}/chat/completions`;
 
+    const reqBody = {
+      model: model,
+      messages: [
+        { role: 'system', content: systemPrompt },
+        { role: 'user', content: userMessage }
+      ],
+      temperature: 0.7
+    };
+
+    // Enable JSON response format for OpenAI/Gemini models if supported
+    if (model.includes('gpt') || model.includes('gemini')) {
+      reqBody.response_format = { type: 'json_object' };
+    }
+
     const response = await fetch(endpoint, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
         'Authorization': `Bearer ${apiKey}`
       },
-      body: JSON.stringify({
-        model: model,
-        messages: [
-          { role: 'system', content: systemPrompt },
-          { role: 'user', content: userMessage }
-        ],
-        temperature: 0.7
-      })
+      body: JSON.stringify(reqBody)
     });
 
     if (!response.ok) {
@@ -163,49 +222,44 @@ You MUST output ONLY a single valid JSON object with the following exact keys:
     throw new Error('AI không trả về kết quả.');
   }
 
-  // Parse JSON object from response
-  try {
-    const codeBlockMatch = rawText.match(/```(?:json)?\s*([\s\S]*?)\s*```/i);
-    const jsonStr = codeBlockMatch ? codeBlockMatch[1] : rawText;
-    const objectMatch = jsonStr.match(/\{[\s\S]*\}/);
-    const parseTarget = objectMatch ? objectMatch[0] : jsonStr;
+  // Safely parse JSON from AI output
+  const parsed = safeParseAIJson(rawText);
 
-    const parsed = JSON.parse(parseTarget.trim());
-
-    // Normalize thumbnailTexts to array of { line1, line2 }
-    let formattedTexts = [];
-    if (Array.isArray(parsed.thumbnailTexts)) {
-      formattedTexts = parsed.thumbnailTexts.map(t => {
-        if (typeof t === 'object' && t !== null) {
-          return {
-            line1: t.line1 || t.line_1 || 'TÔ SƯ HUYNH XUYÊN KHÔNG VỀ THỜI TIÊN CỔ',
-            line2: t.line2 || t.line_2 || 'TOÀN GIA BỊ TỐNG VÀO NGỤC TỤC'
-          };
-        } else if (typeof t === 'string') {
-          const parts = t.split(/[\n|]/);
-          return {
-            line1: parts[0]?.trim() || t,
-            line2: parts[1]?.trim() || ''
-          };
-        }
-        return { line1: 'TÔ SƯ HUYNH XUYÊN KHÔNG VỀ THỜI TIÊN CỔ', line2: '' };
-      });
-    } else {
-      formattedTexts = [
-        { line1: 'TÔ SƯ HUYNH XUYÊN KHÔNG VỀ THỜI TIÊN CỔ', line2: 'TOÀN GIA BỊ TỐNG VÀO NGỤC TỤC' }
-      ];
-    }
-
-    return {
-      titles: Array.isArray(parsed.titles) ? parsed.titles : [parsed.title || 'Tiêu đề Phim Tu Tiên'],
-      thumbnailTexts: formattedTexts,
-      imagePromptEn: parsed.imagePromptEn || parsed.prompt || '',
-      imagePromptVi: parsed.imagePromptVi || '',
-      description: parsed.description || '',
-      tags: parsed.tags || ''
-    };
-  } catch (e) {
-    console.error("YouTube Content JSON parse error:", e, rawText);
-    throw new Error('Không thể phân tích dữ liệu JSON trả về từ AI. Vui lòng thử lại!');
+  if (!parsed) {
+    console.error("Failed raw AI text:", rawText);
+    throw new Error('Không thể phân tích cấu trúc JSON từ kết quả AI trả về. Vui lòng thử lại!');
   }
+
+  // Normalize thumbnailTexts to array of { line1, line2 }
+  let formattedTexts = [];
+  if (Array.isArray(parsed.thumbnailTexts)) {
+    formattedTexts = parsed.thumbnailTexts.map(t => {
+      if (typeof t === 'object' && t !== null) {
+        return {
+          line1: t.line1 || t.line_1 || 'TÔ SƯ HUYNH XUYÊN KHÔNG VỀ THỜI TIÊN CỔ',
+          line2: t.line2 || t.line_2 || 'TOÀN GIA BỊ TỐNG VÀO NGỤC TỤC'
+        };
+      } else if (typeof t === 'string') {
+        const parts = t.split(/[\n|]/);
+        return {
+          line1: parts[0]?.trim() || t,
+          line2: parts[1]?.trim() || ''
+        };
+      }
+      return { line1: 'TÔ SƯ HUYNH XUYÊN KHÔNG VỀ THỜI TIÊN CỔ', line2: '' };
+    });
+  } else {
+    formattedTexts = [
+      { line1: 'TÔ SƯ HUYNH XUYÊN KHÔNG VỀ THỜI TIÊN CỔ', line2: 'TOÀN GIA BỊ TỐNG VÀO NGỤC TỤC' }
+    ];
+  }
+
+  return {
+    titles: Array.isArray(parsed.titles) ? parsed.titles : [parsed.title || 'Tiêu đề Phim Tu Tiên'],
+    thumbnailTexts: formattedTexts,
+    imagePromptEn: parsed.imagePromptEn || parsed.prompt || '',
+    imagePromptVi: parsed.imagePromptVi || '',
+    description: parsed.description || '',
+    tags: parsed.tags || ''
+  };
 }
