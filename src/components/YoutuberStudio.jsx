@@ -3,9 +3,10 @@ import {
   Video, Sparkles, Copy, Check, Image as ImageIcon, Tag, FileText,
   Play, RefreshCw, Wand2, Type, Flame, Layers, Upload, Trash2, CheckSquare, Square, Download, Palette
 } from 'lucide-react';
-import { generateYoutubeContent } from '../utils/youtuberGenerator';
 import { exportThumbnailHD, generateAIThumbnailImage } from '../utils/thumbnailExporter';
 import { uploadReferenceImageToOrimise, generateOrimiseImage } from '../utils/orimiseImageApi';
+import { generateFreeAIImage, FREE_IMAGE_MODELS } from '../utils/freeImageApi';
+
 
 
 
@@ -146,31 +147,35 @@ export default function YoutuberStudio({
     }
   };
 
-  // Generate 1-Click AI Background Image via Free Flux Engine
-  const handleGenerateAIBackground = () => {
+  const [selectedFreeModel, setSelectedFreeModel] = useState('flux');
+
+  // Generate 1-Click AI Background Image via 100% Free AI Engine (Pollinations / Flux / SDXL)
+  const handleGenerateAIBackground = async () => {
     if (!generatedData || !fullImagePromptEn) {
       alert('Vui lòng phân tích tạo content bằng AI trước!');
       return;
     }
 
     setIsGeneratingImage(true);
-    setGenProgressText('Đang tạo ảnh nền AI...');
-    const aiImageUrl = generateAIThumbnailImage(fullImagePromptEn);
+    setGenProgressText('Đang kết nối Server AI Miễn Phí vẽ ảnh...');
 
-    const img = new Image();
-    img.crossOrigin = 'anonymous';
-    img.onload = () => {
+    try {
+      const aiImageUrl = await generateFreeAIImage({
+        prompt: fullImagePromptEn,
+        modelId: selectedFreeModel,
+        width: 1280,
+        height: 720
+      });
+
       setReferenceBgImage(aiImageUrl);
+    } catch (err) {
+      alert(`Lỗi tạo ảnh miễn phí: ${err.message}`);
+    } finally {
       setIsGeneratingImage(false);
       setGenProgressText('');
-    };
-    img.onerror = () => {
-      setReferenceBgImage(aiImageUrl);
-      setIsGeneratingImage(false);
-      setGenProgressText('');
-    };
-    img.src = aiImageUrl;
+    }
   };
+
 
 
 
@@ -541,15 +546,29 @@ export default function YoutuberStudio({
                 )}
               </button>
 
-              <button
-                className="btn btn-secondary btn-sm font-bold flex-1"
-                onClick={handleGenerateAIBackground}
-                disabled={isGeneratingImage}
-                title="Tự động gọi AI Flux (Miễn phí) tạo ảnh nền 16:9 trùng khớp bối cảnh nhân vật"
-              >
-                <Palette size={15} />
-                <span>🎨 Tạo Ảnh Miễn Phí (Flux)</span>
-              </button>
+              <div className="flex-center gap-1 flex-1">
+                <select
+                  className="input-field select-field btn-sm font-bold text-cyan"
+                  style={{ padding: '6px 8px', fontSize: '0.8rem' }}
+                  value={selectedFreeModel}
+                  onChange={e => setSelectedFreeModel(e.target.value)}
+                  title="Chọn mô hình AI tạo ảnh miễn phí"
+                >
+                  {FREE_IMAGE_MODELS.map(m => (
+                    <option key={m.id} value={m.id}>{m.name}</option>
+                  ))}
+                </select>
+
+                <button
+                  className="btn btn-secondary btn-sm font-bold"
+                  onClick={handleGenerateAIBackground}
+                  disabled={isGeneratingImage}
+                  title="Vẽ ảnh 16:9 chất lượng cao bằng Server AI Miễn Phí (Không tốn tiền)"
+                >
+                  <Palette size={15} />
+                  <span>🎨 Tạo Ảnh (Free)</span>
+                </button>
+              </div>
 
               <button
                 className="btn btn-green-glow btn-sm font-bold flex-1"
@@ -560,6 +579,7 @@ export default function YoutuberStudio({
                 <span>📥 Tải Ảnh HD (.PNG)</span>
               </button>
             </div>
+
 
             {genProgressText && (
               <div className="progress-banner mt-2 text-cyan font-bold flex-center gap-2">
