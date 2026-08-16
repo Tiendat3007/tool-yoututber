@@ -116,11 +116,14 @@ export async function generateYoutubeContent({
     .map(s => s.translatedText || s.originalText)
     .join('\n');
 
-  const systemPrompt = `You are a World-Class YouTube Marketing Specialist.
+  const systemPrompt = `You are a World-Class YouTube Growth Expert.
 Task: Analyze the film transcript and generate a high-CTR YouTube Publishing Pack in Vietnamese.
-Rules:
-1. Output ONLY a valid JSON object. No explanation, no markdown text outside JSON.
-2. Escape all quotes inside strings. Do NOT use unescaped newlines inside strings.
+
+RULES FOR THUMBNAIL TEXT (thumbnailTexts):
+Each thumbnail text MUST consist of 2 lines. Each line MUST be long and detailed, approximately 7 to 8 words per line (Đúng 7 đến 8 từ mỗi dòng, viết HOA, kịch tính, giật gân, cuốn hút).
+Example:
+Line 1: "TÔ SƯ HUYNH XUYÊN KHÔNG VỀ THỜI TIÊN CỔ KHỞI ĐẦU BÁ ĐẠO" (8 từ)
+Line 2: "TOÀN GIA BỊ TỐNG VÀO NGỤC TỤC MẠNG NGƯỜI NHƯ CỎ RÁC" (8 từ)
 
 REQUIRED JSON SCHEMA:
 {
@@ -132,9 +135,18 @@ REQUIRED JSON SCHEMA:
     "Tiêu đề 5 bí mật nhân vật"
   ],
   "thumbnailTexts": [
-    { "line1": "DÒNG 1 CHỮ VÀNG 3D", "line2": "DÒNG 2 CHỮ XANH 3D" },
-    { "line1": "DÒNG 1 KỊCH TÍNH THỨ 2", "line2": "DÒNG 2 BIẾN CỐ THỨ 2" },
-    { "line1": "DÒNG 1 KỊCH TÍNH THỨ 3", "line2": "DÒNG 2 BIẾN CỐ THỨ 3" }
+    { 
+      "line1": "TÔ SƯ HUYNH XUYÊN KHÔNG VỀ THỜI TIÊN CỔ KHỞI ĐẦU BÁ ĐẠO", 
+      "line2": "TOÀN GIA BỊ TỐNG VÀO NGỤC TỤC MẠNG NGƯỜI NHƯ CỎ RÁC" 
+    },
+    { 
+      "line1": "ĐỘT PHÁ KIM ĐAN KỲ VÔ THƯỢNG NĂNG LƯỢNG TIÊN TÔNG", 
+      "line2": "TRẢ THÙ DIỆT SẠCH CẢ TÔNG MÔN PHẢN BỘI TẬP THỂ" 
+    },
+    { 
+      "line1": "CHIẾN THẦN TRỌNG SINH NẮM GIỮ HỆ THỐNG BÁ ĐẠO VƯƠNG TRIỀU", 
+      "line2": "MỘT TAY CHE TRỜI SAN BẰNG MỌI CƯỜNG ĐỊCH TÔNG MÔN" 
+    }
   ],
   "imagePromptEn": "Detailed 16:9 Midjourney/Flux prompt with character, aura, lighting, 8k --ar 16:9",
   "imagePromptVi": "Mô tả ý tưởng ảnh bằng tiếng Việt",
@@ -149,7 +161,7 @@ TẬP PHIM: ${fileNames}
 NỘI DUNG PHỤ ĐỀ PHIM (TRÍCH ĐOẠN):
 ${sampledText.substring(0, 5000)}
 
-HÃY XUẤT 1 ĐOẠN JSON HOÀN CHỈNH THEO SCHEMA TRÊN:`;
+HÃY XUẤT 1 ĐOẠN JSON HOÀN CHỈNH VỚI CHỮ THUMBNAIL 2 DÒNG DÀI NỔI BẬT (ĐÚNG 7 TỚI 8 TỪ MỖI DÒNG):`;
 
   let rawText = '';
 
@@ -235,8 +247,8 @@ HÃY XUẤT 1 ĐOẠN JSON HOÀN CHỈNH THEO SCHEMA TRÊN:`;
     formattedTexts = parsed.thumbnailTexts.map(t => {
       if (typeof t === 'object' && t !== null) {
         return {
-          line1: t.line1 || t.line_1 || 'TÔ SƯ HUYNH XUYÊN KHÔNG VỀ THỜI TIÊN CỔ',
-          line2: t.line2 || t.line_2 || 'TOÀN GIA BỊ TỐNG VÀO NGỤC TỤC'
+          line1: t.line1 || t.line_1 || 'TÔ SƯ HUYNH XUYÊN KHÔNG VỀ THỜI TIÊN CỔ KHỞI ĐẦU BÁ ĐẠO',
+          line2: t.line2 || t.line_2 || 'TOÀN GIA BỊ TỐNG VÀO NGỤC TỤC MẠNG NGƯỜI NHƯ CỎ RÁC'
         };
       } else if (typeof t === 'string') {
         const parts = t.split(/[\n|]/);
@@ -245,11 +257,11 @@ HÃY XUẤT 1 ĐOẠN JSON HOÀN CHỈNH THEO SCHEMA TRÊN:`;
           line2: parts[1]?.trim() || ''
         };
       }
-      return { line1: 'TÔ SƯ HUYNH XUYÊN KHÔNG VỀ THỜI TIÊN CỔ', line2: '' };
+      return { line1: 'TÔ SƯ HUYNH XUYÊN KHÔNG VỀ THỜI TIÊN CỔ KHỞI ĐẦU BÁ ĐẠO', line2: '' };
     });
   } else {
     formattedTexts = [
-      { line1: 'TÔ SƯ HUYNH XUYÊN KHÔNG VỀ THỜI TIÊN CỔ', line2: 'TOÀN GIA BỊ TỐNG VÀO NGỤC TỤC' }
+      { line1: 'TÔ SƯ HUYNH XUYÊN KHÔNG VỀ THỜI TIÊN CỔ KHỞI ĐẦU BÁ ĐẠO', line2: 'TOÀN GIA BỊ TỐNG VÀO NGỤC TỤC MẠNG NGƯỜI NHƯ CỎ RÁC' }
     ];
   }
 

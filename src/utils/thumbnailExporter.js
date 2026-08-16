@@ -79,16 +79,17 @@ export async function exportThumbnailHD({
 
     if (line1) {
       const text1 = line1.toUpperCase();
-      ctx.font = '900 60px "Impact", "Arial Black", sans-serif';
+      const fontSize1 = text1.length > 40 ? 38 : text1.length > 25 ? 44 : 54;
+      ctx.font = `900 ${fontSize1}px "Impact", "Arial Black", sans-serif`;
 
       // Heavy 3D Stroke
-      ctx.lineWidth = 14;
+      ctx.lineWidth = 12;
       ctx.strokeStyle = '#000000';
       ctx.strokeText(text1, 640, startY);
 
       // Gold Glow
       ctx.shadowColor = 'rgba(251, 191, 36, 0.9)';
-      ctx.shadowBlur = 30;
+      ctx.shadowBlur = 25;
 
       ctx.fillStyle = '#fbbf24';
       ctx.fillText(text1, 640, startY);
@@ -97,21 +98,23 @@ export async function exportThumbnailHD({
 
     if (line2) {
       const text2 = line2.toUpperCase();
-      ctx.font = '900 52px "Impact", "Arial Black", sans-serif';
+      const fontSize2 = text2.length > 40 ? 34 : text2.length > 25 ? 40 : 48;
+      ctx.font = `900 ${fontSize2}px "Impact", "Arial Black", sans-serif`;
 
       // Heavy 3D Stroke
-      ctx.lineWidth = 14;
+      ctx.lineWidth = 12;
       ctx.strokeStyle = '#000000';
-      ctx.strokeText(text2, 640, startY + 75);
+      ctx.strokeText(text2, 640, startY + 66);
 
       // Cyan Glow
       ctx.shadowColor = 'rgba(34, 211, 238, 0.9)';
-      ctx.shadowBlur = 30;
+      ctx.shadowBlur = 25;
 
       ctx.fillStyle = '#22d3ee';
-      ctx.fillText(text2, 640, startY + 75);
+      ctx.fillText(text2, 640, startY + 66);
       ctx.shadowBlur = 0;
     }
+
 
     resolve(canvas.toDataURL('image/png'));
   });

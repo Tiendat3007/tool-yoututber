@@ -1421,7 +1421,7 @@
 .mockup-text-overlay-2line {
   z-index: 2;
   text-align: center;
-  width: 92%;
+  width: 96%;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -1429,7 +1429,7 @@
 }
 
 .text-stroke-3d-gold {
-  font-size: 1.45rem;
+  font-size: clamp(0.95rem, 2.2vw, 1.35rem);
   font-weight: 900;
   text-transform: uppercase;
   color: #fbbf24;
@@ -1439,13 +1439,14 @@
     2px -2px 0 #000,
     -2px 2px 0 #000,
     0 0 20px rgba(251, 191, 36, 0.9);
-  letter-spacing: 0.8px;
+  letter-spacing: 0.5px;
   line-height: 1.25;
   display: block;
+  word-break: break-word;
 }
 
 .text-stroke-3d-cyan {
-  font-size: 1.3rem;
+  font-size: clamp(0.9rem, 2vw, 1.2rem);
   font-weight: 900;
   text-transform: uppercase;
   color: #22d3ee;
@@ -1455,10 +1456,12 @@
     2px -2px 0 #000,
     -2px 2px 0 #000,
     0 0 20px rgba(34, 211, 238, 0.9);
-  letter-spacing: 0.8px;
+  letter-spacing: 0.5px;
   line-height: 1.25;
   display: block;
+  word-break: break-word;
 }
+
 
 
 
