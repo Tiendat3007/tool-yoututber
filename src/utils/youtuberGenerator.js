@@ -1,48 +1,44 @@
-// YouTube Metadata & Thumbnail Prompt AI Engine (Bulletproof JSON Parsing)
+// YouTube Metadata & Thumbnail Prompt AI Engine (Bulletproof JSON Parser)
 
 function safeParseAIJson(rawText) {
   if (!rawText) return null;
 
-  // 1. Strip markdown code blocks
+  // 1. Strip markdown code fences ```json ... ```
   let cleaned = rawText.replace(/```(?:json)?/gi, '').replace(/```/g, '').trim();
 
-  // 2. Extract object bounded by first '{' and last '}'
+  // 2. Extract object enclosed by first '{' and last '}'
   const startIdx = cleaned.indexOf('{');
   const endIdx = cleaned.lastIndexOf('}');
   if (startIdx !== -1 && endIdx !== -1 && endIdx > startIdx) {
     cleaned = cleaned.substring(startIdx, endIdx + 1);
   }
 
-  // 3. Direct JSON parse
+  // 3. Fix unescaped newlines/tabs inside quoted string values
+  function sanitizeJsonStrings(str) {
+    return str
+      .replace(/,\s*([\}\]])/g, '$1') // remove trailing commas
+      .replace(/"([^"\\]*(?:\\.[^"\\]*)*)"/g, (match) => {
+        return match
+          .replace(/\n/g, '\\n')
+          .replace(/\r/g, '\\r')
+          .replace(/\t/g, '\\t');
+      });
+  }
+
+  // Attempt 1: Direct JSON Parse
   try {
     return JSON.parse(cleaned);
   } catch (e1) {
-    // 4. Sanitize trailing commas and control characters inside string literals
+    // Attempt 2: Parse after sanitizing string literals
     try {
-      const sanitized = cleaned
-        .replace(/,\s*([\}\]])/g, '$1') // Fix trailing commas
-        .replace(/\n/g, '\\n')           // Escape raw newlines
-        .replace(/\r/g, '\\r')
-        .replace(/\t/g, '\\t');
+      const sanitized = sanitizeJsonStrings(cleaned);
       return JSON.parse(sanitized);
     } catch (e2) {
-      console.warn('JSON Repair Attempt 1 failed:', e2);
-    }
-
-    // 5. Advanced string literal repair
-    try {
-      const sanitized2 = cleaned
-        .replace(/(["'])(?:(?=(\\?))\2[\s\S])*?\1/g, (str) => {
-          return str.replace(/\n/g, '\\n').replace(/\r/g, '\\r');
-        })
-        .replace(/,\s*([\}\]])/g, '$1');
-      return JSON.parse(sanitized2);
-    } catch (e3) {
-      console.warn('JSON Repair Attempt 2 failed:', e3);
+      console.warn("JSON repair attempt failed:", e2);
     }
   }
 
-  // 6. Regex Fallback Extractor if JSON structure is severely broken
+  // Attempt 3: Extract structured fields using Regex
   try {
     const titles = [];
     const titleRegex = /"titles"\s*:\s*\[([\s\S]*?)\]/i;
@@ -50,29 +46,33 @@ function safeParseAIJson(rawText) {
     if (titleMatch) {
       const matches = titleMatch[1].match(/"([^"\\]*(?:\\.[^"\\]*)*)"/g);
       if (matches) {
-        matches.forEach(m => titles.push(m.replace(/^"|"$/g, '').replace(/\\"/g, '"')));
+        matches.forEach(m => {
+          const t = m.replace(/^"|"$/g, '').replace(/\\"/g, '"').trim();
+          if (t && !t.startsWith('Tiêu đề 1')) titles.push(t);
+        });
       }
     }
 
-    const descMatch = rawText.match(/"description"\s*:\s*"([\s\S]*?)"(?=\s*,\s*"|\s*\})/i);
-    const promptEnMatch = rawText.match(/"imagePromptEn"\s*:\s*"([\s\S]*?)"(?=\s*,\s*"|\s*\})/i);
-    const promptViMatch = rawText.match(/"imagePromptVi"\s*:\s*"([\s\S]*?)"(?=\s*,\s*"|\s*\})/i);
-    const tagsMatch = rawText.match(/"tags"\s*:\s*"([\s\S]*?)"(?=\s*,\s*"|\s*\})/i);
+    const thumbMatches = [...rawText.matchAll(/\{\s*"line1"\s*:\s*"([^"]+)"\s*,\s*"line2"\s*:\s*"([^"]+)"\s*\}/gi)];
+    const thumbnailTexts = thumbMatches.map(m => ({ line1: m[1], line2: m[2] }));
 
-    if (titles.length > 0) {
+    const descMatch = rawText.match(/"description"\s*:\s*"([\s\S]*?)"(?=\s*,\s*"[a-zA-Z]+"|\s*\})/i);
+    const promptEnMatch = rawText.match(/"imagePromptEn"\s*:\s*"([\s\S]*?)"(?=\s*,\s*"[a-zA-Z]+"|\s*\})/i);
+    const promptViMatch = rawText.match(/"imagePromptVi"\s*:\s*"([\s\S]*?)"(?=\s*,\s*"[a-zA-Z]+"|\s*\})/i);
+    const tagsMatch = rawText.match(/"tags"\s*:\s*"([\s\S]*?)"(?=\s*,\s*"[a-zA-Z]+"|\s*\})/i);
+
+    if (titles.length > 0 || descMatch) {
       return {
-        titles,
-        thumbnailTexts: [
-          { line1: 'TÔ SƯ HUYNH XUYÊN KHÔNG VỀ THỜI TIÊN CỔ', line2: 'TOÀN GIA BỊ TỐNG VÀO NGỤC TỤC' }
-        ],
-        imagePromptEn: promptEnMatch ? promptEnMatch[1].replace(/\\n/g, '\n') : '',
-        imagePromptVi: promptViMatch ? promptViMatch[1].replace(/\\n/g, '\n') : '',
+        titles: titles.length > 0 ? titles : ['Tóm Tắt Phim Tu Tiên'],
+        thumbnailTexts: thumbnailTexts.length > 0 ? thumbnailTexts : null,
+        imagePromptEn: promptEnMatch ? promptEnMatch[1].replace(/\\n/g, ' ') : '',
+        imagePromptVi: promptViMatch ? promptViMatch[1].replace(/\\n/g, ' ') : '',
         description: descMatch ? descMatch[1].replace(/\\n/g, '\n') : '',
         tags: tagsMatch ? tagsMatch[1] : ''
       };
     }
-  } catch (e4) {
-    console.error('Regex Fallback Extractor failed:', e4);
+  } catch (e3) {
+    console.error("Regex fallback parser failed:", e3);
   }
 
   return null;
@@ -116,40 +116,40 @@ export async function generateYoutubeContent({
     .map(s => s.translatedText || s.originalText)
     .join('\n');
 
-  const systemPrompt = `You are a World-Class YouTube Growth Expert and AI Prompt Engineer.
-YOUR TASK: Analyze the movie transcript and output ONLY a raw JSON object (NO markdown, NO intro, NO outro).
+  const systemPrompt = `You are a World-Class YouTube Marketing Specialist.
+Task: Analyze the film transcript and generate a high-CTR YouTube Publishing Pack in Vietnamese.
+Rules:
+1. Output ONLY a valid JSON object. No explanation, no markdown text outside JSON.
+2. Escape all quotes inside strings. Do NOT use unescaped newlines inside strings.
 
-CRITICAL FORMAT REQUIREMENT:
-Return ONLY a valid JSON object matching this schema. All string values MUST escape quotes and newlines:
+REQUIRED JSON SCHEMA:
 {
   "titles": [
-    "Tiêu đề 1 (Giật gân, chuẩn SEO Tu Tiên)",
-    "Tiêu đề 2 (Gây tò mò kịch tính)",
-    "Tiêu đề 3 (Bá đạo, phong cách review)",
-    "Tiêu đề 4 (Tiêu đề ngắn 50 ký tự chuẩn CTR)",
-    "Tiêu đề 5 (Bí mật nhân vật chính)"
+    "Tiêu đề 1 cuốn hút SEO",
+    "Tiêu đề 2 kịch tính tò mò",
+    "Tiêu đề 3 bá đạo tóm tắt",
+    "Tiêu đề 4 CTR ngắn gọn",
+    "Tiêu đề 5 bí mật nhân vật"
   ],
   "thumbnailTexts": [
-    {
-      "line1": "TÔ SƯ HUYNH XUYÊN KHÔNG VỀ THỜI TIÊN CỔ",
-      "line2": "TOÀN GIA BỊ TỐNG VÀO NGỤC TỤC"
-    },
-    {
-      "line1": "ĐỘT PHÁ KIM ĐAN KỲ VÔ THƯỢNG NĂNG LƯỢNG",
-      "line2": "TRẢ THÙ DIỆT SẠCH CẢ TÔNG MÔN PHẢN BỘI"
-    },
-    {
-      "line1": "MẠNG NGƯỜI NHƯ CỎ RÁC TẠI ĐẠI ĐƯỜNG VƯƠNG TRIỀU",
-      "line2": "VỪA MỞ MẮT GẶP ĐỈNH CẤP ĐẠI YÊU VƯƠNG"
-    }
+    { "line1": "DÒNG 1 CHỮ VÀNG 3D", "line2": "DÒNG 2 CHỮ XANH 3D" },
+    { "line1": "DÒNG 1 KỊCH TÍNH THỨ 2", "line2": "DÒNG 2 BIẾN CỐ THỨ 2" },
+    { "line1": "DÒNG 1 KỊCH TÍNH THỨ 3", "line2": "DÒNG 2 BIẾN CỐ THỨ 3" }
   ],
-  "imagePromptEn": "Detailed Midjourney/Flux prompt with character armor, glowing eyes, magic aura, ancient Chinese background, octane render 8k --ar 16:9",
-  "imagePromptVi": "Mô tả ý tưởng ảnh Thumbnail tiếng Việt",
-  "description": "Mô tả video YouTube hoàn chỉnh",
-  "tags": "tu tiên, phim tiên hiệp, xuyên không, review phim..."
+  "imagePromptEn": "Detailed 16:9 Midjourney/Flux prompt with character, aura, lighting, 8k --ar 16:9",
+  "imagePromptVi": "Mô tả ý tưởng ảnh bằng tiếng Việt",
+  "description": "Mô tả video YouTube chi tiết",
+  "tags": "tu tiên, tóm tắt phim, review phim, xuyên không"
 }`;
 
-  const userMessage = `GENRE: ${genre}\nCONTENT TYPE: ${contentType}\nFILES ANALYZED: ${fileNames}\n\nHÃY PHÂN TÍCH TỔNG HỢP VÀ XUẤT NGUYÊN BẢN 1 CẤU TRÚC JSON ĐÚNG CÚ PHÁP:\n\n${sampledText.substring(0, 5000)}`;
+  const userMessage = `THỂ LOẠI: ${genre}
+ĐỊNH DẠNG: ${contentType}
+TẬP PHIM: ${fileNames}
+
+NỘI DUNG PHỤ ĐỀ PHIM (TRÍCH ĐOẠN):
+${sampledText.substring(0, 5000)}
+
+HÃY XUẤT 1 ĐOẠN JSON HOÀN CHỈNH THEO SCHEMA TRÊN:`;
 
   let rawText = '';
 
@@ -167,7 +167,6 @@ Return ONLY a valid JSON object matching this schema. All string values MUST esc
       temperature: 0.7
     };
 
-    // Enable JSON response format for OpenAI/Gemini models if supported
     if (model.includes('gpt') || model.includes('gemini')) {
       reqBody.response_format = { type: 'json_object' };
     }
@@ -227,12 +226,12 @@ Return ONLY a valid JSON object matching this schema. All string values MUST esc
 
   if (!parsed) {
     console.error("Failed raw AI text:", rawText);
-    throw new Error('Không thể phân tích cấu trúc JSON từ kết quả AI trả về. Vui lòng thử lại!');
+    throw new Error('Không thể phân tích dữ liệu từ kết quả AI. Vui lòng thử lại!');
   }
 
-  // Normalize thumbnailTexts to array of { line1, line2 }
+  // Format thumbnailTexts
   let formattedTexts = [];
-  if (Array.isArray(parsed.thumbnailTexts)) {
+  if (Array.isArray(parsed.thumbnailTexts) && parsed.thumbnailTexts.length > 0) {
     formattedTexts = parsed.thumbnailTexts.map(t => {
       if (typeof t === 'object' && t !== null) {
         return {
@@ -255,7 +254,9 @@ Return ONLY a valid JSON object matching this schema. All string values MUST esc
   }
 
   return {
-    titles: Array.isArray(parsed.titles) ? parsed.titles : [parsed.title || 'Tiêu đề Phim Tu Tiên'],
+    titles: (Array.isArray(parsed.titles) && parsed.titles.length > 0)
+      ? parsed.titles
+      : [parsed.title || 'Tiêu đề Phim Tu Tiên'],
     thumbnailTexts: formattedTexts,
     imagePromptEn: parsed.imagePromptEn || parsed.prompt || '',
     imagePromptVi: parsed.imagePromptVi || '',
