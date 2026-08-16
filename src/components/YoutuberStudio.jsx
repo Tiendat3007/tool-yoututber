@@ -209,6 +209,8 @@ export default function YoutuberStudio({
     setTimeout(() => setCopiedField(null), 2000);
   };
 
+  const [selectedAnalysisModel, setSelectedAnalysisModel] = useState(() => aiModel || 'claude-sonnet-5');
+
   const handleGenerate = async () => {
     if (selectedFilesList.length === 0) {
       alert('Vui lòng chọn ít nhất 1 file SRT phụ đề trước khi tạo content YouTube!');
@@ -231,14 +233,14 @@ export default function YoutuberStudio({
         aiProvider,
         apiKey,
         baseUrl: orimiseBaseUrl,
-        model: aiModel
+        model: selectedAnalysisModel
       });
 
       setGeneratedData(result);
       setSelectedTitleIndex(0);
       setSelectedTextIndex(0);
 
-      const firstTextObj = result.thumbnailTexts?.[0] || { line1: 'TÔ SƯ HUYNH XUYÊN KHÔNG', line2: 'TOÀN GIA BỊ BẮT VÀO NGỤC' };
+      const firstTextObj = result.thumbnailTexts?.[0] || { line1: 'TÔ SƯ HUYNH XUYÊN KHÔNG VỀ THỜI TIÊN CỔ', line2: 'TOÀN GIA BỊ TỐNG VÀO NGỤC TỤC' };
       setCustomLine1(firstTextObj.line1);
       setCustomLine2(firstTextObj.line2);
     } catch (err) {
@@ -247,6 +249,7 @@ export default function YoutuberStudio({
       setIsGenerating(false);
     }
   };
+
 
   const currentTitle = generatedData?.titles?.[selectedTitleIndex] || 'TOÀN GIA BỊ BẮT XUYÊN KHÔNG ĐỘT PHÁ KIM ĐAN!';
 
@@ -305,6 +308,22 @@ export default function YoutuberStudio({
 
         <div className="studio-controls-grid">
           <div className="control-field">
+            <label className="form-label font-bold text-cyan">Mô Hình AI Phân Tích Phim:</label>
+            <select
+              value={selectedAnalysisModel}
+              onChange={e => setSelectedAnalysisModel(e.target.value)}
+              className="input-field select-field font-bold text-cyan"
+              title="Chọn mô hình AI chuyên trách phân tích kịch bản và sáng tạo content YouTube"
+            >
+              <option value="claude-sonnet-5">🏆 claude-sonnet-5 (Đỉnh Cao Content YouTube)</option>
+              <option value="gemini-2.5-flash">⚡ gemini-2.5-flash (Siêu Nhanh 2s & Đọc Nhiều Tập)</option>
+              <option value="gpt-4o">🤖 gpt-4o (OpenAI GPT-4o)</option>
+              <option value="gpt-4o-mini">🚀 gpt-4o-mini (OpenAI Tiết Kiệm)</option>
+              <option value="gemini-2.5-pro">🧠 gemini-2.5-pro (Phân Tích Sâu)</option>
+            </select>
+          </div>
+
+          <div className="control-field">
             <label className="form-label">Thể Loại Phim / Truyện:</label>
             <select
               value={genre}
@@ -318,6 +337,7 @@ export default function YoutuberStudio({
               <option value="Cổ Trang / Kiếm Hiệp">Cổ Trang / Kiếm Hiệp</option>
             </select>
           </div>
+
 
           <div className="control-field">
             <label className="form-label">Định Dạng Video YouTube:</label>
