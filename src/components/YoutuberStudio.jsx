@@ -3,9 +3,12 @@ import {
   Video, Sparkles, Copy, Check, Image as ImageIcon, Tag, FileText,
   Play, RefreshCw, Wand2, Type, Flame, Layers, Upload, Trash2, CheckSquare, Square, Download, Palette
 } from 'lucide-react';
+import { generateYoutubeContent } from '../utils/youtuberGenerator';
 import { exportThumbnailHD, generateAIThumbnailImage } from '../utils/thumbnailExporter';
 import { uploadReferenceImageToOrimise, generateOrimiseImage } from '../utils/orimiseImageApi';
 import { generateFreeAIImage, FREE_IMAGE_MODELS } from '../utils/freeImageApi';
+
+
 
 
 
