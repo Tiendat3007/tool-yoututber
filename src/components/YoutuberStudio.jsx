@@ -608,124 +608,109 @@ ${fullImagePromptEn || generatedData.imagePromptEn}
   };
 
   const currentTitle = generatedData?.titles?.[selectedTitleIndex] || 'TOÀN GIA BỊ BẮT XUYÊN KHÔNG ĐỘT PHÁ KIM ĐAN!';
+  const activeSession = historySessions.find(s => s.id === activeSessionId) || (historySessions.length > 0 ? historySessions[0] : null);
 
   return (
     <div className="youtuber-studio-layout">
-      {/* History Sessions / Tabs Strip */}
-      <div className="history-sessions-panel">
-        <div className="history-sessions-header">
-          <div className="history-sessions-title">
-            <History size={18} className="text-cyan" />
-            <span>Lịch Sử Phân Tích ({historySessions.length} phiên đã lưu):</span>
+      {/* History Sessions Dropdown Bar */}
+      <div className="history-sessions-panel" style={{ padding: '10px 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '12px' }}>
+        <div className="flex-center gap-2 flex-wrap" style={{ flex: 1, minWidth: '280px' }}>
+          <div className="flex-center gap-2 font-bold text-cyan" style={{ whiteSpace: 'nowrap' }}>
+            <History size={18} />
+            <span>Lịch Sử Phân Tích ({historySessions.length}):</span>
           </div>
 
-          <div className="flex-center gap-2">
-            <button
-              className="btn btn-cyan btn-sm font-bold"
-              onClick={handleCreateNewSession}
-              title="Mở một phiên phân tích mới để phân tích bộ phim/tập phim khác mà không làm mất kết quả cũ"
-            >
-              <Plus size={15} /> ➕ Phân Tích Phiên Mới
-            </button>
-
-            {historySessions.length > 1 && (
-              <button
-                className="btn btn-secondary btn-sm text-red"
-                onClick={handleClearAllHistory}
-                title="Xóa toàn bộ lịch sử các phiên phân tích"
+          {historySessions.length > 0 ? (
+            <div className="select-with-icon" style={{ flex: 1, minWidth: '220px', maxWidth: '420px' }}>
+              <FileText size={15} className="text-cyan" />
+              <select
+                className="input-field select-field font-bold text-cyan"
+                style={{ background: 'rgba(6, 182, 212, 0.12)', borderColor: 'rgba(6, 182, 212, 0.35)', fontSize: '0.88rem' }}
+                value={activeSessionId || (historySessions[0] ? historySessions[0].id : '')}
+                onChange={(e) => {
+                  const chosen = historySessions.find(s => s.id === e.target.value);
+                  if (chosen) handleSelectSession(chosen);
+                }}
               >
-                <Trash2 size={14} /> Xóa Tất Cả
+                {historySessions.map((session) => {
+                  const displayName = session.title || formatFileRangeTitle(session.fileNames || session.selectedFileIds);
+                  const count = session.fileNames?.length || session.selectedFileIds?.length || 1;
+                  const time = session.createdAt || '';
+                  return (
+                    <option key={session.id} value={session.id}>
+                      📁 {displayName} ({count} tập) • {time}
+                    </option>
+                  );
+                })}
+              </select>
+            </div>
+          ) : (
+            <span className="text-xs text-muted">Chưa có phiên phân tích nào. Hãy chọn các tập bên dưới rồi bấm Phân Tích!</span>
+          )}
+
+          {/* Quick Action buttons for current active session */}
+          {activeSession && (
+            <div className="flex-center gap-1">
+              {editingSessionId === activeSession.id ? (
+                <div className="flex-center gap-1">
+                  <input
+                    type="text"
+                    className="input-field input-xs font-bold"
+                    style={{ width: '140px' }}
+                    autoFocus
+                    value={editSessionTitle}
+                    onChange={e => setEditSessionTitle(e.target.value)}
+                    onBlur={() => handleSaveRenameSession(activeSession.id)}
+                    onKeyDown={e => {
+                      if (e.key === 'Enter') handleSaveRenameSession(activeSession.id);
+                      if (e.key === 'Escape') setEditingSessionId(null);
+                    }}
+                  />
+                  <button className="btn btn-cyan btn-xs font-bold" onClick={() => handleSaveRenameSession(activeSession.id)}>Lưu</button>
+                </div>
+              ) : (
+                <button
+                  className="btn btn-secondary btn-xs font-bold"
+                  onClick={() => {
+                    setEditingSessionId(activeSession.id);
+                    setEditSessionTitle(activeSession.title || formatFileRangeTitle(activeSession.fileNames || activeSession.selectedFileIds));
+                  }}
+                  title="Đổi tên phiên phân tích này"
+                >
+                  <Edit2 size={13} /> Đổi Tên
+                </button>
+              )}
+
+              <button
+                className="btn btn-secondary btn-xs text-red"
+                onClick={(e) => handleDeleteSession(e, activeSession.id)}
+                title="Xóa phiên phân tích hiện tại"
+              >
+                <Trash2 size={13} /> Xóa Phiên Này
               </button>
-            )}
-          </div>
+            </div>
+          )}
         </div>
 
-        {historySessions.length > 0 ? (
-          <div className="history-tabs-track">
-            {historySessions.map((session, idx) => {
-              const isActive = session.id === activeSessionId;
-              const isEditing = editingSessionId === session.id;
+        <div className="flex-center gap-2 ml-auto">
+          <button
+            className="btn btn-cyan btn-sm font-bold"
+            onClick={handleCreateNewSession}
+            title="Mở một phiên phân tích mới để phân tích bộ phim/tập phim khác mà không làm mất kết quả cũ"
+          >
+            <Plus size={15} /> ➕ Phân Tích Phiên Mới
+          </button>
 
-              return (
-                <div
-                  key={session.id}
-                  className={`history-tab-card ${isActive ? 'active' : ''}`}
-                  onClick={() => handleSelectSession(session)}
-                  title="Bấm để xem lại kết quả phân tích của phiên này"
-                >
-                  <div className="history-tab-top">
-                    {isEditing ? (
-                      <input
-                        type="text"
-                        className="input-field input-xs"
-                        autoFocus
-                        value={editSessionTitle}
-                        onChange={e => setEditSessionTitle(e.target.value)}
-                        onBlur={() => handleSaveRenameSession(session.id)}
-                        onKeyDown={e => {
-                          if (e.key === 'Enter') handleSaveRenameSession(session.id);
-                          if (e.key === 'Escape') setEditingSessionId(null);
-                        }}
-                        onClick={e => e.stopPropagation()}
-                      />
-                    ) : (
-                      <div
-                        className="history-tab-filename"
-                        title={session.title || formatFileRangeTitle(session.fileNames || session.selectedFileIds)}
-                        onDoubleClick={(e) => {
-                          e.stopPropagation();
-                          setEditingSessionId(session.id);
-                          setEditSessionTitle(session.title || '');
-                        }}
-                      >
-                        <FileText size={14} className="text-cyan" />
-                        <span>{session.title || formatFileRangeTitle(session.fileNames || session.selectedFileIds)}</span>
-                      </div>
-                    )}
-
-                    <div className="flex-center gap-1" style={{ flexShrink: 0 }}>
-                      <button
-                        className="history-tab-btn-del"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setEditingSessionId(session.id);
-                          setEditSessionTitle(session.title || '');
-                        }}
-                        title="Đổi tên tab này"
-                      >
-                        <Edit2 size={12} />
-                      </button>
-
-                      <button
-                        className="history-tab-btn-del"
-                        onClick={(e) => handleDeleteSession(e, session.id)}
-                        title="Xóa phiên phân tích này khỏi lịch sử"
-                      >
-                        ✕
-                      </button>
-                    </div>
-                  </div>
-
-                  {/* 1-Line Subtitle Story Preview */}
-                  {session.generatedData?.titles?.[0] && (
-                    <div className="history-tab-storytitle" title={session.generatedData.titles[0]}>
-                      💥 {session.generatedData.titles[0]}
-                    </div>
-                  )}
-
-                  <div className="history-tab-meta">
-                    <span>{session.fileNames?.length || session.selectedFileIds?.length || 1} tập</span>
-                    <span><Clock size={11} style={{ display: 'inline', marginRight: '3px' }} />{session.createdAt || 'Vừa xong'}</span>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        ) : (
-          <div className="text-xs text-muted" style={{ padding: '6px 2px' }}>
-            Chưa có phiên phân tích nào. Hãy chọn các tập phim SRT bên dưới rồi nhấn <strong>[🚀 Phân Tích Kịch Bản & Tạo Bộ Xuất Bản]</strong> để tự động lưu vào lịch sử!
-          </div>
-        )}
+          {historySessions.length > 1 && (
+            <button
+              className="btn btn-secondary btn-sm text-red"
+              onClick={handleClearAllHistory}
+              title="Xóa toàn bộ tất cả lịch sử các phiên phân tích"
+            >
+              <Trash2 size={14} /> Xóa Tất Cả
+            </button>
+          )}
+        </div>
       </div>
 
       {/* Top Banner Control Panel (BƯỚC 1) */}
