@@ -224,20 +224,22 @@ export default function AISettingsModal({
           {/* Turbo Multi-Threading Concurrency Selector */}
           <div className="form-group">
             <label className="form-label font-bold text-cyan" style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-              <Zap size={16} /> Chế Độ Dịch Đa Luồng Siêu Tốc (Turbo Worker Pool):
+              <Zap size={16} /> Chế Độ Dịch Đa Luồng Song Song (Worker Threads Pool):
             </label>
             <select
               className="input-field select-field font-bold"
               value={concurrency}
               onChange={e => setConcurrency(Number(e.target.value))}
             >
-              <option value={1}>1 Luồng — Tuần tự tiêu chuẩn (Chậm, an toàn)</option>
-              <option value={2}>2 Luồng — Song song gấp 2x</option>
+              <option value={1}>1 Luồng — Tuần tự chuẩn (1 request/lần)</option>
+              <option value={2}>2 Luồng — Song song 2x (2 khối cùng lúc)</option>
+              <option value={3}>3 Luồng — Song song 3x (3 khối cùng lúc)</option>
               <option value={4}>⚡ 4 Luồng — Turbo 4x Siêu Tốc (Khuyên dùng - Nhanh gấp 400%)</option>
-              <option value={6}>🚀 6 Luồng — Ultra 6x Cực Đại (Dành cho bộ phim 50+ tập dài)</option>
+              <option value={5}>5 Luồng — Tốc độ cao 5x (5 khối cùng lúc)</option>
+              <option value={6}>🚀 6 Luồng — Ultra 6x Cực Đại (Xử lý 30-50 tập phim siêu tốc)</option>
             </select>
             <span className="text-xs text-muted" style={{ display: 'block', marginTop: '4px' }}>
-              Chia nhỏ toàn bộ phụ đề và kích hoạt nhiều tiến trình AI dịch song song cùng lúc, rút ngắn thời gian dịch từ vài phút xuống còn vài chục giây.
+              Chia nhỏ toàn bộ phụ đề và kích hoạt nhiều tiến trình AI dịch song song cùng lúc, tự động kẹp ngữ cảnh 3 câu trước và tự động thử lại khi gặp lỗi Bad Request.
             </span>
           </div>
 

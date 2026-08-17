@@ -661,6 +661,8 @@ export default function App() {
               onExportZip={handleExportZip}
               isBatchProcessing={isBatchProcessing}
               batchProgressText={batchProgressText}
+              concurrency={concurrency}
+              setConcurrency={setConcurrency}
             />
 
             {/* Subtitle Line Editor for Active File */}
@@ -684,6 +686,7 @@ export default function App() {
               geminiKey={geminiKey}
               aiModel={aiModel}
               concurrency={concurrency}
+              setConcurrency={setConcurrency}
               customPrompt={customPrompt}
               activePresetId={activePresetId}
               showDiffLog={showDiffLog}

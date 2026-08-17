@@ -21,7 +21,9 @@ export default function FileListPanel({
   onBatchSaveDirectAll,
   onExportZip,
   isBatchProcessing,
-  batchProgressText
+  batchProgressText,
+  concurrency = 4,
+  setConcurrency
 }) {
 
   const fileInputRef = useRef(null);
@@ -307,13 +309,32 @@ export default function FileListPanel({
           </div>
 
           <div className="batch-btn-group">
+            {setConcurrency && (
+              <div className="select-with-icon select-concurrency" title="Chọn số luồng AI dịch song song cùng lúc">
+                <Zap size={14} className="text-cyan" />
+                <select
+                  value={concurrency}
+                  onChange={e => setConcurrency(Number(e.target.value))}
+                  className="input-field select-field input-sm font-bold text-cyan"
+                  style={{ background: 'rgba(6, 182, 212, 0.12)', borderColor: 'rgba(6, 182, 212, 0.35)', minWidth: '130px' }}
+                >
+                  <option value={1}>1 Luồng (Đơn luồng)</option>
+                  <option value={2}>2 Luồng (Song song 2x)</option>
+                  <option value={3}>3 Luồng (Song song 3x)</option>
+                  <option value={4}>⚡ 4 Luồng (Turbo 4x)</option>
+                  <option value={5}>5 Luồng (Song song 5x)</option>
+                  <option value={6}>🚀 6 Luồng (Ultra 6x)</option>
+                </select>
+              </div>
+            )}
+
             <button
-              className="btn btn-purple btn-sm"
+              className="btn btn-purple btn-sm font-bold"
               onClick={onBatchTranslateAI}
               disabled={isBatchProcessing}
               title="Dịch toàn bộ tất cả file SRT trong danh sách bằng AI"
             >
-              <Sparkles size={16} /> Dịch AI Tất Cả {files.length} File
+              <Sparkles size={16} /> Dịch AI Tất Cả {files.length} File ({concurrency} Luồng)
             </button>
 
             <button

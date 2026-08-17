@@ -27,6 +27,7 @@ export default function SubtitleEditor({
   geminiKey,
   aiModel,
   concurrency = 4,
+  setConcurrency,
   customPrompt,
   activePresetId,
   showDiffLog,
@@ -448,13 +449,32 @@ export default function SubtitleEditor({
                 <BookOpen size={16} /> Dịch Từ Điển File Hiện Tại ({selectedIds.length > 0 ? selectedIds.length : 'Tất cả'})
               </button>
 
+              {setConcurrency && (
+                <div className="select-with-icon select-concurrency" title="Chọn số luồng AI dịch song song cùng lúc">
+                  <Zap size={14} className="text-cyan" />
+                  <select
+                    value={concurrency}
+                    onChange={e => setConcurrency(Number(e.target.value))}
+                    className="input-field select-field input-sm font-bold text-cyan"
+                    style={{ background: 'rgba(6, 182, 212, 0.12)', borderColor: 'rgba(6, 182, 212, 0.35)', minWidth: '125px' }}
+                  >
+                    <option value={1}>1 Luồng</option>
+                    <option value={2}>2 Luồng (2x)</option>
+                    <option value={3}>3 Luồng (3x)</option>
+                    <option value={4}>⚡ 4 Luồng (Turbo)</option>
+                    <option value={5}>5 Luồng (5x)</option>
+                    <option value={6}>🚀 6 Luồng (Ultra)</option>
+                  </select>
+                </div>
+              )}
+
               <button
-                className="btn btn-purple btn-sm"
+                className="btn btn-purple btn-sm font-bold"
                 onClick={handleAIBatchTranslate}
                 disabled={isTranslating}
                 title={`Dịch file hiện tại bằng AI ${aiProvider === 'orimise' ? `Orimise (${aiModel})` : `Gemini (${aiModel})`}`}
               >
-                <Sparkles size={16} /> Dịch AI File Này
+                <Sparkles size={16} /> Dịch AI File Này ({concurrency} Luồng)
               </button>
 
               {/* Red/Green Diff Toggle Button */}
