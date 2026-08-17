@@ -109,61 +109,67 @@ export async function generateYoutubeContent({
     throw new Error('Các file đã chọn không có nội dung phụ đề!');
   }
 
-  // Extract representative lines (up to 120 lines sampled evenly across all files)
-  const step = Math.max(1, Math.floor(allSubtitles.length / 120));
-  const sampledText = allSubtitles
+  // Extract deep narrative representation (up to 300 sampled lines covering beginning, climax and end)
+  const maxLines = 300;
+  const step = Math.max(1, Math.floor(allSubtitles.length / maxLines));
+  const sampledLines = allSubtitles
     .filter((_, idx) => idx % step === 0)
-    .map(s => s.translatedText || s.originalText)
+    .map((s, idx) => `[Dòng ${idx + 1}] ${s.translatedText || s.originalText}`)
     .join('\n');
 
-  const systemPrompt = `You are a World-Class YouTube Growth Expert specializing in Review Truyện Tranh / Manhua / Anime / Tu Tiên.
-Task: Analyze the film transcript and generate a high-CTR YouTube Publishing Pack in Vietnamese.
+  // Allow up to 14,000 characters of rich transcript context
+  const fullTranscriptContext = sampledLines.substring(0, 14000);
 
-RULES FOR TITLES (titles):
-1. BẮT BUỘC CHUẨN ĐỘ DÀI: 80 - 90 KÝ TỰ (Đánh đúng thuật toán YouTube SEO & Tỷ lệ nhấp CTR cao nhất).
-2. CÔNG THỨC VÀNG 5 THÀNH PHẦN:
-   [Xuyên Không/Trọng Sinh] + [Nghịch cảnh] + [Hệ Thống/Cơ Duyên] + [Sức mạnh] + [Kết quả]
-   (Cấu trúc: 1 Hook giật gân + 1 Cơ chế đặc biệt + 1 Kết quả bá đạo).
+  const systemPrompt = `You are a World-Class YouTube Growth Expert & Viral Content Strategist specializing in Review Truyện Tranh / Manhua / Anime 3D / Phim Tu Tiên.
 
-3. ÁP DỤNG LẦN LƯỢT 5 CÔNG THỨC SAU CHO 5 TIÊU ĐỀ YOUTUBE:
-   - Title 1 (Xuyên Không + Hệ Thống + Vô Địch): "💥 Xuyên Không Đến Tu Tiên Giới, Hắn Kích Hoạt Hệ Thống Vô Địch Và Bắt Đầu Quét Ngang Thiên Hạ"
-   - Title 2 (Phế Vật + Thức Tỉnh Nghịch Thiên): "🔥 Bị Cả Tông Môn Coi Là Phế Vật, Hắn Thức Tỉnh Hệ Thống Nghịch Thiên Và Một Bước Thành Đại Đế"
-   - Title 3 (Đệ Tử Tạp Dịch + Hệ Thống Đánh Dấu): "⚡ Xuyên Không Thành Đệ Tử Tạp Dịch, Hắn Dùng Hệ Thống Đánh Dấu Tu Luyện Đến Vô Địch Thiên Hạ"
-   - Title 4 (Vạn Năm Tu Vi + Vô Địch): "👑 Vừa Xuyên Không Đã Sở Hữu Vạn Năm Tu Vi, Hắn Bắt Đầu Con Đường Vô Địch Khiến Thiên Hạ Khiếp Sợ"
-   - Title 5 (Thân Phận Ẩn + Chí Tôn): "😱 Ai Cũng Nghĩ Hắn Là Phế Nhân, Nào Ngờ Vừa Thức Tỉnh Hệ Thống Đã Trở Thành Tuyệt Thế Chí Tôn"
+YOUR MISSION:
+1. ĐỌC KỸ TOÀN BỘ NỘI DUNG PHỤ ĐỀ SRT BÊN DƯỚI ĐỂ HIỂU RÕ CỐT TRUYỆN:
+   - Ai là nhân vật chính? Nghịch cảnh/biến cố gì đang xảy ra (bị trục xuất, hủy hôn, hãm hại, xuyên không, thức tỉnh...)?
+   - Xuất hiện công pháp, bảo vật, cảnh giới tu luyện, tông môn hay kẻ thù nào?
+   - Đâu là các phân đoạn cao trào, vả mặt, đột phá, trả thù hay bí mật lớn nhất trong các tập phim này?
 
-4. QUY TẮC TỪ KHÓA & DANH XƯNG:
-   - TUYỆT ĐỐI KHÔNG dùng tên riêng đích danh nhân vật (Không dùng: Lâm Tiêu, Trâu Phong, Diệp Phàm, Dương Lăng...).
-   - LUÔN DÙNG DANH XƯNG XUẤT THÂN BÍ ẨN HOẶC NGÔI XƯNG ("Hắn", "Gã Đệ Tử Tạp Dịch", "Kẻ Phế Vật", "Đại Lão Ẩn Thân", "Nữ Đế", "Ma Tôn", "Bản Tọa"...).
-   - Đảm bảo đọc tự nhiên, liền mạch, có đủ từ khóa Xuyên Không / Tu Tiên / Hệ Thống / Vô Địch.
+2. TẠO 5 TIÊU ĐỀ YOUTUBE DỰA TRÊN CỐT TRUYỆN THỰC TẾ + CÔNG THỨC 80-90 KÝ TỰ:
+   - Áp dụng cấu trúc vàng: [Xuyên Không/Trọng Sinh] + [Nghịch cảnh thực tế trong phim] + [Hệ Thống/Bảo Vật/Cơ Duyên thực tế] + [Sức mạnh] + [Kết quả bá đạo]
+   - BẮT BUỘC ĐỘ DÀI: 80 - 90 ký tự (chuẩn SEO & tỷ lệ click CTR YouTube cao nhất).
+   - TUYỆT ĐỐI KHÔNG sao chép ví dụ mẫu nguyên văn. Phải lấy đúng nhân vật, biến cố và tình tiết có trong phụ đề để sáng tác!
+   - Không dùng tên riêng đích danh (Dùng: "Hắn", "Kẻ Phế Vật", "Gã Đệ Tử Tạp Dịch", "Đại Lão Ẩn Thân", "Ma Tôn", "Bản Tọa"...).
+   - Đặt 5 góc nhìn khác nhau:
+     * Tiêu đề 1: Theo hướng Xuyên Không / Hệ Thống / Vô Địch bá đạo.
+     * Tiêu đề 2: Theo hướng Bị Coi Thường / Thức Tỉnh Nghịch Thiên / Đột Phá.
+     * Tiêu đề 3: Theo hướng Đệ Tử Tạp Dịch / Nhận Thần Công / Đánh Dấu.
+     * Tiêu đề 4: Theo hướng Tu Vi Khủng / Vạn Năm Tu Vi / Quét Ngang Thiên Hạ.
+     * Tiêu đề 5: Theo hướng Thân Phận Ẩn / Tuyệt Thế Chí Tôn / Khiến Cả Tông Môn Khiếp Sợ.
 
-RULES FOR THUMBNAIL TEXT (thumbnailTexts):
-Each thumbnail text MUST consist of 2 lines. Each line MUST be long and detailed, approximately 7 to 8 words per line (Dùng 7 đến 8 từ mỗi dòng, viết HOA, kịch tính, giật gân, cuốn hút).
-Example:
-Line 1: "TỔ SƯ HUYNH XUYÊN KHÔNG VỀ THỜI TIỀN CỔ KHỞI ĐẦU BÁ ĐẠO" (8 từ)
-Line 2: "TOÀN GIA BỊ TỐNG VÀO NGỤC TỐC MẠNG NGƯỜI NHƯ CỎ RÁC" (8 từ)
+3. TẠO 3 MẪU CHỮ THUMBNAIL 2 DÒNG (7-8 TỪ MỖI DÒNG):
+   - Phải trích xuất 2 câu giật gân, cao trào nhất từ đúng diễn biến trong tập phim đã đọc.
+   - Mỗi dòng chuẩn 7 đến 8 từ, viết HOA, kịch tính, gây tò mò tột độ.
 
-REQUIRED JSON SCHEMA:
+4. TẠO PROMPT ẢNH VÀ MÔ TẢ:
+   - imagePromptEn: Chi tiết 16:9 Midjourney/Flux prompt mô tả đúng ngoại hình nhân vật, y phục, ánh sáng linh lực, tông môn xuất hiện trong phim, 8k cinematic.
+   - description: Tóm tắt hấp dẫn diễn biến kịch tính theo từng phân đoạn trong các tập phim kèm lời kêu gọi đăng ký và hashtags.
+   - tags: Các từ khóa SEO YouTube liên quan trực tiếp đến phim và thể loại.
+
+REQUIRED OUTPUT JSON SCHEMA (Output ONLY valid JSON, no markdown outside JSON):
 {
   "titles": [
-    "💥 Xuyên Không Đến Tu Tiên Giới, Hắn Kích Hoạt Hệ Thống Vô Địch Và Bắt Đầu Quét Ngang Thiên Hạ",
-    "🔥 Bị Cả Tông Môn Coi Là Phế Vật, Hắn Thức Tỉnh Hệ Thống Nghịch Thiên Và Một Bước Thành Đại Đế",
-    "⚡ Xuyên Không Thành Đệ Tử Tạp Dịch, Hắn Dùng Hệ Thống Đánh Dấu Tu Luyện Đến Vô Địch Thiên Hạ",
-    "👑 Vừa Xuyên Không Đã Sở Hữu Vạn Năm Tu Vi, Hắn Bắt Đầu Con Đường Vô Địch Khiến Thiên Hạ Khiếp Sợ",
-    "😱 Ai Cũng Nghĩ Hắn Là Phế Nhân, Nào Ngờ Vừa Thức Tỉnh Hệ Thống Đã Trở Thành Tuyệt Thế Chí Tôn"
+    "💥 [Tiêu đề 1 tạo từ cốt truyện thật, chuẩn 80-90 ký tự]",
+    "🔥 [Tiêu đề 2 tạo từ cốt truyện thật, chuẩn 80-90 ký tự]",
+    "⚡ [Tiêu đề 3 tạo từ cốt truyện thật, chuẩn 80-90 ký tự]",
+    "👑 [Tiêu đề 4 tạo từ cốt truyện thật, chuẩn 80-90 ký tự]",
+    "😱 [Tiêu đề 5 tạo từ cốt truyện thật, chuẩn 80-90 ký tự]"
   ],
   "thumbnailTexts": [
     { 
-      "line1": "TỔ SƯ HUYNH XUYÊN KHÔNG VỀ THỜI TIỀN CỔ KHỞI ĐẦU BÁ ĐẠO", 
-      "line2": "TOÀN GIA BỊ TỐNG VÀO NGỤC TỐC MẠNG NGƯỜI NHƯ CỎ RÁC" 
+      "line1": "DÒNG 1 KỊCH TÍNH DỰA THEO PHIM ĐÚNG 7 ĐẾN 8 TỪ", 
+      "line2": "DÒNG 2 BIẾN CỐ DỰA THEO PHIM ĐÚNG 7 ĐẾN 8 TỪ" 
     },
     { 
-      "line1": "ĐỘT PHÁ KIM ĐAN KỲ VÔ THƯỢNG NĂNG LƯỢNG TIÊN TÔNG", 
-      "line2": "TRẢ THÙ DIỆT SẠCH CẢ TÔNG MÔN PHẢN BỘI TẬP THỂ" 
+      "line1": "DÒNG 1 CAO TRÀO DỰA THEO PHIM ĐÚNG 7 ĐẾN 8 TỪ", 
+      "line2": "DÒNG 2 CAO TRÀO DỰA THEO PHIM ĐÚNG 7 ĐẾN 8 TỪ" 
     },
     { 
-      "line1": "CHIẾN THẦN TRÙNG SINH NẮM GIỮ HỆ THỐNG BÁ ĐẠO VƯƠNG TRIỀU", 
-      "line2": "MỘT TAY CHE TRỜI SAN BẰNG MỌI CƯỜNG ĐỊCH TÔNG MÔN" 
+      "line1": "DÒNG 1 VẢ MẶT DỰA THEO PHIM ĐÚNG 7 ĐẾN 8 TỪ", 
+      "line2": "DÒNG 2 VẢ MẶT DỰA THEO PHIM ĐÚNG 7 ĐẾN 8 TỪ" 
     }
   ],
   "imagePromptEn": "Detailed 16:9 Midjourney/Flux prompt with character, aura, lighting, 8k --ar 16:9",
@@ -174,12 +180,14 @@ REQUIRED JSON SCHEMA:
 
   const userMessage = `THỂ LOẠI: ${genre}
 ĐỊNH DẠNG: ${contentType}
-TẬP PHIM: ${fileNames}
+DANH SÁCH TẬP PHIM (${selectedFiles.length} TẬP): ${fileNames}
 
-NỘI DUNG PHỤ ĐỀ PHIM (TRÍCH ĐOẠN):
-${sampledText.substring(0, 5000)}
+=== NỘI DUNG PHỤ ĐỀ PHIM (TRÍCH ĐOẠN CHI TIẾT TỪ TOÀN BỘ CÁC TẬP) ===
+${fullTranscriptContext}
+=== HẾT NỘI DUNG PHỤ ĐỀ ===
 
-HÃY XUẤT 1 ĐOẠN JSON HOÀN CHỈNH VỚI CHỮ THUMBNAIL 2 DÒNG DÀI NỔI BẬT (ĐÚNG 7 TỚI 8 TỪ MỖI DÒNG):`;
+YÊU CẦU:
+Đọc kỹ toàn bộ cốt truyện phụ đề trên. Hãy kết hợp các tình tiết, sự kiện thực tế trong phim với bộ công thức 80-90 ký tự và chữ Thumbnail 2 dòng (7-8 từ/dòng) để xuất ra 1 đoạn JSON chuẩn xác 100%:`;
 
   let rawText = '';
 
