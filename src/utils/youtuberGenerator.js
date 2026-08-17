@@ -113,55 +113,46 @@ export async function generateYoutubeContent({
     throw new Error('Các file đã chọn không có nội dung phụ đề!');
   }
 
-  // Extract deep narrative representation (up to 300 sampled lines covering beginning, climax and end)
-  const maxLines = 300;
-  const step = Math.max(1, Math.floor(allSubtitles.length / maxLines));
-  const sampledLines = allSubtitles
-    .filter((_, idx) => idx % step === 0)
-    .map((s, idx) => `[Dòng ${idx + 1}] ${s.translatedText || s.originalText}`)
-    .join('\n');
+  // Combine 100% FULL subtitles of all selected files with episode headers and timecodes (NO SKIPPING)
+  const fullTranscriptContext = selectedFiles.map((file, fileIdx) => {
+    const lines = file.subtitles.map((s, idx) => {
+      const text = s.translatedText || s.originalText || '';
+      return `[${s.startTime || idx + 1}] ${text}`;
+    }).join('\n');
+    return `=== TẬP PHIM #${fileIdx + 1}: ${file.name} (Toàn bộ ${file.subtitles.length} câu thoại) ===\n${lines}`;
+  }).join('\n\n');
 
-  // Allow up to 14,000 characters of rich transcript context
-  const fullTranscriptContext = sampledLines.substring(0, 14000);
+  const systemPrompt = `You are an Elite YouTube Creative Director & Viral Content Strategist specializing in Review Truyện Tranh / Manhua / Donghua 3D / Phim Tu Tiên.
 
-  const systemPrompt = `You are an Elite YouTube Creative Director & AI Prompt Master specializing in 3D Anime / Manhua / Donghua / Tu Tiên review channels.
+QUY TRÌNH 2 BƯỚC BẮT BUỘC KHI XỬ LÝ DỮ LIỆU:
 
-YOUR COMPREHENSIVE GENERATION DIRECTIVE:
-Phân tích toàn bộ phụ đề kịch bản SRT để xuất trọn bộ YouTube Publishing Pack có tính TƯƠNG HỖ VÀ LIÊN KẾT CAO GIỮA TITLE - TEXT THUMBNAIL - PROMPT ẢNH:
+BƯỚC 1: ĐỌC VÀ HIỂU TRỌN VẸN 100% CỐT TRUYỆN TỪ ĐẦU ĐẾN CUỐI
+- Đọc kỹ toàn bộ từng câu thoại trong tất cả các tập phim SRT được cung cấp bên dưới (không bỏ sót tình tiết nào).
+- Nắm rõ: Nhân vật chính là ai, khởi đầu từ nghịch cảnh nào (bị phế, hủy hôn, đuổi khỏi tông môn, trọng sinh, xuyên không...)?
+- Xuất hiện công pháp, hệ thống, bảo vật hay cơ duyên gì?
+- Những phân đoạn cao trào, vả mặt kẻ thù, đột phá cảnh giới và kết cục của chuỗi tập phim.
 
-1. QUY TẮC TIÊU ĐỀ YOUTUBE (titles - 5 Tiêu Đề):
-   - ĐỘ DÀI CHUẨN: 80 - 90 KÝ TỰ (Đúng điểm ngọt thuật toán YouTube CTR & SEO).
-   - CÔNG THỨC VÀNG 5 THÀNH PHẦN:
-     [Xuyên Không/Trọng Sinh] + [Nghịch Cảnh Trong Phim] + [Cơ Duyên/Hệ Thống] + [Sức Mạnh Đạt Được] + [Kết Quả Bá Đạo]
-   - KHÔNG dùng tên riêng đích danh (Dùng danh xưng: Hắn, Kẻ Phế Vật, Gã Đệ Tử Tạp Dịch, Ma Tôn, Tuyệt Thế Cao Thủ...).
-   - Tạo 5 Tiêu Đề theo 5 góc độ hấp dẫn khác nhau từ chính diễn biến phim (1: Vô Địch Hệ Thống, 2: Vả Mặt Đột Phá, 3: Cơ Duyên Thần Công, 4: Vạn Năm Tu Vi, 5: Thân Phận Ẩn).
+BƯỚC 2: TỔNG HỢP VÀ SÁNG TẠO BỘ METADATA YOUTUBE CHUẨN VIRAL
+1. TÓM TẮT CỐT TRUYỆN CHI TIẾT (storySummary):
+   - Viết bài tóm tắt mạch lạc, cuốn hút (khoảng 350 - 550 chữ) kể lại toàn bộ diễn biến các tập phim từ mở đầu đến kết thúc để nhà sáng tạo video đọc hiểu trọn vẹn 100% câu chuyện.
 
-2. QUY TẮC CHỮ THUMBNAIL 2 DÒNG (thumbnailTexts - 3 Mẫu 2 Dòng):
-   - MỖI DÒNG ĐÚNG 7 ĐẾN 8 TỪ, viết HOA toàn bộ.
-   - NGUYÊN TẮC ĐỐI XỨNG TƯƠNG PHẢN (GÂY TÒ MÒ CỰC ĐỘ):
-     * DÒNG 1 (Chữ Vàng 3D): Nêu nghịch cảnh/nguy nan/thách thức lớn nhất trong tập phim.
-     * DÒNG 2 (Chữ Xanh 3D): Nêu cú phản đòn/thức tỉnh/vả mặt rung chuyển tông môn.
-   - Ví dụ:
-     Line 1: "VỪA XUYÊN KHÔNG ĐÃ BỊ TỐNG VÀO HẦM NGỤC" (8 từ)
-     Line 2: "KÍCH HOẠT HỆ THỐNG VÔ ĐỊCH QUÉT SẠCH TÔNG MÔN" (8 từ)
+2. 5 TIÊU ĐỀ YOUTUBE CHUẨN 80–90 KÝ TỰ (titles):
+   - Áp dụng công thức: [Xuyên Không/Trọng Sinh] + [Nghịch Cảnh Trong Phim] + [Cơ Duyên/Hệ Thống] + [Sức Mạnh] + [Kết Quả Bá Đạo]
+   - Chuẩn độ dài 80 - 90 ký tự. Không dùng tên riêng đích danh (dùng: Hắn, Gã Đệ Tử Tạp Dịch, Kẻ Phế Vật, Ma Tôn...).
+   - Chia 5 góc độ hấp dẫn khác nhau dựa trên đúng cốt truyện đã đọc.
 
-3. QUY TẮC PROMPT ẢNH MIDJOURNEY / FLUX (imagePromptEn & imagePromptVi):
-   - imagePromptEn: Viết bằng tiếng Anh chuẩn Prompt Master cho Midjourney v6/Flux.1:
-     * Chủ thể: Nhân vật chính nam/nữ với thần thái bá đạo, mắt lóe sáng linh lực rực rỡ (glowing sacred eyes), áo choàng Tiên Hiệp tung bay trong gió (flowing Xianxia robe with intricate golden embroidery).
-     * Tư thế: Đang tung chưởng hoặc rút thần kiếm phát ra năng lượng sấm sét cuồn cuộn (summoning ancient divine sword, lightning aura).
-     * Bối cảnh: Khung cảnh tông môn Tiên Hiệp cổ kính kỳ vĩ, thiên kiếp mây đen bao phủ hoặc cung điện hoàng kim đổ nát (ancient Chinese floating mountains, thunderstorm sky, dramatic lighting, octane render 8k, cinematic composition, framed with negative center space for bold 3D text overlay --ar 16:9).
-   - imagePromptVi: Mô tả ý tưởng chi tiết bằng tiếng Việt (bố cục nhân vật, ánh sáng, góc đặt chữ 2 dòng).
+3. 3 MẪU CHỮ THUMBNAIL 2 DÒNG (thumbnailTexts):
+   - Mỗi dòng đúng 7 đến 8 từ, viết HOA, tương phản mạnh (Dòng 1: Nghịch cảnh/nguy hiểm - Dòng 2: Phản đòn/đột phá).
 
-4. TÓM TẮT CỐT TRUYỆN TOÀN TẬP (storySummary):
-   - Viết bài tóm tắt chi tiết, liền mạch, cuốn hút (khoảng 300 - 500 chữ) tóm lược toàn bộ cốt truyện các tập phim: nhân vật chính là ai, khởi đầu từ đâu, biến cố gì xảy ra, quá trình tu luyện/đột phá, các màn đối đầu gay cấn và kết cục của các tập phim này để nhà sáng tạo video đọc hiểu trọn vẹn.
+4. PROMPT ẢNH MIDJOURNEY/FLUX (imagePromptEn & imagePromptVi):
+   - 16:9 Midjourney v6/Flux prompt miêu tả đúng nhân vật, áo choàng chiến bào, thần kiếm, hào quang linh lực và bối cảnh tông môn trong phim, 8k cinematic octane render, chừa không gian giữa để đặt chữ 3D.
 
-5. MÔ TẢ (description) & TAGS (tags):
-   - description: Viết đoạn mô tả YouTube cuốn hút, tóm tắt các nút thắt cao trào của các tập phim, chèn mốc thời gian và lời kêu gọi bấm Đăng Ký.
-   - tags: Chuỗi từ khóa SEO YouTube phân cách bởi dấu phẩy.
+5. MÔ TẢ & TAGS (description & tags):
+   - Mô tả video YouTube cuốn hút theo dòng thời gian và danh sách thẻ tags SEO.
 
 REQUIRED OUTPUT JSON FORMAT (Return ONLY valid JSON):
 {
-  "storySummary": "Tóm tắt cốt truyện toàn tập chi tiết, mạch lạc, dễ đọc để nhà sáng tạo nắm rõ diễn biến phim...",
+  "storySummary": "Bài tóm tắt toàn bộ cốt truyện chi tiết, mạch lạc, dễ hiểu...",
   "titles": [
     "💥 [Tiêu đề 1 chuẩn 80-90 ký tự dựa theo phim]",
     "🔥 [Tiêu đề 2 chuẩn 80-90 ký tự dựa theo phim]",
@@ -189,20 +180,19 @@ REQUIRED OUTPUT JSON FORMAT (Return ONLY valid JSON):
   "tags": "tu tiên, tóm tắt phim, review phim tu tiên..."
 }`;
 
-
   const userMessage = `THỂ LOẠI: ${genre}
 ĐỊNH DẠNG: ${contentType}
 DANH SÁCH TẬP PHIM (${selectedFiles.length} TẬP): ${fileNames}
 
-=== TOÀN BỘ DIỄN BIẾN PHỤ ĐỀ SRT TRÍCH ĐOẠN ĐẦY ĐỦ ===
+=== NỘI DUNG TOÀN BỘ 100% PHỤ ĐỀ SRT CỦA TẤT CẢ CÁC TẬP ===
 ${fullTranscriptContext}
-=== HẾT DIỄN BIẾN PHỤ ĐỀ ===
+=== HẾT TOÀN BỘ PHỤ ĐỀ SRT ===
 
-YÊU CẦU ĐẶC BIỆT:
-1. Đọc kỹ diễn biến trên và tạo 5 Tiêu Đề chuẩn công thức 80-90 ký tự.
-2. Tạo 3 Mẫu Chữ Thumbnail 2 Dòng tương phản (Dòng 1: Nghịch cảnh, Dòng 2: Phản đòn vả mặt) đúng 7-8 từ/dòng.
-3. Tạo Prompt Ảnh Midjourney/Flux 16:9 sắc nét khớp nhân vật và không gian trong phim.
-4. Trả về đúng 1 đối tượng JSON duy nhất:`;
+HÃY THỰC HIỆN ĐÚNG QUY TRÌNH 2 BƯỚC:
+1. Đọc và hiểu toàn bộ 100% nội dung phụ đề trên để viết bài TÓM TẮT CỐT TRUYỆN CHI TIẾT (storySummary).
+2. Tạo 5 Tiêu Đề chuẩn 80-90 ký tự + 3 Mẫu Chữ Thumbnail 2 Dòng (7-8 từ/dòng) + Prompt Ảnh khớp 100% với phim.
+3. Xuất ra 1 đối tượng JSON duy nhất:`;
+
 
   let rawText = '';
 
