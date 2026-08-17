@@ -731,165 +731,187 @@ ${fullImagePromptEn || generatedData.imagePromptEn}
           </div>
         </div>
 
-        {/* Multi-SRT File Selection Toolbar */}
+        {/* Multi-SRT File Selection Toolbar (Collapsible) */}
         <div className="multi-file-selector-box mb-3 mt-3">
-          <div className="flex-between flex-wrap gap-2 mb-2">
-            <label className="form-label mb-0 font-bold text-cyan" style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-              <CheckSquare size={16} />
-              <span>Chọn Các Tập SRT Phân Tích Tổng Hợp ({selectedFileIds.length} / {files.length} tập chọn — Tổng {totalSelectedSubtitles} dòng thoại):</span>
-            </label>
+          <div
+            className="flex-between flex-wrap gap-2 cursor-pointer"
+            onClick={() => setIsEpisodesExpanded(prev => !prev)}
+            title="Bấm để Đóng / Mở Rộng chọn tập phim"
+            style={{ userSelect: 'none' }}
+          >
+            <div className="flex-center gap-2 flex-wrap">
+              <label className="form-label mb-0 font-bold text-cyan flex-center gap-2 cursor-pointer">
+                <CheckSquare size={17} />
+                <span>Chọn Tập Phim SRT ({selectedFileIds.length} / {files.length} tập chọn — Tổng {totalSelectedSubtitles.toLocaleString()} dòng thoại)</span>
+              </label>
+              <span className="badge-info text-xs font-bold" style={{ background: 'rgba(6, 182, 212, 0.15)', color: '#22d3ee', padding: '2px 8px', borderRadius: '12px', border: '1px solid rgba(6, 182, 212, 0.3)' }}>
+                {formatFileRangeTitle(selectedFilesList)}
+              </span>
+            </div>
+
             <div className="flex-center gap-2">
-              <div className="filter-counter text-muted font-bold" style={{ fontSize: '0.8rem' }}>
-                Đang hiện: <strong className="highlight-cyan">{sortedFiles.length}</strong> / {files.length} tập
-              </div>
+              <button
+                type="button"
+                className="btn btn-cyan btn-xs font-bold flex-center gap-1"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setIsEpisodesExpanded(prev => !prev);
+                }}
+              >
+                {isEpisodesExpanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+                <span>{isEpisodesExpanded ? '▲ Thu Gọn Lại' : `▼ Mở Rộng Chọn Tập (${files.length} tập)`}</span>
+              </button>
+            </div>
+          </div>
 
+          {/* Full Selection Controls & Pill Grid (Visible only when expanded) */}
+          {isEpisodesExpanded ? (
+            <div className="mt-3" style={{ animation: 'fadeIn 0.2s ease' }}>
+              {/* Search, Filter & Bulk Selection Controls */}
               {files.length > 0 && (
-                <button
-                  className="btn btn-secondary btn-xs font-bold text-cyan flex-center gap-1"
-                  onClick={() => setIsEpisodesExpanded(prev => !prev)}
-                  title={isEpisodesExpanded ? "Thu gọn danh sách tập" : "Mở rộng danh sách tất cả các tập"}
-                >
-                  {isEpisodesExpanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
-                  <span>{isEpisodesExpanded ? 'Thu Gọn Danh Sách' : `Mở Rộng (${sortedFiles.length} tập)`}</span>
-                </button>
+                <div className="file-filter-toolbar mb-3" style={{ background: 'rgba(0,0,0,0.3)', padding: '8px 12px', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.06)' }}>
+                  <div className="search-box" style={{ maxWidth: '320px', flex: 1 }}>
+                    <Search size={15} className="search-icon" />
+                    <input
+                      type="text"
+                      placeholder="🔍 Tìm mã tập (VD: c9, c2, b2, tập 1, SubGoc...)..."
+                      value={searchQuery}
+                      onChange={e => setSearchQuery(e.target.value)}
+                      className="input-field input-sm"
+                      autoFocus
+                    />
+                    {searchQuery && (
+                      <button
+                        className="btn-clear-search text-muted"
+                        onClick={() => setSearchQuery('')}
+                      >
+                        ✕
+                      </button>
+                    )}
+                  </div>
+
+                  <div className="filter-controls-group flex-wrap gap-2">
+                    {/* Search Quick Selection Buttons */}
+                    {searchQuery && sortedFiles.length > 0 ? (
+                      <>
+                        <button
+                          className="btn btn-green-glow btn-xs font-bold"
+                          onClick={handleKeepOnlyFiltered}
+                          title={`Bỏ chọn các tập khác và CHỈ CHỌN đúng ${sortedFiles.length} tập đang khớp với "${searchQuery}"`}
+                        >
+                          <CheckCircle2 size={13} /> CHỈ CHỌN {sortedFiles.length} TẬP ĐANG LỌC
+                        </button>
+                        <button
+                          className="btn btn-cyan btn-xs font-bold"
+                          onClick={handleSelectAllFiltered}
+                          title={`Thêm ${sortedFiles.length} tập đang lọc vào danh sách chọn`}
+                        >
+                          [✓] Thêm {sortedFiles.length} Tập
+                        </button>
+                        <button
+                          className="btn btn-secondary btn-xs text-red"
+                          onClick={handleDeselectAllFiltered}
+                          title={`Bỏ chọn ${sortedFiles.length} tập đang lọc`}
+                        >
+                          [✕] Bỏ {sortedFiles.length} Tập
+                        </button>
+                      </>
+                    ) : (
+                      <>
+                        <button className="btn btn-secondary btn-xs font-bold" onClick={handleSelectAllFiles}>
+                          [✓] Chọn Tất Cả ({files.length} tập)
+                        </button>
+                        <button className="btn btn-secondary btn-xs" onClick={handleDeselectAllFiles}>
+                          [✕] Chọn 1 Tập
+                        </button>
+                      </>
+                    )}
+
+                    <div className="select-with-icon">
+                      <Filter size={13} className="text-cyan" />
+                      <select
+                        value={statusFilter}
+                        onChange={e => setStatusFilter(e.target.value)}
+                        className="input-field select-field input-xs"
+                      >
+                        <option value="all">Tất cả ({files.length})</option>
+                        <option value="pending">Chưa dịch</option>
+                        <option value="done">Đã dịch xong</option>
+                      </select>
+                    </div>
+
+                    <div className="select-with-icon">
+                      <ArrowUpDown size={13} className="text-cyan" />
+                      <select
+                        value={sortOption}
+                        onChange={e => setSortOption(e.target.value)}
+                        className="input-field select-field input-xs"
+                      >
+                        <option value="natural">Tự nhiên (1, 2, ... 10)</option>
+                        <option value="name_asc">Tên A &rarr; Z</option>
+                        <option value="name_desc">Tên Z &rarr; A</option>
+                        <option value="lines_desc">Số dòng (Nhiều &rarr; Ít)</option>
+                      </select>
+                    </div>
+                  </div>
+                </div>
               )}
-            </div>
-          </div>
 
-          {/* Search, Filter & Bulk Selection Controls */}
-          {files.length > 0 && (
-            <div className="file-filter-toolbar mb-3" style={{ background: 'rgba(0,0,0,0.3)', padding: '8px 12px', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.06)' }}>
-              <div className="search-box" style={{ maxWidth: '320px', flex: 1 }}>
-                <Search size={15} className="search-icon" />
-                <input
-                  type="text"
-                  placeholder="🔍 Tìm mã tập (VD: c9, c2, b2, tập 1, SubGoc...)..."
-                  value={searchQuery}
-                  onChange={e => {
-                    setSearchQuery(e.target.value);
-                    if (e.target.value && !isEpisodesExpanded) setIsEpisodesExpanded(true);
-                  }}
-                  className="input-field input-sm"
-                />
-                {searchQuery && (
-                  <button
-                    className="btn-clear-search text-muted"
-                    onClick={() => setSearchQuery('')}
-                  >
-                    ✕
-                  </button>
-                )}
-              </div>
+              <div className="file-checkboxes-grid expanded">
+                {sortedFiles.map(f => {
+                  const isChecked = selectedFileIds.includes(f.id);
+                  const translatedCount = f.subtitles.filter(s => s.status === 'translated' || s.status === 'edited').length;
+                  const isDone = translatedCount === f.subtitles.length && f.subtitles.length > 0;
 
-              <div className="filter-controls-group flex-wrap gap-2">
-                {/* Search Quick Selection Buttons */}
-                {searchQuery && sortedFiles.length > 0 ? (
-                  <>
+                  return (
+                    <label key={f.id} className={`file-checkbox-pill ${isChecked ? 'checked' : ''} ${isDone ? 'done-border' : ''}`}>
+                      <input
+                        type="checkbox"
+                        checked={isChecked}
+                        onChange={() => handleToggleSelectFile(f.id)}
+                      />
+                      <span className="file-pill-name" title={f.name}>{f.name}</span>
+                      <span className="file-pill-lines">({f.subtitles.length} dòng)</span>
+                      {isDone && <span className="text-emerald" style={{ fontSize: '0.7rem', marginLeft: '4px' }}>✓</span>}
+                    </label>
+                  );
+                })}
+
+                {sortedFiles.length === 0 && files.length > 0 && (
+                  <div className="empty-state-filter p-2 text-muted" style={{ fontSize: '0.85rem' }}>
+                    Không tìm thấy tập nào khớp với từ khóa "<span className="highlight-cyan">{searchQuery}</span>".
                     <button
-                      className="btn btn-green-glow btn-xs font-bold"
-                      onClick={handleKeepOnlyFiltered}
-                      title={`Bỏ chọn các tập khác và CHỈ CHỌN đúng ${sortedFiles.length} tập đang khớp với "${searchQuery}"`}
+                      className="btn btn-secondary btn-xs ml-2"
+                      onClick={() => { setSearchQuery(''); setStatusFilter('all'); }}
                     >
-                      <CheckCircle2 size={13} /> CHỈ CHỌN {sortedFiles.length} TẬP ĐANG LỌC
+                      Xóa bộ lọc
                     </button>
-                    <button
-                      className="btn btn-cyan btn-xs font-bold"
-                      onClick={handleSelectAllFiltered}
-                      title={`Thêm ${sortedFiles.length} tập đang lọc vào danh sách chọn`}
-                    >
-                      [✓] Thêm {sortedFiles.length} Tập
-                    </button>
-                    <button
-                      className="btn btn-secondary btn-xs text-red"
-                      onClick={handleDeselectAllFiltered}
-                      title={`Bỏ chọn ${sortedFiles.length} tập đang lọc`}
-                    >
-                      [✕] Bỏ {sortedFiles.length} Tập
-                    </button>
-                  </>
-                ) : (
-                  <>
-                    <button className="btn btn-secondary btn-xs font-bold" onClick={handleSelectAllFiles}>
-                      [✓] Chọn Tất Cả ({files.length} tập)
-                    </button>
-                    <button className="btn btn-secondary btn-xs" onClick={handleDeselectAllFiles}>
-                      [✕] Chọn 1 Tập
-                    </button>
-                  </>
+                  </div>
                 )}
 
-                <div className="select-with-icon">
-                  <Filter size={13} className="text-cyan" />
-                  <select
-                    value={statusFilter}
-                    onChange={e => setStatusFilter(e.target.value)}
-                    className="input-field select-field input-xs"
-                  >
-                    <option value="all">Tất cả ({files.length})</option>
-                    <option value="pending">Chưa dịch</option>
-                    <option value="done">Đã dịch xong</option>
-                  </select>
-                </div>
-
-                <div className="select-with-icon">
-                  <ArrowUpDown size={13} className="text-cyan" />
-                  <select
-                    value={sortOption}
-                    onChange={e => setSortOption(e.target.value)}
-                    className="input-field select-field input-xs"
-                  >
-                    <option value="natural">Tự nhiên (1, 2, ... 10)</option>
-                    <option value="name_asc">Tên A &rarr; Z</option>
-                    <option value="name_desc">Tên Z &rarr; A</option>
-                    <option value="lines_desc">Số dòng (Nhiều &rarr; Ít)</option>
-                  </select>
-                </div>
+                {files.length === 0 && <span className="text-muted">Chưa có file SRT nào trong danh sách. Hãy nạp file SRT ở tab Trình Dịch.</span>}
               </div>
-            </div>
-          )}
 
-          <div className={`file-checkboxes-grid ${isEpisodesExpanded ? 'expanded' : 'collapsed'}`}>
-            {sortedFiles.map(f => {
-              const isChecked = selectedFileIds.includes(f.id);
-              const translatedCount = f.subtitles.filter(s => s.status === 'translated' || s.status === 'edited').length;
-              const isDone = translatedCount === f.subtitles.length && f.subtitles.length > 0;
-
-              return (
-                <label key={f.id} className={`file-checkbox-pill ${isChecked ? 'checked' : ''} ${isDone ? 'done-border' : ''}`}>
-                  <input
-                    type="checkbox"
-                    checked={isChecked}
-                    onChange={() => handleToggleSelectFile(f.id)}
-                  />
-                  <span className="file-pill-name" title={f.name}>{f.name}</span>
-                  <span className="file-pill-lines">({f.subtitles.length} dòng)</span>
-                  {isDone && <span className="text-emerald" style={{ fontSize: '0.7rem', marginLeft: '4px' }}>✓</span>}
-                </label>
-              );
-            })}
-
-            {sortedFiles.length === 0 && files.length > 0 && (
-              <div className="empty-state-filter p-2 text-muted" style={{ fontSize: '0.85rem' }}>
-                Không tìm thấy tập nào khớp với từ khóa "<span className="highlight-cyan">{searchQuery}</span>".
+              {/* Bottom Quick Collapse Action */}
+              <div className="flex-center mt-2">
                 <button
-                  className="btn btn-secondary btn-xs ml-2"
-                  onClick={() => { setSearchQuery(''); setStatusFilter('all'); }}
+                  type="button"
+                  className="btn btn-secondary btn-xs font-bold text-muted"
+                  onClick={() => setIsEpisodesExpanded(false)}
                 >
-                  Xóa bộ lọc
+                  <ChevronUp size={13} /> Thu Gọn Danh Sách Tập Lại
                 </button>
               </div>
-            )}
-
-            {files.length === 0 && <span className="text-muted">Chưa có file SRT nào trong danh sách. Hãy nạp file SRT ở tab Trình Dịch.</span>}
-          </div>
-
-          {!isEpisodesExpanded && sortedFiles.length > 4 && (
+            </div>
+          ) : (
+            /* Summary preview when collapsed */
             <div
-              className="episodes-expand-hint"
+              className="episodes-expand-hint mt-2"
               onClick={() => setIsEpisodesExpanded(true)}
-              title="Bấm để mở rộng toàn bộ danh sách tập"
+              title="Bấm để mở rộng toàn bộ danh sách tập phim & tìm kiếm"
             >
-              <span>▼ Còn {sortedFiles.length - 4} tập khác &bull; Bấm để mở rộng toàn bộ</span>
+              <span>📁 {formatFileRangeTitle(selectedFilesList)} ({selectedFileIds.length} / {files.length} tập chọn) &bull; Bấm để mở rộng danh sách & bộ lọc</span>
+              <ChevronDown size={14} />
             </div>
           )}
         </div>
