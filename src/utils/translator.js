@@ -94,7 +94,12 @@ BẮT BUỘC TUÂN THỦ QUY TẮC CỐT LÕI (DỊCH SANG TIẾNG VIỆT CỔ T
    BẢNG JSON GLOSSARY:
    ${termsJsonString}
 
-2. XƯNG HÔ & TÊN: 
+2. LIÊN KẾT MẠCH TRUYỆN & NGỮ CẢNH LIỀN TRƯỚC (CONTEXT-AWARE):
+   - Trong mỗi khối phụ đề gửi đến có kèm mục "NGỮ CẢNH CÂU THOẠI LIỀN TRƯỚC".
+   - BẮT BUỘC đọc ngữ cảnh trước để xác định rõ ai đang nói với ai, quan hệ nhân vật (sư đồ, kẻ thù, đạo lữ, tôn chủ - thuộc hạ) nhằm giữ ĐẠI TỪ XƯNG HÔ (ta - ngươi, hắn - nàng, bổn tọa, tiền bối, sư tôn) ĐỒNG NHẤT 100% xuyên suốt các khối.
+   - TUYỆT ĐỐI KHÔNG dịch các câu trong phần ngữ cảnh liền trước, CHỈ DỊCH các câu trong "DANH SÁCH PHỤ ĐỀ MỤC TIÊU".
+
+3. XƯNG HÔ & TÊN: 
    - Đặt theo vị trí: [Tên + Danh xưng] (VD: 苏师兄 -> Tô sư huynh, 林师姐 -> Lâm sư tỷ, 叶前辈 -> Diệp tiền bối, 陈长老 -> Trần trưởng lão, 王宗主 -> Vương tông chủ). CẤM đảo thành "Sư huynh Tô", "Sư tỷ Lâm".
    - 师尊 -> sư tôn, 师父 -> sư phụ, 前辈 -> tiền bối, 晚辈 -> vãn bối, 道友 -> đạo hữu, 阁下 -> các hạ.
    - Đại từ quyền uy: 本座 -> bổn tọa, 本尊 -> bổn tôn, 本帝 -> bổn đế, 本王 -> bổn vương. KHÔNG dịch thành "tôi".
@@ -172,6 +177,7 @@ function parseJSONArrayFromText(rawText) {
 // Orimise API Translator (OpenAI Compatible Format)
 export async function translateBatchWithOrimise({
   subtitles,
+  contextSubtitles = [],
   apiKey,
   baseUrl = 'https://api.orimise.com/v1',
   systemPrompt,
@@ -190,10 +196,16 @@ export async function translateBatchWithOrimise({
     text: sub.originalText
   }));
 
+  let contextBlock = '';
+  if (contextSubtitles && contextSubtitles.length > 0) {
+    const contextItems = contextSubtitles.map(s => `[Dòng ${s.index}]: ${s.translatedText || s.originalText}`).join('\n');
+    contextBlock = `NGỮ CẢNH CÂU THOẠI LIỀN TRƯỚC (Dùng để hiểu mạch truyện & giữ nhất quán xưng hô đại từ, TUYỆT ĐỐI KHÔNG DỊCH LẠI CÁC CÂU NÀY):\n${contextItems}\n\n`;
+  }
+
   const userContent = `BẢNG TỪ ĐIỂN JSON GLOSSARY BẮT BUỘC DÙNG KHI DỊCH:
 ${JSON.stringify(relevantGlossary, null, 2)}
 
-DANH SÁCH PHỤ ĐỀ CẦN DỊCH SANG TIẾNG VIỆT TU TIÊN (Xuất duy nhất JSON array [{"id": 1, "translatedText": "..."}]):
+${contextBlock}DANH SÁCH PHỤ ĐỀ MỤC TIÊU CẦN DỊCH (Xuất duy nhất JSON array [{"id": 1, "translatedText": "..."}]):
 ${JSON.stringify(inputPayload, null, 2)}`;
 
   const endpoint = baseUrl.endsWith('/chat/completions')
@@ -251,6 +263,7 @@ ${JSON.stringify(inputPayload, null, 2)}`;
 // Google Gemini API Translator
 export async function translateBatchWithGemini({
   subtitles,
+  contextSubtitles = [],
   apiKey,
   systemPrompt,
   glossary = [],
@@ -268,10 +281,16 @@ export async function translateBatchWithGemini({
     text: sub.originalText
   }));
 
+  let contextBlock = '';
+  if (contextSubtitles && contextSubtitles.length > 0) {
+    const contextItems = contextSubtitles.map(s => `[Dòng ${s.index}]: ${s.translatedText || s.originalText}`).join('\n');
+    contextBlock = `NGỮ CẢNH CÂU THOẠI LIỀN TRƯỚC (Dùng để hiểu mạch truyện & giữ nhất quán xưng hô đại từ, TUYỆT ĐỐI KHÔNG DỊCH LẠI CÁC CÂU NÀY):\n${contextItems}\n\n`;
+  }
+
   const userContent = `BẢNG TỪ ĐIỂN JSON GLOSSARY BẮT BUỘC DÙNG KHI DỊCH:
 ${JSON.stringify(relevantGlossary, null, 2)}
 
-DANH SÁCH PHỤ ĐỀ CẦN DỊCH SANG TIẾNG VIỆT TU TIÊN (Xuất duy nhất JSON array [{"id": 1, "translatedText": "..."}]):
+${contextBlock}DANH SÁCH PHỤ ĐỀ MỤC TIÊU CẦN DỊCH (Xuất duy nhất JSON array [{"id": 1, "translatedText": "..."}]):
 ${JSON.stringify(inputPayload, null, 2)}`;
 
   const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
@@ -332,9 +351,104 @@ ${JSON.stringify(inputPayload, null, 2)}`;
 }
 
 /**
- * ⚡ TURBO MULTI-THREADING TRANSLATION ENGINE
- * Breaks subtitles into optimized batches and executes concurrent worker threads in parallel.
- * Speeds up translation by 300% - 500%!
+ * ⚡ Helper translating a single chunk with up to 3 automatic retries and fallback subdivision
+ */
+async function translateChunkWithResilience({
+  chunk,
+  contextSubtitles,
+  isOrimise,
+  apiKey,
+  baseUrl,
+  systemPrompt,
+  glossary,
+  model,
+  retryCount = 0
+}) {
+  const maxRetries = 3;
+  try {
+    if (isOrimise) {
+      return await translateBatchWithOrimise({
+        subtitles: chunk,
+        contextSubtitles,
+        apiKey,
+        baseUrl,
+        systemPrompt,
+        glossary,
+        model
+      });
+    } else {
+      return await translateBatchWithGemini({
+        subtitles: chunk,
+        contextSubtitles,
+        apiKey,
+        systemPrompt,
+        glossary,
+        model
+      });
+    }
+  } catch (err) {
+    if (retryCount < maxRetries) {
+      const delayMs = (retryCount + 1) * 1500;
+      console.warn(`[Auto-Retry] Khối dịch gặp lỗi "${err.message}". Đang tự động thử lại lần ${retryCount + 1}/${maxRetries} sau ${delayMs}ms...`);
+      await new Promise(r => setTimeout(r, delayMs));
+
+      return await translateChunkWithResilience({
+        chunk,
+        contextSubtitles,
+        isOrimise,
+        apiKey,
+        baseUrl,
+        systemPrompt,
+        glossary,
+        model,
+        retryCount: retryCount + 1
+      });
+    }
+
+    // Fallback: If 3 retries failed and chunk has more than 5 lines, split in half
+    if (chunk.length > 5) {
+      console.warn(`[Auto-Split Fallback] Chia nhỏ khối ${chunk.length} dòng thành 2 nửa để giải quyết lỗi Bad Request...`);
+      const mid = Math.floor(chunk.length / 2);
+      const half1 = chunk.slice(0, mid);
+      const half2 = chunk.slice(mid);
+
+      const map1 = await translateChunkWithResilience({
+        chunk: half1,
+        contextSubtitles,
+        isOrimise,
+        apiKey,
+        baseUrl,
+        systemPrompt,
+        glossary,
+        model,
+        retryCount: 0
+      });
+
+      const map2 = await translateChunkWithResilience({
+        chunk: half2,
+        contextSubtitles: half1,
+        isOrimise,
+        apiKey,
+        baseUrl,
+        systemPrompt,
+        glossary,
+        model,
+        retryCount: 0
+      });
+
+      const combinedMap = new Map();
+      map1.forEach((val, key) => combinedMap.set(key, val));
+      map2.forEach((val, key) => combinedMap.set(key, val));
+      return combinedMap;
+    }
+
+    throw err;
+  }
+}
+
+/**
+ * ⚡ TURBO MULTI-THREADING TRANSLATION ENGINE (CONTEXT-AWARE & AUTO-RETRY RESILIENT)
+ * Breaks subtitles into optimized batches with sliding context window and executes concurrent worker threads.
  */
 export async function translateSubtitlesWithThreadPool({
   subtitles,
@@ -346,17 +460,26 @@ export async function translateSubtitlesWithThreadPool({
   model,
   batchSize = 25,
   concurrency = 4,
-  onProgress // (completedChunks, totalChunks, completedLines, totalLines) => void
+  onProgress // (completedChunks, totalChunks, completedLines, totalLines, currentStatus) => void
 }) {
   if (!subtitles || subtitles.length === 0) return new Map();
 
-  // 1. Break subtitles into chunks
-  const chunks = [];
+  // 1. Break subtitles into chunks with their context lines
+  const chunkObjects = [];
   for (let i = 0; i < subtitles.length; i += batchSize) {
-    chunks.push(subtitles.slice(i, i + batchSize));
+    const chunk = subtitles.slice(i, i + batchSize);
+    const contextSubtitles = i > 0
+      ? subtitles.slice(Math.max(0, i - 3), i)
+      : [];
+
+    chunkObjects.push({
+      chunk,
+      contextSubtitles,
+      startIndex: i
+    });
   }
 
-  const totalChunks = chunks.length;
+  const totalChunks = chunkObjects.length;
   let completedChunks = 0;
   const resultMap = new Map();
 
@@ -364,79 +487,47 @@ export async function translateSubtitlesWithThreadPool({
   let chunkQueueIndex = 0;
 
   async function worker(workerId) {
-    while (chunkQueueIndex < chunks.length) {
+    while (chunkQueueIndex < chunkObjects.length) {
       const currentIdx = chunkQueueIndex++;
-      const chunk = chunks[currentIdx];
+      const { chunk, contextSubtitles } = chunkObjects[currentIdx];
 
-      let chunkResultMap;
       try {
-        if (isOrimise) {
-          chunkResultMap = await translateBatchWithOrimise({
-            subtitles: chunk,
-            apiKey,
-            baseUrl,
-            systemPrompt,
-            glossary,
-            model
-          });
-        } else {
-          chunkResultMap = await translateBatchWithGemini({
-            subtitles: chunk,
-            apiKey,
-            systemPrompt,
-            glossary,
-            model
-          });
-        }
-      } catch (err) {
-        // Auto-retry once with 1.2s delay if transient rate-limit or network hiccup occurs
-        await new Promise(r => setTimeout(r, 1200));
-        try {
-          if (isOrimise) {
-            chunkResultMap = await translateBatchWithOrimise({
-              subtitles: chunk,
-              apiKey,
-              baseUrl,
-              systemPrompt,
-              glossary,
-              model
-            });
-          } else {
-            chunkResultMap = await translateBatchWithGemini({
-              subtitles: chunk,
-              apiKey,
-              systemPrompt,
-              glossary,
-              model
-            });
-          }
-        } catch (retryErr) {
-          console.error(`[Worker ${workerId}] Batch ${currentIdx + 1} failed after retry:`, retryErr);
-          throw retryErr;
-        }
-      }
+        const chunkResultMap = await translateChunkWithResilience({
+          chunk,
+          contextSubtitles,
+          isOrimise,
+          apiKey,
+          baseUrl,
+          systemPrompt,
+          glossary,
+          model
+        });
 
-      if (chunkResultMap) {
-        chunkResultMap.forEach((val, key) => resultMap.set(key, val));
-      }
-
-      completedChunks++;
-      if (onProgress) {
-        onProgress(
-          completedChunks,
-          totalChunks,
-          Math.min(completedChunks * batchSize, subtitles.length),
-          subtitles.length
-        );
+        if (chunkResultMap) {
+          chunkResultMap.forEach((val, key) => resultMap.set(key, val));
+        }
+      } catch (fatalErr) {
+        console.error(`[Worker ${workerId}] Khối ${currentIdx + 1} không thể dịch sau nhiều lần thử:`, fatalErr);
+      } finally {
+        completedChunks++;
+        if (onProgress) {
+          onProgress(
+            completedChunks,
+            totalChunks,
+            Math.min(completedChunks * batchSize, subtitles.length),
+            subtitles.length
+          );
+        }
       }
     }
   }
 
   // 3. Launch pool of parallel workers
-  const numWorkers = Math.min(Math.max(1, concurrency), chunks.length);
+  const numWorkers = Math.min(Math.max(1, concurrency), chunkObjects.length);
   const workers = Array.from({ length: numWorkers }, (_, i) => worker(i + 1));
   await Promise.all(workers);
 
   return resultMap;
 }
+
 
