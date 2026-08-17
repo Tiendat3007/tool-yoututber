@@ -1,4 +1,4 @@
-// YouTube Metadata & Thumbnail Prompt AI Engine (Bulletproof JSON Parser)
+// YouTube Metadata & Thumbnail Prompt AI Engine (Supercharged AI Generation)
 
 function safeParseAIJson(rawText) {
   if (!rawText) return null;
@@ -120,74 +120,80 @@ export async function generateYoutubeContent({
   // Allow up to 14,000 characters of rich transcript context
   const fullTranscriptContext = sampledLines.substring(0, 14000);
 
-  const systemPrompt = `You are a World-Class YouTube Growth Expert & Viral Content Strategist specializing in Review Truyện Tranh / Manhua / Anime 3D / Phim Tu Tiên.
+  const systemPrompt = `You are an Elite YouTube Creative Director & AI Prompt Master specializing in 3D Anime / Manhua / Donghua / Tu Tiên review channels.
 
-YOUR MISSION:
-1. ĐỌC KỸ TOÀN BỘ NỘI DUNG PHỤ ĐỀ SRT BÊN DƯỚI ĐỂ HIỂU RÕ CỐT TRUYỆN:
-   - Ai là nhân vật chính? Nghịch cảnh/biến cố gì đang xảy ra (bị trục xuất, hủy hôn, hãm hại, xuyên không, thức tỉnh...)?
-   - Xuất hiện công pháp, bảo vật, cảnh giới tu luyện, tông môn hay kẻ thù nào?
-   - Đâu là các phân đoạn cao trào, vả mặt, đột phá, trả thù hay bí mật lớn nhất trong các tập phim này?
+YOUR COMPREHENSIVE GENERATION DIRECTIVE:
+Phân tích toàn bộ phụ đề kịch bản SRT để xuất trọn bộ YouTube Publishing Pack có tính TƯƠNG HỖ VÀ LIÊN KẾT CAO GIỮA TITLE - TEXT THUMBNAIL - PROMPT ẢNH:
 
-2. TẠO 5 TIÊU ĐỀ YOUTUBE DỰA TRÊN CỐT TRUYỆN THỰC TẾ + CÔNG THỨC 80-90 KÝ TỰ:
-   - Áp dụng cấu trúc vàng: [Xuyên Không/Trọng Sinh] + [Nghịch cảnh thực tế trong phim] + [Hệ Thống/Bảo Vật/Cơ Duyên thực tế] + [Sức mạnh] + [Kết quả bá đạo]
-   - BẮT BUỘC ĐỘ DÀI: 80 - 90 ký tự (chuẩn SEO & tỷ lệ click CTR YouTube cao nhất).
-   - TUYỆT ĐỐI KHÔNG sao chép ví dụ mẫu nguyên văn. Phải lấy đúng nhân vật, biến cố và tình tiết có trong phụ đề để sáng tác!
-   - Không dùng tên riêng đích danh (Dùng: "Hắn", "Kẻ Phế Vật", "Gã Đệ Tử Tạp Dịch", "Đại Lão Ẩn Thân", "Ma Tôn", "Bản Tọa"...).
-   - Đặt 5 góc nhìn khác nhau:
-     * Tiêu đề 1: Theo hướng Xuyên Không / Hệ Thống / Vô Địch bá đạo.
-     * Tiêu đề 2: Theo hướng Bị Coi Thường / Thức Tỉnh Nghịch Thiên / Đột Phá.
-     * Tiêu đề 3: Theo hướng Đệ Tử Tạp Dịch / Nhận Thần Công / Đánh Dấu.
-     * Tiêu đề 4: Theo hướng Tu Vi Khủng / Vạn Năm Tu Vi / Quét Ngang Thiên Hạ.
-     * Tiêu đề 5: Theo hướng Thân Phận Ẩn / Tuyệt Thế Chí Tôn / Khiến Cả Tông Môn Khiếp Sợ.
+1. QUY TẮC TIÊU ĐỀ YOUTUBE (titles - 5 Tiêu Đề):
+   - ĐỘ DÀI CHUẨN: 80 - 90 KÝ TỰ (Đúng điểm ngọt thuật toán YouTube CTR & SEO).
+   - CÔNG THỨC VÀNG 5 THÀNH PHẦN:
+     [Xuyên Không/Trọng Sinh] + [Nghịch Cảnh Trong Phim] + [Cơ Duyên/Hệ Thống] + [Sức Mạnh Đạt Được] + [Kết Quả Bá Đạo]
+   - KHÔNG dùng tên riêng đích danh (Dùng danh xưng: Hắn, Kẻ Phế Vật, Gã Đệ Tử Tạp Dịch, Ma Tôn, Tuyệt Thế Cao Thủ...).
+   - Tạo 5 Tiêu Đề theo 5 góc độ hấp dẫn khác nhau từ chính diễn biến phim (1: Vô Địch Hệ Thống, 2: Vả Mặt Đột Phá, 3: Cơ Duyên Thần Công, 4: Vạn Năm Tu Vi, 5: Thân Phận Ẩn).
 
-3. TẠO 3 MẪU CHỮ THUMBNAIL 2 DÒNG (7-8 TỪ MỖI DÒNG):
-   - Phải trích xuất 2 câu giật gân, cao trào nhất từ đúng diễn biến trong tập phim đã đọc.
-   - Mỗi dòng chuẩn 7 đến 8 từ, viết HOA, kịch tính, gây tò mò tột độ.
+2. QUY TẮC CHỮ THUMBNAIL 2 DÒNG (thumbnailTexts - 3 Mẫu 2 Dòng):
+   - MỖI DÒNG ĐÚNG 7 ĐẾN 8 TỪ, viết HOA toàn bộ.
+   - NGUYÊN TẮC ĐỐI XỨNG TƯƠNG PHẢN (GÂY TÒ MÒ CỰC ĐỘ):
+     * DÒNG 1 (Chữ Vàng 3D): Nêu nghịch cảnh/nguy nan/thách thức lớn nhất trong tập phim.
+     * DÒNG 2 (Chữ Xanh 3D): Nêu cú phản đòn/thức tỉnh/vả mặt rung chuyển tông môn.
+   - Ví dụ:
+     Line 1: "VỪA XUYÊN KHÔNG ĐÃ BỊ TỐNG VÀO HẦM NGỤC" (8 từ)
+     Line 2: "KÍCH HOẠT HỆ THỐNG VÔ ĐỊCH QUÉT SẠCH TÔNG MÔN" (8 từ)
 
-4. TẠO PROMPT ẢNH VÀ MÔ TẢ:
-   - imagePromptEn: Chi tiết 16:9 Midjourney/Flux prompt mô tả đúng ngoại hình nhân vật, y phục, ánh sáng linh lực, tông môn xuất hiện trong phim, 8k cinematic.
-   - description: Tóm tắt hấp dẫn diễn biến kịch tính theo từng phân đoạn trong các tập phim kèm lời kêu gọi đăng ký và hashtags.
-   - tags: Các từ khóa SEO YouTube liên quan trực tiếp đến phim và thể loại.
+3. QUY TẮC PROMPT ẢNH MIDJOURNEY / FLUX (imagePromptEn & imagePromptVi):
+   - imagePromptEn: Viết bằng tiếng Anh chuẩn Prompt Master cho Midjourney v6/Flux.1:
+     * Chủ thể: Nhân vật chính nam/nữ với thần thái bá đạo, mắt lóe sáng linh lực rực rỡ (glowing sacred eyes), áo choàng Tiên Hiệp tung bay trong gió (flowing Xianxia robe with intricate golden embroidery).
+     * Tư thế: Đang tung chưởng hoặc rút thần kiếm phát ra năng lượng sấm sét cuồn cuộn (summoning ancient divine sword, lightning aura).
+     * Bối cảnh: Khung cảnh tông môn Tiên Hiệp cổ kính kỳ vĩ, thiên kiếp mây đen bao phủ hoặc cung điện hoàng kim đổ nát (ancient Chinese floating mountains, thunderstorm sky, dramatic lighting, octane render 8k, cinematic composition, framed with negative center space for bold 3D text overlay --ar 16:9).
+   - imagePromptVi: Mô tả ý tưởng chi tiết bằng tiếng Việt (bố cục nhân vật, ánh sáng, góc đặt chữ 2 dòng).
 
-REQUIRED OUTPUT JSON SCHEMA (Output ONLY valid JSON, no markdown outside JSON):
+4. MÔ TẢ (description) & TAGS (tags):
+   - description: Viết đoạn mô tả cuốn hút, tóm tắt các nút thắt cao trào của các tập phim, chèn mốc thời gian và lời kêu gọi bấm Đăng Ký.
+   - tags: Chuỗi từ khóa SEO YouTube phân cách bởi dấu phẩy.
+
+REQUIRED OUTPUT JSON FORMAT (Return ONLY valid JSON):
 {
   "titles": [
-    "💥 [Tiêu đề 1 tạo từ cốt truyện thật, chuẩn 80-90 ký tự]",
-    "🔥 [Tiêu đề 2 tạo từ cốt truyện thật, chuẩn 80-90 ký tự]",
-    "⚡ [Tiêu đề 3 tạo từ cốt truyện thật, chuẩn 80-90 ký tự]",
-    "👑 [Tiêu đề 4 tạo từ cốt truyện thật, chuẩn 80-90 ký tự]",
-    "😱 [Tiêu đề 5 tạo từ cốt truyện thật, chuẩn 80-90 ký tự]"
+    "💥 [Tiêu đề 1 chuẩn 80-90 ký tự dựa theo phim]",
+    "🔥 [Tiêu đề 2 chuẩn 80-90 ký tự dựa theo phim]",
+    "⚡ [Tiêu đề 3 chuẩn 80-90 ký tự dựa theo phim]",
+    "👑 [Tiêu đề 4 chuẩn 80-90 ký tự dựa theo phim]",
+    "😱 [Tiêu đề 5 chuẩn 80-90 ký tự dựa theo phim]"
   ],
   "thumbnailTexts": [
-    { 
-      "line1": "DÒNG 1 KỊCH TÍNH DỰA THEO PHIM ĐÚNG 7 ĐẾN 8 TỪ", 
-      "line2": "DÒNG 2 BIẾN CỐ DỰA THEO PHIM ĐÚNG 7 ĐẾN 8 TỪ" 
+    {
+      "line1": "DÒNG 1 NGHỊCH CẢNH CỦA PHIM ĐÚNG 7 ĐẾN 8 TỪ",
+      "line2": "DÒNG 2 PHẢN ĐÒN VẢ MẶT CỦA PHIM ĐÚNG 7 ĐẾN 8 TỪ"
     },
-    { 
-      "line1": "DÒNG 1 CAO TRÀO DỰA THEO PHIM ĐÚNG 7 ĐẾN 8 TỪ", 
-      "line2": "DÒNG 2 CAO TRÀO DỰA THEO PHIM ĐÚNG 7 ĐẾN 8 TỪ" 
+    {
+      "line1": "DÒNG 1 BIẾN CỐ BẤT NGỜ ĐÚNG 7 ĐẾN 8 TỪ",
+      "line2": "DÒNG 2 ĐỘT PHÁ BÁ ĐẠO ĐÚNG 7 ĐẾN 8 TỪ"
     },
-    { 
-      "line1": "DÒNG 1 VẢ MẶT DỰA THEO PHIM ĐÚNG 7 ĐẾN 8 TỪ", 
-      "line2": "DÒNG 2 VẢ MẶT DỰA THEO PHIM ĐÚNG 7 ĐẾN 8 TỪ" 
+    {
+      "line1": "DÒNG 1 THÁCH THỨC SINH TỬ ĐÚNG 7 ĐẾN 8 TỪ",
+      "line2": "DÒNG 2 QUÉT NGANG THIÊN HẠ ĐÚNG 7 ĐẾN 8 TỪ"
     }
   ],
-  "imagePromptEn": "Detailed 16:9 Midjourney/Flux prompt with character, aura, lighting, 8k --ar 16:9",
-  "imagePromptVi": "Mô tả ý tưởng ảnh bằng tiếng Việt",
-  "description": "Mô tả video YouTube chi tiết",
-  "tags": "tu tiên, tóm tắt phim, review phim, xuyên không"
+  "imagePromptEn": "Cinematic 16:9 master piece of Xianxia protagonist with glowing eyes and golden dragon aura...",
+  "imagePromptVi": "Mô tả ý tưởng hình ảnh thumbnail bằng tiếng Việt...",
+  "description": "Mô tả video YouTube chi tiết theo các tập phim...",
+  "tags": "tu tiên, tóm tắt phim, review phim tu tiên..."
 }`;
 
   const userMessage = `THỂ LOẠI: ${genre}
 ĐỊNH DẠNG: ${contentType}
 DANH SÁCH TẬP PHIM (${selectedFiles.length} TẬP): ${fileNames}
 
-=== NỘI DUNG PHỤ ĐỀ PHIM (TRÍCH ĐOẠN CHI TIẾT TỪ TOÀN BỘ CÁC TẬP) ===
+=== TOÀN BỘ DIỄN BIẾN PHỤ ĐỀ SRT TRÍCH ĐOẠN ĐẦY ĐỦ ===
 ${fullTranscriptContext}
-=== HẾT NỘI DUNG PHỤ ĐỀ ===
+=== HẾT DIỄN BIẾN PHỤ ĐỀ ===
 
-YÊU CẦU:
-Đọc kỹ toàn bộ cốt truyện phụ đề trên. Hãy kết hợp các tình tiết, sự kiện thực tế trong phim với bộ công thức 80-90 ký tự và chữ Thumbnail 2 dòng (7-8 từ/dòng) để xuất ra 1 đoạn JSON chuẩn xác 100%:`;
+YÊU CẦU ĐẶC BIỆT:
+1. Đọc kỹ diễn biến trên và tạo 5 Tiêu Đề chuẩn công thức 80-90 ký tự.
+2. Tạo 3 Mẫu Chữ Thumbnail 2 Dòng tương phản (Dòng 1: Nghịch cảnh, Dòng 2: Phản đòn vả mặt) đúng 7-8 từ/dòng.
+3. Tạo Prompt Ảnh Midjourney/Flux 16:9 sắc nét khớp nhân vật và không gian trong phim.
+4. Trả về đúng 1 đối tượng JSON duy nhất:`;
 
   let rawText = '';
 
@@ -273,8 +279,8 @@ YÊU CẦU:
     formattedTexts = parsed.thumbnailTexts.map(t => {
       if (typeof t === 'object' && t !== null) {
         return {
-          line1: t.line1 || t.line_1 || 'TÔ SƯ HUYNH XUYÊN KHÔNG VỀ THỜI TIÊN CỔ KHỞI ĐẦU BÁ ĐẠO',
-          line2: t.line2 || t.line_2 || 'TOÀN GIA BỊ TỐNG VÀO NGỤC TỤC MẠNG NGƯỜI NHƯ CỎ RÁC'
+          line1: t.line1 || t.line_1 || 'VỪA XUYÊN KHÔNG ĐÃ BỊ TỐNG VÀO HẦM NGỤC',
+          line2: t.line2 || t.line_2 || 'KÍCH HOẠT HỆ THỐNG VÔ ĐỊCH QUÉT SẠCH TÔNG MÔN'
         };
       } else if (typeof t === 'string') {
         const parts = t.split(/[\n|]/);
@@ -283,11 +289,11 @@ YÊU CẦU:
           line2: parts[1]?.trim() || ''
         };
       }
-      return { line1: 'TÔ SƯ HUYNH XUYÊN KHÔNG VỀ THỜI TIÊN CỔ KHỞI ĐẦU BÁ ĐẠO', line2: '' };
+      return { line1: 'VỪA XUYÊN KHÔNG ĐÃ BỊ TỐNG VÀO HẦM NGỤC', line2: '' };
     });
   } else {
     formattedTexts = [
-      { line1: 'TÔ SƯ HUYNH XUYÊN KHÔNG VỀ THỜI TIÊN CỔ KHỞI ĐẦU BÁ ĐẠO', line2: 'TOÀN GIA BỊ TỐNG VÀO NGỤC TỤC MẠNG NGƯỜI NHƯ CỎ RÁC' }
+      { line1: 'VỪA XUYÊN KHÔNG ĐÃ BỊ TỐNG VÀO HẦM NGỤC', line2: 'KÍCH HOẠT HỆ THỐNG VÔ ĐỊCH QUÉT SẠCH TÔNG MÔN' }
     ];
   }
 
