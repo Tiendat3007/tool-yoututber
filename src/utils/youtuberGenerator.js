@@ -63,17 +63,29 @@ function safeParseAIJson(rawText) {
     const promptViMatch = rawText.match(/"imagePromptVi"\s*:\s*"([\s\S]*?)"(?=\s*,\s*"[a-zA-Z]+"|\s*\})/i);
     const tagsMatch = rawText.match(/"tags"\s*:\s*"([\s\S]*?)"(?=\s*,\s*"[a-zA-Z]+"|\s*\})/i);
 
+    // Extract timestamps array
+    const timeMatch = rawText.match(/"timestamps"\s*:\s*\[([\s\S]*?)\]/i);
+    const timestamps = [];
+    if (timeMatch) {
+      const items = timeMatch[1].match(/"([^"\\]*(?:\\.[^"\\]*)*)"/g);
+      if (items) {
+        items.forEach(t => timestamps.push(t.replace(/^"|"$/g, '').trim()));
+      }
+    }
+
     if (titles.length > 0 || descMatch || summaryMatch) {
       return {
         titles: titles.length > 0 ? titles : ['Tóm Tắt Phim Tu Tiên'],
         thumbnailTexts: thumbnailTexts.length > 0 ? thumbnailTexts : null,
         storySummary: summaryMatch ? summaryMatch[1].replace(/\\n/g, '\n') : '',
+        timestamps: timestamps.length > 0 ? timestamps : [],
         imagePromptEn: promptEnMatch ? promptEnMatch[1].replace(/\\n/g, ' ') : '',
         imagePromptVi: promptViMatch ? promptViMatch[1].replace(/\\n/g, ' ') : '',
         description: descMatch ? descMatch[1].replace(/\\n/g, '\n') : '',
         tags: tagsMatch ? tagsMatch[1] : ''
       };
     }
+
   } catch (e3) {
     console.error("Regex fallback parser failed:", e3);
   }
@@ -113,13 +125,27 @@ export async function generateYoutubeContent({
     throw new Error('Các file đã chọn không có nội dung phụ đề!');
   }
 
-  // Combine 100% FULL subtitles of all selected files with episode headers and timecodes (NO SKIPPING)
+  // Helper: Format compact time stamp (e.g. '00:01:23,456' -> '01:23') to save 40% tokens
+  const formatCompactTime = (timeStr) => {
+    if (!timeStr) return '';
+    return timeStr.replace(/^00:/, '').split(',')[0].split('.')[0];
+  };
+
+  // Combine 100% FULL subtitles of all selected files in token-optimized compact format
   const fullTranscriptContext = selectedFiles.map((file, fileIdx) => {
-    const lines = file.subtitles.map((s, idx) => {
-      const text = s.translatedText || s.originalText || '';
-      return `[${s.startTime || idx + 1}] ${text}`;
-    }).join('\n');
-    return `=== TẬP PHIM #${fileIdx + 1}: ${file.name} (Toàn bộ ${file.subtitles.length} câu thoại) ===\n${lines}`;
+    let prevText = '';
+    const compactLines = file.subtitles
+      .map(s => {
+        const text = (s.translatedText || s.originalText || '').trim();
+        if (!text || text === prevText) return null;
+        prevText = text;
+        const time = formatCompactTime(s.startTime);
+        return time ? `[${time}] ${text}` : text;
+      })
+      .filter(Boolean)
+      .join('\n');
+
+    return `=== TẬP #${fileIdx + 1}: ${file.name} (${file.subtitles.length} dòng) ===\n${compactLines}`;
   }).join('\n\n');
 
   const systemPrompt = `You are an Elite YouTube Creative Director & Viral Content Strategist specializing in Review Truyện Tranh / Manhua / Donghua 3D / Phim Tu Tiên.
@@ -144,11 +170,14 @@ BƯỚC 2: TỔNG HỢP VÀ SÁNG TẠO BỘ METADATA YOUTUBE CHUẨN VIRAL
 3. 3 MẪU CHỮ THUMBNAIL 2 DÒNG (thumbnailTexts):
    - Mỗi dòng đúng 7 đến 8 từ, viết HOA, tương phản mạnh (Dòng 1: Nghịch cảnh/nguy hiểm - Dòng 2: Phản đòn/đột phá).
 
-4. PROMPT ẢNH MIDJOURNEY/FLUX (imagePromptEn & imagePromptVi):
+4. BẢNG MỐC THỜI GIAN PHÂN CẢNH YOUTUBE (timestamps):
+   - Mảng 4 - 6 mốc thời gian diễn biến chính (VD: "00:00 Mở đầu: Xuyên Không...", "03:45 Nghịch Cảnh...", "12:10 Cao Trào...", "20:30 Kết Cục...").
+
+5. PROMPT ẢNH MIDJOURNEY/FLUX (imagePromptEn & imagePromptVi):
    - 16:9 Midjourney v6/Flux prompt miêu tả đúng nhân vật, áo choàng chiến bào, thần kiếm, hào quang linh lực và bối cảnh tông môn trong phim, 8k cinematic octane render, chừa không gian giữa để đặt chữ 3D.
 
-5. MÔ TẢ & TAGS (description & tags):
-   - Mô tả video YouTube cuốn hút theo dòng thời gian và danh sách thẻ tags SEO.
+6. MÔ TẢ & TAGS (description & tags):
+   - Mô tả video YouTube cuốn hút theo dòng thời gian, nhúng sẵn mốc thời gian và danh sách thẻ tags SEO.
 
 REQUIRED OUTPUT JSON FORMAT (Return ONLY valid JSON):
 {
@@ -174,11 +203,19 @@ REQUIRED OUTPUT JSON FORMAT (Return ONLY valid JSON):
       "line2": "DÒNG 2 QUÉT NGANG THIÊN HẠ ĐÚNG 7 ĐẾN 8 TỪ"
     }
   ],
+  "timestamps": [
+    "00:00 Mở đầu: Xuyên Không Đến Tu Tiên Giới",
+    "03:45 Biến cố: Toàn Gia Bị Tống Vào Hầm Ngục",
+    "08:20 Cơ duyên: Thức Tỉnh Hệ Thống Vô Địch",
+    "14:15 Cao trào: Đột Phá Cảnh Giới Quét Sạch Kẻ Thù",
+    "22:00 Kết cục: Bắt Đầu Hành Trình Vô Địch Thiên Hạ"
+  ],
   "imagePromptEn": "Cinematic 16:9 master piece of Xianxia protagonist with glowing eyes and golden dragon aura...",
   "imagePromptVi": "Mô tả ý tưởng hình ảnh thumbnail bằng tiếng Việt...",
   "description": "Mô tả video YouTube chi tiết theo các tập phim...",
   "tags": "tu tiên, tóm tắt phim, review phim tu tiên..."
 }`;
+
 
   const userMessage = `THỂ LOẠI: ${genre}
 ĐỊNH DẠNG: ${contentType}
@@ -296,16 +333,25 @@ HÃY THỰC HIỆN ĐÚNG QUY TRÌNH 2 BƯỚC:
     ];
   }
 
+  // Ensure description has timestamps if available
+  let finalDescription = parsed.description || '';
+  const parsedTimestamps = Array.isArray(parsed.timestamps) ? parsed.timestamps : [];
+  if (parsedTimestamps.length > 0 && !finalDescription.includes('00:00')) {
+    finalDescription = `${finalDescription}\n\n📌 MỐC THỜI GIAN VIDEO:\n${parsedTimestamps.join('\n')}`;
+  }
+
   return {
     titles: (Array.isArray(parsed.titles) && parsed.titles.length > 0)
       ? parsed.titles
       : [parsed.title || 'Tiêu đề Phim Tu Tiên'],
     thumbnailTexts: formattedTexts,
     storySummary: parsed.storySummary || parsed.summary || '',
+    timestamps: parsedTimestamps,
     imagePromptEn: parsed.imagePromptEn || parsed.prompt || '',
     imagePromptVi: parsed.imagePromptVi || '',
-    description: parsed.description || '',
+    description: finalDescription,
     tags: parsed.tags || ''
   };
 }
+
 

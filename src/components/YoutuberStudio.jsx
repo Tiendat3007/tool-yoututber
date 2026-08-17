@@ -5,9 +5,10 @@ import {
 } from 'lucide-react';
 
 import { generateYoutubeContent } from '../utils/youtuberGenerator';
-import { exportThumbnailHD, generateAIThumbnailImage } from '../utils/thumbnailExporter';
+import { exportThumbnailHD, generateAIThumbnailImage, THUMBNAIL_COLOR_THEMES } from '../utils/thumbnailExporter';
 import { uploadReferenceImageToOrimise, generateOrimiseImage } from '../utils/orimiseImageApi';
 import { generateFreeAIImage, FREE_IMAGE_MODELS } from '../utils/freeImageApi';
+
 
 
 
@@ -183,6 +184,9 @@ export default function YoutuberStudio({
 
 
 
+  const [selectedThemeId, setSelectedThemeId] = useState('gold-cyan');
+  const activeColorTheme = THUMBNAIL_COLOR_THEMES.find(t => t.id === selectedThemeId) || THUMBNAIL_COLOR_THEMES[0];
+
   // Export 1080p HD PNG Thumbnail Image
   const handleDownloadThumbnailHD = async () => {
     try {
@@ -190,7 +194,8 @@ export default function YoutuberStudio({
         bgImage: referenceBgImage,
         line1: displayLine1,
         line2: displayLine2,
-        channelName: 'TU TIÊN ANIME'
+        channelName: 'TU TIÊN ANIME',
+        themeId: selectedThemeId
       });
 
       const a = document.createElement('a');
@@ -202,6 +207,75 @@ export default function YoutuberStudio({
     }
   };
 
+  // 1-Click Export Full YouTube Creator Pack (.TXT metadata + HD .PNG)
+  const handleExportFullPack = async () => {
+    if (!generatedData) {
+      alert('Vui lòng phân tích tạo content bằng AI trước!');
+      return;
+    }
+
+    try {
+      // 1. Export HD PNG Thumbnail
+      const pngDataUrl = await exportThumbnailHD({
+        bgImage: referenceBgImage,
+        line1: displayLine1,
+        line2: displayLine2,
+        channelName: 'TU TIÊN ANIME',
+        themeId: selectedThemeId
+      });
+
+      const pngLink = document.createElement('a');
+      pngLink.href = pngDataUrl;
+      pngLink.download = `thumbnail_1080p_${Date.now()}.png`;
+      pngLink.click();
+
+      // 2. Generate and download Metadata .TXT file
+      const packContent = `=====================================================
+🎬 BỘ XUẤT BẢN YOUTUBE PRO - TU TIÊN ANIME
+Tập phim phân tích: ${selectedFilesList.map(f => f.name).join(', ')}
+Ngày tạo: ${new Date().toLocaleString('vi-VN')}
+=====================================================
+
+📌 5 TIÊU ĐỀ YOUTUBE (CLICKBAIT SEO 80-90 KÝ TỰ):
+${generatedData.titles.map((t, idx) => `${idx + 1}. ${t}`).join('\n')}
+
+-----------------------------------------------------
+🖼️ CHỮ THUMBNAIL 2 DÒNG:
+Dòng 1: ${displayLine1}
+Dòng 2: ${displayLine2}
+
+-----------------------------------------------------
+📖 TÓM TẮT CỐT TRUYỆN TOÀN TẬP:
+${generatedData.storySummary || 'Chưa có tóm tắt'}
+
+-----------------------------------------------------
+⏱️ MỐC THỜI GIAN (TIMESTAMPS):
+${(generatedData.timestamps || []).join('\n') || '00:00 Mở đầu: Bắt Đầu Tập Phim'}
+
+-----------------------------------------------------
+📝 MÔ TẢ VIDEO YOUTUBE (DESCRIPTION):
+${generatedData.description}
+
+-----------------------------------------------------
+🏷️ THẺ TAGS YOUTUBE:
+${generatedData.tags}
+
+-----------------------------------------------------
+🎨 PROMPT TẠO ẢNH AI (MIDJOURNEY / FLUX):
+${fullImagePromptEn || generatedData.imagePromptEn}
+`;
+
+      const blob = new Blob([packContent], { type: 'text/plain;charset=utf-8' });
+      const txtUrl = URL.createObjectURL(blob);
+      const txtLink = document.createElement('a');
+      txtLink.href = txtUrl;
+      txtLink.download = `youtube_pack_${Date.now()}.txt`;
+      txtLink.click();
+      URL.revokeObjectURL(txtUrl);
+    } catch (err) {
+      alert(`Lỗi xuất gói xuất bản: ${err.message}`);
+    }
+  };
 
   const handleCopy = (text, fieldName) => {
     if (!text) return;
@@ -209,6 +283,7 @@ export default function YoutuberStudio({
     setCopiedField(fieldName);
     setTimeout(() => setCopiedField(null), 2000);
   };
+
 
   const [selectedAnalysisModel, setSelectedAnalysisModel] = useState(() => aiModel || 'claude-sonnet-5');
 
@@ -557,10 +632,24 @@ export default function YoutuberStudio({
                 <div className="mockup-badge-hd">1080p HD</div>
                 <div className="mockup-badge-duration">32:45</div>
 
-                {/* Giant Bold 2-Line 3D Text Overlay */}
+                {/* Giant Bold 2-Line 3D Text Overlay with Dynamic Theme */}
                 <div className="mockup-text-overlay-2line">
-                  {displayLine1 && <span className="text-stroke-3d-gold">{displayLine1}</span>}
-                  {displayLine2 && <span className="text-stroke-3d-cyan">{displayLine2}</span>}
+                  {displayLine1 && (
+                    <span
+                      className="text-stroke-3d-gold"
+                      style={{ color: activeColorTheme.color1, textShadow: `3px 3px 0 #000, -2px -2px 0 #000, 2px -2px 0 #000, -2px 2px 0 #000, 0 0 20px ${activeColorTheme.glow1}` }}
+                    >
+                      {displayLine1}
+                    </span>
+                  )}
+                  {displayLine2 && (
+                    <span
+                      className="text-stroke-3d-cyan"
+                      style={{ color: activeColorTheme.color2, textShadow: `3px 3px 0 #000, -2px -2px 0 #000, 2px -2px 0 #000, -2px 2px 0 #000, 0 0 20px ${activeColorTheme.glow2}` }}
+                    >
+                      {displayLine2}
+                    </span>
+                  )}
                 </div>
 
                 <div className="mockup-channel-watermark">
@@ -575,8 +664,34 @@ export default function YoutuberStudio({
               </div>
             </div>
 
+            {/* Thumbnail Theme Selector Toolbar */}
+            <div className="flex-between flex-wrap gap-2 mt-3 p-2 rounded" style={{ background: 'rgba(0,0,0,0.3)', border: '1px solid var(--border-color)' }}>
+              <span className="text-xs font-bold text-cyan flex-center gap-1">
+                <Palette size={14} /> Màu Chữ 3D:
+              </span>
+              <select
+                className="input-field select-field btn-xs font-bold"
+                style={{ width: 'auto', padding: '4px 8px', fontSize: '0.8rem' }}
+                value={selectedThemeId}
+                onChange={e => setSelectedThemeId(e.target.value)}
+              >
+                {THUMBNAIL_COLOR_THEMES.map(theme => (
+                  <option key={theme.id} value={theme.id}>{theme.name}</option>
+                ))}
+              </select>
+
+              <button
+                className="btn btn-green-glow btn-xs font-bold ml-auto"
+                onClick={handleExportFullPack}
+                title="Tải về trọn bộ file ảnh Thumbnail 1080p HD (.PNG) + Toàn bộ Metadata kịch bản (.TXT) chỉ với 1 Click"
+              >
+                <Download size={13} />
+                <span>📦 Xuất Trọn Gói (.TXT + .PNG)</span>
+              </button>
+            </div>
+
             {/* Thumbnail Action Buttons (Instant AI Generator & HD Download) */}
-            <div className="flex-center flex-wrap gap-2 mt-3">
+            <div className="flex-center flex-wrap gap-2 mt-2">
               <button
                 className="btn btn-purple btn-sm font-bold flex-1"
                 onClick={handleGenerateOrimiseBackground}
@@ -676,7 +791,7 @@ export default function YoutuberStudio({
             </div>
           </div>
 
-          {/* Column 3: YouTube Description & Tags */}
+          {/* Column 3: YouTube Description, Timestamps & Tags */}
           <div className="studio-column card-panel">
             <div className="column-header">
               <FileText size={20} className="text-cyan" />
@@ -692,10 +807,33 @@ export default function YoutuberStudio({
 
             <textarea
               className="input-field textarea-field description-box"
-              rows={12}
+              rows={9}
               value={generatedData.description}
               readOnly
             />
+
+            {/* Timestamps Chapter Breakdown */}
+            {generatedData.timestamps && generatedData.timestamps.length > 0 && (
+              <div className="timestamps-section mt-3">
+                <div className="flex-between mb-1">
+                  <span className="text-xs font-bold text-amber flex-center gap-1">
+                    ⏱️ Mốc Thời Gian Phân Cảnh (Timestamps):
+                  </span>
+                  <button
+                    className="btn btn-secondary btn-xs"
+                    onClick={() => handleCopy(generatedData.timestamps.join('\n'), 'timestamps')}
+                  >
+                    {copiedField === 'timestamps' ? <Check size={12} className="text-emerald" /> : <Copy size={12} />}
+                    <span>Sao Chép Mốc Giờ</span>
+                  </button>
+                </div>
+                <div className="timestamps-box p-2 rounded text-xs font-mono" style={{ background: 'rgba(0,0,0,0.3)', border: '1px solid var(--border-color)', color: '#fbbf24', maxHeight: '110px', overflowY: 'auto' }}>
+                  {generatedData.timestamps.map((ts, idx) => (
+                    <div key={idx} className="py-0.5">{ts}</div>
+                  ))}
+                </div>
+              </div>
+            )}
 
             <div className="column-header mt-4">
               <Tag size={20} className="text-purple" />
@@ -711,13 +849,14 @@ export default function YoutuberStudio({
 
             <textarea
               className="input-field textarea-field tags-box font-mono"
-              rows={5}
+              rows={4}
               value={generatedData.tags}
               readOnly
             />
           </div>
         </div>
       </>
+
       ) : (
 
 
