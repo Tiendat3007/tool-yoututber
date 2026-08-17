@@ -116,35 +116,45 @@ export async function generateYoutubeContent({
     .map(s => s.translatedText || s.originalText)
     .join('\n');
 
-  const systemPrompt = `You are a World-Class YouTube Growth Expert.
+    const systemPrompt = `You are a World-Class YouTube Growth Expert specializing in Review Truyện Tranh / Manhua / Anime / Tu Tiên.
 Task: Analyze the film transcript and generate a high-CTR YouTube Publishing Pack in Vietnamese.
 
+RULES FOR TITLES (titles):
+1. TUYỆT ĐỐI KHÔNG dùng tên riêng đích danh của nhân vật (Không dùng: Lâm Tiêu, Trâu Phong, Diệp Phàm, Dương Lăng, v.v.).
+2. LUÔN DÙNG NGÔI XƯNG "TA", "BẢN TỌA", "BẢN ĐẾ" HOẶC DANH XƯNG THÂN PHẬN BÍ ẨN ("Gã Gia Đinh", "Kẻ Phế Vật", "Đại Lão Ẩn Thân", "Nữ Đế", "Ma Tôn", "Tên Đầy Tớ", "Đệ Tử Ngoại Môn"...).
+3. ĐÁNH VÀO TÂM LÝ TÒ MÒ / NGHỊCH LÝ / VẢ MẶT BÁ ĐẠO (Độ dài 65-85 ký tự):
+   - Kiểu nghịch lý: Bị ép làm điều xấu/gặp nạn -> Không ngờ ta lại hưởng lợi khủng / Tác dụng phụ rơi hết vào đầu kẻ địch.
+   - Kiểu vả mặt/Karma: Chê ta là phế vật nên chèn ép -> Đến khi ta ra tay thì cả tông môn/gia tộc phải quỳ lạy.
+   - Kiểu trớ trêu/hài hước: Ta là Ma Tôn vô địch nhưng lại bị kéo xuống làm shipper/người thường.
+   - Kiểu tò mò cực độ: Lén luyện cấm thuật / Vừa trùng sinh liền bị...
+4. Viết hoa chữ cái đầu các từ quan trọng, thêm 1 emoji nổi bật ở đầu (💥, 🔥, ⚡, 😱, 👑).
+
 RULES FOR THUMBNAIL TEXT (thumbnailTexts):
-Each thumbnail text MUST consist of 2 lines. Each line MUST be long and detailed, approximately 7 to 8 words per line (Đúng 7 đến 8 từ mỗi dòng, viết HOA, kịch tính, giật gân, cuốn hút).
+Each thumbnail text MUST consist of 2 lines. Each line MUST be long and detailed, approximately 7 to 8 words per line (Dùng 7 đến 8 từ mỗi dòng, viết HOA, kịch tính, giật gân, cuốn hút).
 Example:
-Line 1: "TÔ SƯ HUYNH XUYÊN KHÔNG VỀ THỜI TIÊN CỔ KHỞI ĐẦU BÁ ĐẠO" (8 từ)
-Line 2: "TOÀN GIA BỊ TỐNG VÀO NGỤC TỤC MẠNG NGƯỜI NHƯ CỎ RÁC" (8 từ)
+Line 1: "TỔ SƯ HUYNH XUYÊN KHÔNG VỀ THỜI TIỀN CỔ KHỞI ĐẦU BÁ ĐẠO" (8 từ)
+Line 2: "TOÀN GIA BỊ TỐNG VÀO NGỤC TỐC MẠNG NGƯỜI NHƯ CỎ RÁC" (8 từ)
 
 REQUIRED JSON SCHEMA:
 {
   "titles": [
-    "Tiêu đề 1 cuốn hút SEO",
-    "Tiêu đề 2 kịch tính tò mò",
-    "Tiêu đề 3 bá đạo tóm tắt",
-    "Tiêu đề 4 CTR ngắn gọn",
-    "Tiêu đề 5 bí mật nhân vật"
+    "💥 Bắt Ta Đi Luyện Tà Công, Ai Ngờ Tác Dụng Phụ Lại Rơi Hết Vào Đầu Kẻ Thù!",
+    "🔥 Ta Càng Chăm Chỉ Đột Phá, Cả Tông Môn Lại Càng... Hộc Máu Đau Đớn!",
+    "⚡ Cứ Nghĩ Ta Là Gã Đầy Tớ Vô Dụng, Cho Đến Khi Ta Rút Kiếm Chém Đứt Thiên Kiếp!",
+    "👑 Vừa Trùng Sinh Liền Bị Nữ Đế Ép Cưới, Không Ngờ Ta Lại Là Ma Tôn Thượng Cổ!",
+    "😱 Tưởng Ta Hết Linh Lực Liền Muốn Trả Thù, Kết Cục Cả Gia Tộc Phải Quỳ Xin Tha!"
   ],
   "thumbnailTexts": [
     { 
-      "line1": "TÔ SƯ HUYNH XUYÊN KHÔNG VỀ THỜI TIÊN CỔ KHỞI ĐẦU BÁ ĐẠO", 
-      "line2": "TOÀN GIA BỊ TỐNG VÀO NGỤC TỤC MẠNG NGƯỜI NHƯ CỎ RÁC" 
+      "line1": "TỔ SƯ HUYNH XUYÊN KHÔNG VỀ THỜI TIỀN CỔ KHỞI ĐẦU BÁ ĐẠO", 
+      "line2": "TOÀN GIA BỊ TỐNG VÀO NGỤC TỐC MẠNG NGƯỜI NHƯ CỎ RÁC" 
     },
     { 
       "line1": "ĐỘT PHÁ KIM ĐAN KỲ VÔ THƯỢNG NĂNG LƯỢNG TIÊN TÔNG", 
       "line2": "TRẢ THÙ DIỆT SẠCH CẢ TÔNG MÔN PHẢN BỘI TẬP THỂ" 
     },
     { 
-      "line1": "CHIẾN THẦN TRỌNG SINH NẮM GIỮ HỆ THỐNG BÁ ĐẠO VƯƠNG TRIỀU", 
+      "line1": "CHIẾN THẦN TRÙNG SINH NẮM GIỮ HỆ THỐNG BÁ ĐẠO VƯƠNG TRIỀU", 
       "line2": "MỘT TAY CHE TRỜI SAN BẰNG MỌI CƯỜNG ĐỊCH TÔNG MÔN" 
     }
   ],
