@@ -56,7 +56,15 @@ export default function App() {
   // Glossary state with localStorage persistence
   const [glossary, setGlossary] = useState(() => {
     const saved = localStorage.getItem('tutien_glossary');
-    return saved ? JSON.parse(saved) : DEFAULT_GLOSSARY;
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length >= DEFAULT_GLOSSARY.length) {
+          return parsed;
+        }
+      } catch (e) {}
+    }
+    return DEFAULT_GLOSSARY;
   });
 
   // Pronoun active preset

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Plus, Trash2, Edit3, Check, X, Search, Download, Upload, RefreshCw, BookOpen, ShieldCheck } from 'lucide-react';
+import { Plus, Trash2, Edit3, Check, X, Search, Download, Upload, RefreshCw, BookOpen, ShieldCheck, HelpCircle } from 'lucide-react';
 import { DEFAULT_GLOSSARY } from '../data/defaultGlossary';
 
 export default function GlossaryManager({ glossary, setGlossary }) {
@@ -8,24 +8,28 @@ export default function GlossaryManager({ glossary, setGlossary }) {
   const [editingId, setEditingId] = useState(null);
   const [editZh, setEditZh] = useState('');
   const [editVi, setEditVi] = useState('');
+  const [editUsage, setEditUsage] = useState('');
 
   // New term state
   const [newZh, setNewZh] = useState('');
   const [newVi, setNewVi] = useState('');
+  const [newUsage, setNewUsage] = useState('');
   const [newCategory, setNewCategory] = useState('canh_gioi');
 
   const categories = [
     { id: 'all', label: 'Tất cả từ vựng' },
     { id: 'canh_gioi', label: 'Cảnh Giới' },
     { id: 'xung_ho', label: 'Xưng Hô' },
-    { id: 'thuat_ngu', label: 'Thuật Ngữ' },
+    { id: 'thuat_ngu', label: 'Thuật Ngữ & Khẩu Khí' },
     { id: 'vat_pham', label: 'Vật Phẩm & Đan Dược' },
   ];
 
   const filteredGlossary = glossary.filter(item => {
+    const q = searchTerm.toLowerCase();
     const matchesSearch =
-      item.zh.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      item.vi.toLowerCase().includes(searchTerm.toLowerCase());
+      item.zh.toLowerCase().includes(q) ||
+      item.vi.toLowerCase().includes(q) ||
+      (item.usage && item.usage.toLowerCase().includes(q));
     const matchesCat = selectedCategory === 'all' || item.category === selectedCategory;
     return matchesSearch && matchesCat;
   });
@@ -38,6 +42,7 @@ export default function GlossaryManager({ glossary, setGlossary }) {
       id: `custom_${Date.now()}`,
       zh: newZh.trim(),
       vi: newVi.trim(),
+      usage: newUsage.trim(),
       category: newCategory,
       enabled: true
     };
@@ -45,6 +50,7 @@ export default function GlossaryManager({ glossary, setGlossary }) {
     setGlossary([newItem, ...glossary]);
     setNewZh('');
     setNewVi('');
+    setNewUsage('');
   };
 
   const handleToggle = (id) => {
@@ -63,17 +69,18 @@ export default function GlossaryManager({ glossary, setGlossary }) {
     setEditingId(item.id);
     setEditZh(item.zh);
     setEditVi(item.vi);
+    setEditUsage(item.usage || '');
   };
 
   const saveEdit = (id) => {
     setGlossary(glossary.map(item =>
-      item.id === id ? { ...item, zh: editZh, vi: editVi } : item
+      item.id === id ? { ...item, zh: editZh, vi: editVi, usage: editUsage } : item
     ));
     setEditingId(null);
   };
 
   const resetToDefault = () => {
-    if (window.confirm('Khôi phục từ điển Tu Tiên về mặc định? Mọi thay đổi tùy chỉnh sẽ bị ghi đè.')) {
+    if (window.confirm('Khôi phục toàn bộ từ điển Tu Tiên Master Script chuẩn về mặc định?')) {
       setGlossary(DEFAULT_GLOSSARY);
     }
   };
@@ -96,12 +103,44 @@ export default function GlossaryManager({ glossary, setGlossary }) {
     reader.onload = (evt) => {
       try {
         const imported = JSON.parse(evt.target.result);
+        let parsedList = [];
+
         if (Array.isArray(imported)) {
-          setGlossary(imported);
-          alert(`Đã nhập thành công ${imported.length} từ vựng vào từ điển!`);
+          parsedList = imported;
+        } else if (typeof imported === 'object' && imported !== null) {
+          // Parse Key-Value or Key-Object JSON dictionary: { "师尊": { "translation": "Sư tôn", "usage": "..." } }
+          parsedList = Object.entries(imported).map(([zh, val], idx) => {
+            if (typeof val === 'object' && val !== null) {
+              return {
+                id: `import_${Date.now()}_${idx}`,
+                zh: zh.trim(),
+                vi: (val.translation || val.vi || val.text || '').trim(),
+                usage: (val.usage || val.note || '').trim(),
+                category: val.category || 'thuat_ngu',
+                enabled: true
+              };
+            } else if (typeof val === 'string') {
+              return {
+                id: `import_${Date.now()}_${idx}`,
+                zh: zh.trim(),
+                vi: val.trim(),
+                usage: '',
+                category: 'thuat_ngu',
+                enabled: true
+              };
+            }
+            return null;
+          }).filter(Boolean);
+        }
+
+        if (parsedList.length > 0) {
+          setGlossary(parsedList);
+          alert(`Đã nhập thành công ${parsedList.length} thuật ngữ vào từ điển Tu Tiên!`);
+        } else {
+          alert('Không tìm thấy thuật ngữ nào trong file JSON.');
         }
       } catch (err) {
-        alert('File JSON từ điển không hợp lệ.');
+        alert(`Lỗi đọc file JSON: ${err.message}`);
       }
     };
     reader.readAsText(file);
@@ -112,11 +151,11 @@ export default function GlossaryManager({ glossary, setGlossary }) {
       <div className="section-header">
         <div className="section-title">
           <BookOpen className="text-cyan" />
-          <h2>Từ Điển Hán-Việt Tu Tiên ({glossary.length} từ vựng)</h2>
+          <h2>Từ Điển Hán-Việt Tu Tiên Master ({glossary.length} thuật ngữ)</h2>
         </div>
         <div className="action-row">
           <button className="btn btn-secondary btn-sm" onClick={resetToDefault}>
-            <RefreshCw size={15} /> Khôi Phục Mặc Định
+            <RefreshCw size={15} /> Khôi Phục Mặc Định ({DEFAULT_GLOSSARY.length} Từ)
           </button>
           <button className="btn btn-secondary btn-sm" onClick={exportJSON}>
             <Download size={15} /> Xuất JSON
@@ -130,23 +169,30 @@ export default function GlossaryManager({ glossary, setGlossary }) {
 
       {/* Add New Term Form */}
       <form onSubmit={handleAddTerm} className="add-term-form">
-        <h4>Thêm Từ Mới Vào Từ Điển Tu Tiên:</h4>
+        <h4>Thêm Thuật Ngữ Mới Vào Từ Điển:</h4>
         <div className="form-grid">
           <input
             type="text"
-            placeholder="Từ gốc / Từ Trung / Tiếng Anh (VD: 筑基 / golden core)"
+            placeholder="Từ gốc / Chữ Hán (VD: 筑基 / 师尊)"
             value={newZh}
             onChange={e => setNewZh(e.target.value)}
-            className="input-field"
+            className="input-field font-bold font-mono"
             required
           />
           <input
             type="text"
-            placeholder="Dịch Hán Việt Tu Tiên chuẩn (VD: Trúc Cơ)"
+            placeholder="Dịch Hán Việt Tu Tiên chuẩn (VD: Trúc Cơ / Sư tôn)"
             value={newVi}
             onChange={e => setNewVi(e.target.value)}
-            className="input-field"
+            className="input-field font-bold text-cyan"
             required
+          />
+          <input
+            type="text"
+            placeholder="Ngữ cảnh sử dụng / Ghi chú (VD: Kính xưng trang trọng...)"
+            value={newUsage}
+            onChange={e => setNewUsage(e.target.value)}
+            className="input-field text-muted text-xs"
           />
           <select
             value={newCategory}
@@ -155,10 +201,10 @@ export default function GlossaryManager({ glossary, setGlossary }) {
           >
             <option value="canh_gioi">Cảnh Giới</option>
             <option value="xung_ho">Xưng Hô</option>
-            <option value="thuat_ngu">Thuật Ngữ</option>
+            <option value="thuat_ngu">Thuật Ngữ & Khẩu Khí</option>
             <option value="vat_pham">Vật Phẩm & Đan Dược</option>
           </select>
-          <button type="submit" className="btn btn-cyan">
+          <button type="submit" className="btn btn-cyan font-bold">
             <Plus size={16} /> Thêm Vào Từ Điển
           </button>
         </div>
@@ -170,7 +216,7 @@ export default function GlossaryManager({ glossary, setGlossary }) {
           <Search size={18} className="search-icon" />
           <input
             type="text"
-            placeholder="Tìm kiếm từ Hán Việt hoặc từ gốc..."
+            placeholder="Tìm kiếm chữ Hán, từ Hán Việt hoặc ngữ cảnh sử dụng..."
             value={searchTerm}
             onChange={e => setSearchTerm(e.target.value)}
             className="input-field"
@@ -194,11 +240,12 @@ export default function GlossaryManager({ glossary, setGlossary }) {
         <table className="glossary-table">
           <thead>
             <tr>
-              <th style={{ width: '60px' }}>Dùng</th>
-              <th>Từ Gốc / Gốc Tiếng Trung</th>
-              <th>Dịch Hán Việt Tu Tiên</th>
-              <th>Phân Loại</th>
-              <th style={{ width: '120px', textAlign: 'right' }}>Thao Tác</th>
+              <th style={{ width: '50px' }}>Dùng</th>
+              <th style={{ width: '180px' }}>Từ Gốc (Chữ Hán)</th>
+              <th style={{ width: '220px' }}>Dịch Hán Việt Chuẩn</th>
+              <th>Ngữ Cảnh & Hướng Dẫn Sử Dụng</th>
+              <th style={{ width: '130px' }}>Phân Loại</th>
+              <th style={{ width: '90px', textAlign: 'right' }}>Thao Tác</th>
             </tr>
           </thead>
           <tbody>
@@ -218,10 +265,10 @@ export default function GlossaryManager({ glossary, setGlossary }) {
                       type="text"
                       value={editZh}
                       onChange={e => setEditZh(e.target.value)}
-                      className="input-field input-sm"
+                      className="input-field input-sm font-mono"
                     />
                   ) : (
-                    <span className="font-mono text-cyan-light">{item.zh}</span>
+                    <span className="font-mono text-cyan-light font-bold" style={{ fontSize: '1rem' }}>{item.zh}</span>
                   )}
                 </td>
                 <td>
@@ -230,10 +277,25 @@ export default function GlossaryManager({ glossary, setGlossary }) {
                       type="text"
                       value={editVi}
                       onChange={e => setEditVi(e.target.value)}
-                      className="input-field input-sm"
+                      className="input-field input-sm font-bold text-cyan"
                     />
                   ) : (
-                    <span className="highlight-text">{item.vi}</span>
+                    <span className="highlight-text font-bold" style={{ fontSize: '0.95rem' }}>{item.vi}</span>
+                  )}
+                </td>
+                <td>
+                  {editingId === item.id ? (
+                    <input
+                      type="text"
+                      value={editUsage}
+                      onChange={e => setEditUsage(e.target.value)}
+                      className="input-field input-sm text-xs"
+                      placeholder="Ghi chú ngữ cảnh..."
+                    />
+                  ) : (
+                    <span className="text-xs text-muted" style={{ lineHeight: '1.4', display: 'block' }}>
+                      {item.usage || 'Thuật ngữ Tu Tiên cố định'}
+                    </span>
                   )}
                 </td>
                 <td>
@@ -266,8 +328,8 @@ export default function GlossaryManager({ glossary, setGlossary }) {
             ))}
             {filteredGlossary.length === 0 && (
               <tr>
-                <td colSpan={5} className="empty-state">
-                  Không tìm thấy từ vựng nào phù hợp.
+                <td colSpan={6} className="empty-state">
+                  Không tìm thấy thuật ngữ nào phù hợp.
                 </td>
               </tr>
             )}
