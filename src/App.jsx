@@ -16,7 +16,16 @@ import { loadProjectStateFromDB, saveProjectStateToDB } from './utils/dbStorage'
 import './App.css';
 
 export default function App() {
-  const [activeTab, setActiveTab] = useState('editor');
+  const [activeTab, setActiveTab] = useState(() => {
+    return localStorage.getItem('tutien_active_tab') || 'editor';
+  });
+
+  // Persist activeTab to localStorage
+  useEffect(() => {
+    if (activeTab) {
+      localStorage.setItem('tutien_active_tab', activeTab);
+    }
+  }, [activeTab]);
 
   // Multi-file state: array of file objects
   const [files, setFiles] = useState([]);
@@ -35,6 +44,9 @@ export default function App() {
           setActiveFileId(restored.files[0].id);
         }
       }
+      if (restored.activeTab && !localStorage.getItem('tutien_active_tab')) {
+        setActiveTab(restored.activeTab);
+      }
       setIsStateLoaded(true);
     }
     restoreState();
@@ -44,10 +56,10 @@ export default function App() {
   useEffect(() => {
     if (!isStateLoaded) return;
     const timer = setTimeout(() => {
-      saveProjectStateToDB(files, activeFileId);
+      saveProjectStateToDB(files, activeFileId, activeTab);
     }, 500);
     return () => clearTimeout(timer);
-  }, [files, activeFileId, isStateLoaded]);
+  }, [files, activeFileId, activeTab, isStateLoaded]);
 
 
   // Diff tracking state (Hiển thị Lịch sử Thay Đổi Đỏ/Xanh)

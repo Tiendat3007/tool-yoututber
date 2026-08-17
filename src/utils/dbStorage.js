@@ -17,7 +17,7 @@ function openDB() {
   });
 }
 
-export async function saveProjectStateToDB(files, activeFileId) {
+export async function saveProjectStateToDB(files, activeFileId, activeTab = 'editor') {
   try {
     const db = await openDB();
     const tx = db.transaction(STORE_NAME, 'readwrite');
@@ -39,6 +39,9 @@ export async function saveProjectStateToDB(files, activeFileId) {
 
     store.put(cleanFiles, 'files');
     store.put(activeFileId, 'activeFileId');
+    if (activeTab) {
+      store.put(activeTab, 'activeTab');
+    }
   } catch (err) {
     console.warn('Unable to persist project state to IndexedDB:', err);
   }
@@ -58,14 +61,16 @@ export async function loadProjectStateFromDB() {
 
     const files = await getVal('files');
     const activeFileId = await getVal('activeFileId');
+    const activeTab = await getVal('activeTab');
 
     return {
       files: Array.isArray(files) ? files : [],
-      activeFileId: activeFileId || (Array.isArray(files) && files.length > 0 ? files[0].id : null)
+      activeFileId: activeFileId || (Array.isArray(files) && files.length > 0 ? files[0].id : null),
+      activeTab: activeTab || 'editor'
     };
   } catch (err) {
     console.warn('Unable to restore project state from IndexedDB:', err);
-    return { files: [], activeFileId: null };
+    return { files: [], activeFileId: null, activeTab: 'editor' };
   }
 }
 
