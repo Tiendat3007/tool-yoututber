@@ -640,29 +640,32 @@ ${fullImagePromptEn || generatedData.imagePromptEn}
         )}
       </div>
 
-      {/* Top Banner Control Panel */}
+      {/* Top Banner Control Panel (BƯỚC 1) */}
       <div className="card-panel studio-banner">
         <div className="banner-title-group">
           <div className="youtube-badge">
             <Video size={26} className="text-red-accent" />
           </div>
           <div>
-            <h2>🎬 YOUTUBER STUDIO & THUMBNAIL CREATOR PRO</h2>
-            <p className="text-muted">
-              Phân tích đa tập phim SRT để tạo 5 Title Giật Gân, Text Thumbnail 2 Dòng Ngắn Gọn Dễ Hiểu, Up Ảnh Tham Chiếu & Prompt AI!
+            <div className="flex-center gap-2 mb-1">
+              <span className="step-badge">BƯỚC 1</span>
+              <h2 style={{ margin: 0 }}>🎬 YOUTUBER STUDIO & THUMBNAIL CREATOR PRO</h2>
+            </div>
+            <p className="text-muted" style={{ margin: 0, fontSize: '0.85rem' }}>
+              Chọn các tập phim SRT &bull; AI đọc toàn bộ kịch bản &bull; Tóm tắt cốt truyện, tạo 5 Title Giật Gân, Chữ Thumbnail 2 Dòng, Thiết kế ảnh bìa 16:9 & Trọn bộ Metadata!
             </p>
           </div>
         </div>
 
         {/* Multi-SRT File Selection Toolbar */}
-        <div className="multi-file-selector-box mb-3">
+        <div className="multi-file-selector-box mb-3 mt-3">
           <div className="flex-between flex-wrap gap-2 mb-2">
-            <label className="form-label mb-0">
-              <CheckSquare size={16} className="text-cyan" />
-              <span>Chọn Các Tập SRT Phân Tích Tổng Hợp ({selectedFileIds.length} / {files.length} tập chọn - {totalSelectedSubtitles} dòng):</span>
+            <label className="form-label mb-0 font-bold text-cyan" style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <CheckSquare size={16} />
+              <span>Chọn Các Tập SRT Phân Tích Tổng Hợp ({selectedFileIds.length} / {files.length} tập chọn — Tổng {totalSelectedSubtitles} dòng thoại):</span>
             </label>
             <div className="flex-center gap-2">
-              <button className="btn btn-secondary btn-xs" onClick={handleSelectAllFiles}>
+              <button className="btn btn-secondary btn-xs font-bold" onClick={handleSelectAllFiles}>
                 [✓] Chọn Tất Cả
               </button>
               <button className="btn btn-secondary btn-xs" onClick={handleDeselectAllFiles}>
@@ -686,13 +689,13 @@ ${fullImagePromptEn || generatedData.imagePromptEn}
                 </label>
               );
             })}
-            {files.length === 0 && <span className="text-muted">Chưa có file SRT nào trong danh sách.</span>}
+            {files.length === 0 && <span className="text-muted">Chưa có file SRT nào trong danh sách. Hãy nạp file SRT ở tab Trình Dịch.</span>}
           </div>
         </div>
 
         <div className="studio-controls-grid">
           <div className="control-field">
-            <label className="form-label font-bold text-cyan">Mô Hình AI Phân Tích Phim:</label>
+            <label className="form-label font-bold text-cyan">Mô Hình AI Phân Tích Kịch Bản:</label>
             <select
               value={selectedAnalysisModel}
               onChange={e => setSelectedAnalysisModel(e.target.value)}
@@ -746,7 +749,7 @@ ${fullImagePromptEn || generatedData.imagePromptEn}
               {isGenerating ? (
                 <>
                   <RefreshCw size={20} className="spinner" />
-                  <span>Đang Phân Tích AI...</span>
+                  <span>Đang Phân Tích Kịch Bản AI...</span>
                 </>
               ) : (
                 <>
@@ -762,13 +765,14 @@ ${fullImagePromptEn || generatedData.imagePromptEn}
       {/* Main Results Grid */}
       {generatedData ? (
         <>
-          {/* Full Story Summary Synopsis Box for Creators */}
+          {/* Full Story Summary Synopsis Box (BƯỚC 2) */}
           {generatedData.storySummary && (
             <div className="card-panel story-summary-banner mb-3">
               <div className="flex-between flex-wrap gap-2 mb-2">
                 <div className="flex-center gap-2">
-                  <BookOpen size={22} className="text-cyan" />
-                  <h3 className="text-cyan font-bold mb-0">📖 TÓM TẮT CỐT TRUYỆN CHI TIẾT ({selectedFileIds.length} TẬP ĐÃ CHỌN)</h3>
+                  <span className="step-badge emerald">BƯỚC 2</span>
+                  <BookOpen size={20} className="text-emerald" />
+                  <h3 className="text-emerald font-bold mb-0">📖 TÓM TẮT CỐT TRUYỆN CHI TIẾT ({selectedFileIds.length} TẬP)</h3>
                 </div>
                 <button
                   className="btn btn-secondary btn-sm font-bold"
@@ -776,7 +780,7 @@ ${fullImagePromptEn || generatedData.imagePromptEn}
                   title="Sao chép toàn bộ tóm tắt cốt truyện"
                 >
                   {copiedField === 'story_summary' ? <Check size={14} className="text-emerald" /> : <Copy size={14} />}
-                  <span>Sao Chép Tóm Tắt Truyện</span>
+                  <span>Sao Chép Tóm Tắt</span>
                 </button>
               </div>
 
@@ -788,24 +792,32 @@ ${fullImagePromptEn || generatedData.imagePromptEn}
 
           <div className="studio-results-grid">
 
-          {/* Column 1: YouTube Titles & 2-Line Text Overlays */}
+          {/* Column 1: YouTube Titles & 2-Line Text Overlays (BƯỚC 3) */}
           <div className="studio-column card-panel">
             <div className="column-header">
-              <Flame size={20} className="text-cyan" />
-              <h3>📌 5 Tiêu Đề YouTube Hấp Dẫn (Clickbait SEO)</h3>
+              <span className="step-badge gold">BƯỚC 3</span>
+              <Flame size={20} className="text-amber" />
+              <h3>📌 5 Tiêu Đề YouTube (Clickbait SEO)</h3>
             </div>
 
             <div className="titles-list">
               {generatedData.titles.map((title, idx) => {
                 const isSelected = selectedTitleIndex === idx;
+                const charCount = title.length;
+                const isOptimal = charCount >= 60 && charCount <= 95;
+
                 return (
                   <div
                     key={idx}
                     className={`title-item-card ${isSelected ? 'selected' : ''}`}
                     onClick={() => setSelectedTitleIndex(idx)}
+                    title="Bấm để chọn tiêu đề này hiển thị trên mockup"
                   >
                     <div className="title-number">#{idx + 1}</div>
-                    <div className="title-text">{title}</div>
+                    <div className="title-text" style={{ flex: 1 }}>{title}</div>
+                    <span className={`char-count-badge ${isOptimal ? 'optimal' : ''}`} title={`${charCount} ký tự (Độ dài lý tưởng: 60-90 ký tự)`}>
+                      {charCount} ký tự
+                    </span>
                     <button
                       className="btn-icon text-cyan"
                       onClick={(e) => {
@@ -839,9 +851,10 @@ ${fullImagePromptEn || generatedData.imagePromptEn}
                       setCustomLine1(item.line1);
                       setCustomLine2(item.line2);
                     }}
+                    title="Bấm để đưa mẫu chữ này lên ảnh bìa"
                   >
                     <span className="overlay-badge">Mẫu {idx + 1}</span>
-                    <div className="overlay-2line-preview">
+                    <div className="overlay-2line-preview" style={{ flex: 1 }}>
                       <div className="line1-gold">{item.line1}</div>
                       {item.line2 && <div className="line2-cyan">{item.line2}</div>}
                     </div>
@@ -862,7 +875,9 @@ ${fullImagePromptEn || generatedData.imagePromptEn}
 
             {/* 2-Line Custom Inputs for Live Preview */}
             <div className="custom-2line-box mt-3">
-              <label className="form-label font-bold text-cyan">Tùy Chỉnh Chữ 2 Dòng Trên Thumbnail (Live Preview):</label>
+              <label className="form-label font-bold text-cyan" style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <Edit2 size={14} /> Tùy Chỉnh Chữ 2 Dòng Trực Tiếp (Live Update):
+              </label>
 
               <div className="form-group mb-2">
                 <span className="text-xs text-muted">Dòng 1 (Chữ vàng 3D đập vào mắt):</span>
@@ -888,11 +903,12 @@ ${fullImagePromptEn || generatedData.imagePromptEn}
             </div>
           </div>
 
-          {/* Column 2: Live Thumbnail Mockup & Reference Image Upload */}
+          {/* Column 2: Live Thumbnail Mockup & Reference Image Upload (BƯỚC 4) */}
           <div className="studio-column card-panel">
             <div className="column-header">
-              <ImageIcon size={20} className="text-cyan" />
-              <h3>🎨 Live Mockup Ảnh Bìa Thumbnail 16:9</h3>
+              <span className="step-badge purple">BƯỚC 4</span>
+              <ImageIcon size={20} className="text-purple" />
+              <h3>🎨 Thiết Kế Thumbnail 16:9 & AI Vẽ Ảnh</h3>
 
               <div className="flex-center gap-2 ml-auto">
                 <button
@@ -1014,7 +1030,7 @@ ${fullImagePromptEn || generatedData.imagePromptEn}
                 ) : (
                   <>
                     <Sparkles size={15} />
-                    <span>✨ Gen Ảnh Orimise AI ($0.05)</span>
+                    <span>✨ Gen Ảnh Orimise ($0.05)</span>
                   </>
                 )}
               </button>
@@ -1039,7 +1055,7 @@ ${fullImagePromptEn || generatedData.imagePromptEn}
                   title="Vẽ ảnh 16:9 chất lượng cao bằng Server AI Miễn Phí (Không tốn tiền)"
                 >
                   <Palette size={15} />
-                  <span>🎨 Tạo Ảnh (Free)</span>
+                  <span>🎨 Tạo Ảnh Free</span>
                 </button>
               </div>
 
@@ -1053,15 +1069,12 @@ ${fullImagePromptEn || generatedData.imagePromptEn}
               </button>
             </div>
 
-
             {genProgressText && (
               <div className="progress-banner mt-2 text-cyan font-bold flex-center gap-2">
                 <RefreshCw size={14} className="spinner" />
                 <span>{genProgressText}</span>
               </div>
             )}
-
-
 
             {/* AI Image Prompts */}
             <div className="prompt-section mt-4">
@@ -1085,7 +1098,6 @@ ${fullImagePromptEn || generatedData.imagePromptEn}
                 value={fullImagePromptEn || generatedData.imagePromptEn}
                 readOnly
               />
-
             </div>
 
             <div className="prompt-section mt-3">
@@ -1099,11 +1111,12 @@ ${fullImagePromptEn || generatedData.imagePromptEn}
             </div>
           </div>
 
-          {/* Column 3: YouTube Description, Timestamps & Tags */}
+          {/* Column 3: YouTube Description, Timestamps & Tags (BƯỚC 5) */}
           <div className="studio-column card-panel">
             <div className="column-header">
+              <span className="step-badge emerald">BƯỚC 5</span>
               <FileText size={20} className="text-cyan" />
-              <h3>📝 Mô Tả Video YouTube ({selectedFileIds.length} tập)</h3>
+              <h3>📝 Mô Tả & Metadata Xuất Bản ({selectedFileIds.length} tập)</h3>
               <button
                 className="btn btn-secondary btn-sm ml-auto"
                 onClick={() => handleCopy(generatedData.description, 'desc')}
@@ -1164,6 +1177,7 @@ ${fullImagePromptEn || generatedData.imagePromptEn}
           </div>
         </div>
       </>
+
 
       ) : (
 
