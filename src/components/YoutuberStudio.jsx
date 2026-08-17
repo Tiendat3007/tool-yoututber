@@ -1,8 +1,9 @@
 import React, { useState, useRef } from 'react';
 import {
   Video, Sparkles, Copy, Check, Image as ImageIcon, Tag, FileText,
-  Play, RefreshCw, Wand2, Type, Flame, Layers, Upload, Trash2, CheckSquare, Square, Download, Palette
+  Play, RefreshCw, Wand2, Type, Flame, Layers, Upload, Trash2, CheckSquare, Square, Download, Palette, BookOpen
 } from 'lucide-react';
+
 import { generateYoutubeContent } from '../utils/youtuberGenerator';
 import { exportThumbnailHD, generateAIThumbnailImage } from '../utils/thumbnailExporter';
 import { uploadReferenceImageToOrimise, generateOrimiseImage } from '../utils/orimiseImageApi';
@@ -377,7 +378,33 @@ export default function YoutuberStudio({
 
       {/* Main Results Grid */}
       {generatedData ? (
-        <div className="studio-results-grid">
+        <>
+          {/* Full Story Summary Synopsis Box for Creators */}
+          {generatedData.storySummary && (
+            <div className="card-panel story-summary-banner mb-3">
+              <div className="flex-between flex-wrap gap-2 mb-2">
+                <div className="flex-center gap-2">
+                  <BookOpen size={22} className="text-cyan" />
+                  <h3 className="text-cyan font-bold mb-0">📖 TÓM TẮT CỐT TRUYỆN CHI TIẾT ({selectedFileIds.length} TẬP ĐÃ CHỌN)</h3>
+                </div>
+                <button
+                  className="btn btn-secondary btn-sm font-bold"
+                  onClick={() => handleCopy(generatedData.storySummary, 'story_summary')}
+                  title="Sao chép toàn bộ tóm tắt cốt truyện"
+                >
+                  {copiedField === 'story_summary' ? <Check size={14} className="text-emerald" /> : <Copy size={14} />}
+                  <span>Sao Chép Tóm Tắt Truyện</span>
+                </button>
+              </div>
+
+              <div className="story-summary-box">
+                <p className="story-summary-text">{generatedData.storySummary}</p>
+              </div>
+            </div>
+          )}
+
+          <div className="studio-results-grid">
+
           {/* Column 1: YouTube Titles & 2-Line Text Overlays */}
           <div className="studio-column card-panel">
             <div className="column-header">
@@ -690,7 +717,10 @@ export default function YoutuberStudio({
             />
           </div>
         </div>
+      </>
       ) : (
+
+
         /* Empty State */
         <div className="card-panel empty-studio-card">
           <Video size={64} className="text-muted pulse" />

@@ -56,15 +56,18 @@ function safeParseAIJson(rawText) {
     const thumbMatches = [...rawText.matchAll(/\{\s*"line1"\s*:\s*"([^"]+)"\s*,\s*"line2"\s*:\s*"([^"]+)"\s*\}/gi)];
     const thumbnailTexts = thumbMatches.map(m => ({ line1: m[1], line2: m[2] }));
 
+    const summaryMatch = rawText.match(/"storySummary"\s*:\s*"([\s\S]*?)"(?=\s*,\s*"[a-zA-Z]+"|\s*\})/i) ||
+                         rawText.match(/"summary"\s*:\s*"([\s\S]*?)"(?=\s*,\s*"[a-zA-Z]+"|\s*\})/i);
     const descMatch = rawText.match(/"description"\s*:\s*"([\s\S]*?)"(?=\s*,\s*"[a-zA-Z]+"|\s*\})/i);
     const promptEnMatch = rawText.match(/"imagePromptEn"\s*:\s*"([\s\S]*?)"(?=\s*,\s*"[a-zA-Z]+"|\s*\})/i);
     const promptViMatch = rawText.match(/"imagePromptVi"\s*:\s*"([\s\S]*?)"(?=\s*,\s*"[a-zA-Z]+"|\s*\})/i);
     const tagsMatch = rawText.match(/"tags"\s*:\s*"([\s\S]*?)"(?=\s*,\s*"[a-zA-Z]+"|\s*\})/i);
 
-    if (titles.length > 0 || descMatch) {
+    if (titles.length > 0 || descMatch || summaryMatch) {
       return {
         titles: titles.length > 0 ? titles : ['Tóm Tắt Phim Tu Tiên'],
         thumbnailTexts: thumbnailTexts.length > 0 ? thumbnailTexts : null,
+        storySummary: summaryMatch ? summaryMatch[1].replace(/\\n/g, '\n') : '',
         imagePromptEn: promptEnMatch ? promptEnMatch[1].replace(/\\n/g, ' ') : '',
         imagePromptVi: promptViMatch ? promptViMatch[1].replace(/\\n/g, ' ') : '',
         description: descMatch ? descMatch[1].replace(/\\n/g, '\n') : '',
@@ -77,6 +80,7 @@ function safeParseAIJson(rawText) {
 
   return null;
 }
+
 
 export async function generateYoutubeContent({
   selectedFiles = [],
@@ -148,12 +152,16 @@ Phân tích toàn bộ phụ đề kịch bản SRT để xuất trọn bộ You
      * Bối cảnh: Khung cảnh tông môn Tiên Hiệp cổ kính kỳ vĩ, thiên kiếp mây đen bao phủ hoặc cung điện hoàng kim đổ nát (ancient Chinese floating mountains, thunderstorm sky, dramatic lighting, octane render 8k, cinematic composition, framed with negative center space for bold 3D text overlay --ar 16:9).
    - imagePromptVi: Mô tả ý tưởng chi tiết bằng tiếng Việt (bố cục nhân vật, ánh sáng, góc đặt chữ 2 dòng).
 
-4. MÔ TẢ (description) & TAGS (tags):
-   - description: Viết đoạn mô tả cuốn hút, tóm tắt các nút thắt cao trào của các tập phim, chèn mốc thời gian và lời kêu gọi bấm Đăng Ký.
+4. TÓM TẮT CỐT TRUYỆN TOÀN TẬP (storySummary):
+   - Viết bài tóm tắt chi tiết, liền mạch, cuốn hút (khoảng 300 - 500 chữ) tóm lược toàn bộ cốt truyện các tập phim: nhân vật chính là ai, khởi đầu từ đâu, biến cố gì xảy ra, quá trình tu luyện/đột phá, các màn đối đầu gay cấn và kết cục của các tập phim này để nhà sáng tạo video đọc hiểu trọn vẹn.
+
+5. MÔ TẢ (description) & TAGS (tags):
+   - description: Viết đoạn mô tả YouTube cuốn hút, tóm tắt các nút thắt cao trào của các tập phim, chèn mốc thời gian và lời kêu gọi bấm Đăng Ký.
    - tags: Chuỗi từ khóa SEO YouTube phân cách bởi dấu phẩy.
 
 REQUIRED OUTPUT JSON FORMAT (Return ONLY valid JSON):
 {
+  "storySummary": "Tóm tắt cốt truyện toàn tập chi tiết, mạch lạc, dễ đọc để nhà sáng tạo nắm rõ diễn biến phim...",
   "titles": [
     "💥 [Tiêu đề 1 chuẩn 80-90 ký tự dựa theo phim]",
     "🔥 [Tiêu đề 2 chuẩn 80-90 ký tự dựa theo phim]",
@@ -180,6 +188,7 @@ REQUIRED OUTPUT JSON FORMAT (Return ONLY valid JSON):
   "description": "Mô tả video YouTube chi tiết theo các tập phim...",
   "tags": "tu tiên, tóm tắt phim, review phim tu tiên..."
 }`;
+
 
   const userMessage = `THỂ LOẠI: ${genre}
 ĐỊNH DẠNG: ${contentType}
@@ -302,9 +311,11 @@ YÊU CẦU ĐẶC BIỆT:
       ? parsed.titles
       : [parsed.title || 'Tiêu đề Phim Tu Tiên'],
     thumbnailTexts: formattedTexts,
+    storySummary: parsed.storySummary || parsed.summary || '',
     imagePromptEn: parsed.imagePromptEn || parsed.prompt || '',
     imagePromptVi: parsed.imagePromptVi || '',
     description: parsed.description || '',
     tags: parsed.tags || ''
   };
 }
+
