@@ -740,12 +740,12 @@ ${fullImagePromptEn || generatedData.imagePromptEn}
             style={{ userSelect: 'none' }}
           >
             <div className="flex-center gap-2 flex-wrap">
-              <label className="form-label mb-0 font-bold text-cyan flex-center gap-2 cursor-pointer">
-                <CheckSquare size={17} />
-                <span>Chọn Tập Phim SRT ({selectedFileIds.length} / {files.length} tập chọn — Tổng {totalSelectedSubtitles.toLocaleString()} dòng thoại)</span>
-              </label>
+              <CheckSquare size={17} className="text-cyan" />
+              <span className="font-bold text-cyan" style={{ fontSize: '0.9rem' }}>
+                Chọn Các Tập SRT Phân Tích Tổng Hợp ({selectedFileIds.length} / {files.length} tập chọn — Tổng {totalSelectedSubtitles.toLocaleString()} dòng thoại):
+              </span>
               <span className="badge-info text-xs font-bold" style={{ background: 'rgba(6, 182, 212, 0.15)', color: '#22d3ee', padding: '2px 8px', borderRadius: '12px', border: '1px solid rgba(6, 182, 212, 0.3)' }}>
-                {formatFileRangeTitle(selectedFilesList)}
+                📁 {formatFileRangeTitle(selectedFilesList)}
               </span>
             </div>
 
@@ -759,13 +759,13 @@ ${fullImagePromptEn || generatedData.imagePromptEn}
                 }}
               >
                 {isEpisodesExpanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
-                <span>{isEpisodesExpanded ? '▲ Thu Gọn Lại' : `▼ Mở Rộng Chọn Tập (${files.length} tập)`}</span>
+                <span>{isEpisodesExpanded ? '▲ Thu Gọn' : `▼ Mở Rộng (${files.length} tập)`}</span>
               </button>
             </div>
           </div>
 
-          {/* Full Selection Controls & Pill Grid (Visible only when expanded) */}
-          {isEpisodesExpanded ? (
+          {/* Full Selection Controls & Pill Grid (Visible ONLY when expanded) */}
+          {isEpisodesExpanded && (
             <div className="mt-3" style={{ animation: 'fadeIn 0.2s ease' }}>
               {/* Search, Filter & Bulk Selection Controls */}
               {files.length > 0 && (
@@ -902,16 +902,6 @@ ${fullImagePromptEn || generatedData.imagePromptEn}
                   <ChevronUp size={13} /> Thu Gọn Danh Sách Tập Lại
                 </button>
               </div>
-            </div>
-          ) : (
-            /* Summary preview when collapsed */
-            <div
-              className="episodes-expand-hint mt-2"
-              onClick={() => setIsEpisodesExpanded(true)}
-              title="Bấm để mở rộng toàn bộ danh sách tập phim & tìm kiếm"
-            >
-              <span>📁 {formatFileRangeTitle(selectedFilesList)} ({selectedFileIds.length} / {files.length} tập chọn) &bull; Bấm để mở rộng danh sách & bộ lọc</span>
-              <ChevronDown size={14} />
             </div>
           )}
         </div>
