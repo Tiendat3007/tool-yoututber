@@ -68,3 +68,33 @@ export async function loadProjectStateFromDB() {
     return { files: [], activeFileId: null };
   }
 }
+
+export async function saveYoutuberStudioStateToDB(studioState) {
+
+  try {
+    const db = await openDB();
+    const tx = db.transaction(STORE_NAME, 'readwrite');
+    const store = tx.objectStore(STORE_NAME);
+    store.put(studioState, 'youtuber_studio_state');
+  } catch (err) {
+    console.warn('Unable to persist youtuber studio state to IndexedDB:', err);
+  }
+}
+
+export async function loadYoutuberStudioStateFromDB() {
+  try {
+    const db = await openDB();
+    const tx = db.transaction(STORE_NAME, 'readonly');
+    const store = tx.objectStore(STORE_NAME);
+
+    return new Promise((resolve) => {
+      const req = store.get('youtuber_studio_state');
+      req.onsuccess = () => resolve(req.result || null);
+      req.onerror = () => resolve(null);
+    });
+  } catch (err) {
+    console.warn('Unable to restore youtuber studio state from IndexedDB:', err);
+    return null;
+  }
+}
+

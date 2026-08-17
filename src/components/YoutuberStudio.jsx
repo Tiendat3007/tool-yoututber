@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import {
   Video, Sparkles, Copy, Check, Image as ImageIcon, Tag, FileText,
   Play, RefreshCw, Wand2, Type, Flame, Layers, Upload, Trash2, CheckSquare, Square, Download, Palette, BookOpen
@@ -8,6 +8,7 @@ import { generateYoutubeContent } from '../utils/youtuberGenerator';
 import { exportThumbnailHD, generateAIThumbnailImage, THUMBNAIL_COLOR_THEMES } from '../utils/thumbnailExporter';
 import { uploadReferenceImageToOrimise, generateOrimiseImage } from '../utils/orimiseImageApi';
 import { generateFreeAIImage, FREE_IMAGE_MODELS } from '../utils/freeImageApi';
+import { saveYoutuberStudioStateToDB, loadYoutuberStudioStateFromDB } from '../utils/dbStorage';
 
 
 
@@ -54,6 +55,78 @@ export default function YoutuberStudio({
 
   // Copy status indicators
   const [copiedField, setCopiedField] = useState(null);
+
+  // Theme & Model states
+  const [selectedThemeId, setSelectedThemeId] = useState('gold-cyan');
+  const [selectedFreeModel, setSelectedFreeModel] = useState('flux');
+  const [selectedAnalysisModel, setSelectedAnalysisModel] = useState(() => aiModel || 'claude-sonnet-5');
+  const [isRestoring, setIsRestoring] = useState(true);
+
+  // Restore previous Youtuber Studio state from IndexedDB across page reloads (F5)
+  useEffect(() => {
+    let isMounted = true;
+    async function restoreStudioState() {
+      try {
+        const saved = await loadYoutuberStudioStateFromDB();
+        if (saved && isMounted) {
+          if (saved.generatedData) setGeneratedData(saved.generatedData);
+          if (Array.isArray(saved.selectedFileIds) && saved.selectedFileIds.length > 0) {
+            // Keep selected files that still exist in current project
+            setSelectedFileIds(saved.selectedFileIds);
+          }
+          if (typeof saved.selectedTitleIndex === 'number') setSelectedTitleIndex(saved.selectedTitleIndex);
+          if (typeof saved.selectedTextIndex === 'number') setSelectedTextIndex(saved.selectedTextIndex);
+          if (saved.customLine1 !== undefined) setCustomLine1(saved.customLine1);
+          if (saved.customLine2 !== undefined) setCustomLine2(saved.customLine2);
+          if (saved.referenceBgImage) setReferenceBgImage(saved.referenceBgImage);
+          if (saved.selectedThemeId) setSelectedThemeId(saved.selectedThemeId);
+          if (saved.genre) setGenre(saved.genre);
+          if (saved.contentType) setContentType(saved.contentType);
+          if (saved.selectedAnalysisModel) setSelectedAnalysisModel(saved.selectedAnalysisModel);
+          if (saved.selectedFreeModel) setSelectedFreeModel(saved.selectedFreeModel);
+        }
+      } catch (err) {
+        console.warn('Could not restore YoutuberStudio state:', err);
+      } finally {
+        if (isMounted) setIsRestoring(false);
+      }
+    }
+    restoreStudioState();
+    return () => { isMounted = false; };
+  }, []);
+
+  // Auto-save state to IndexedDB whenever critical states change
+  useEffect(() => {
+    if (isRestoring) return;
+    saveYoutuberStudioStateToDB({
+      generatedData,
+      selectedFileIds,
+      selectedTitleIndex,
+      selectedTextIndex,
+      customLine1,
+      customLine2,
+      referenceBgImage,
+      selectedThemeId,
+      genre,
+      contentType,
+      selectedAnalysisModel,
+      selectedFreeModel
+    });
+  }, [
+    isRestoring,
+    generatedData,
+    selectedFileIds,
+    selectedTitleIndex,
+    selectedTextIndex,
+    customLine1,
+    customLine2,
+    referenceBgImage,
+    selectedThemeId,
+    genre,
+    contentType,
+    selectedAnalysisModel,
+    selectedFreeModel
+  ]);
 
   const selectedFilesList = files.filter(f => selectedFileIds.includes(f.id));
   const totalSelectedSubtitles = selectedFilesList.reduce((sum, f) => sum + f.subtitles.length, 0);
@@ -152,7 +225,6 @@ export default function YoutuberStudio({
     }
   };
 
-  const [selectedFreeModel, setSelectedFreeModel] = useState('flux');
 
   // Generate 1-Click AI Background Image via 100% Free AI Engine (Pollinations / Flux / SDXL)
   const handleGenerateAIBackground = async () => {
@@ -184,7 +256,6 @@ export default function YoutuberStudio({
 
 
 
-  const [selectedThemeId, setSelectedThemeId] = useState('gold-cyan');
   const activeColorTheme = THUMBNAIL_COLOR_THEMES.find(t => t.id === selectedThemeId) || THUMBNAIL_COLOR_THEMES[0];
 
   // Export 1080p HD PNG Thumbnail Image
@@ -285,7 +356,6 @@ ${fullImagePromptEn || generatedData.imagePromptEn}
   };
 
 
-  const [selectedAnalysisModel, setSelectedAnalysisModel] = useState(() => aiModel || 'claude-sonnet-5');
 
   const handleGenerate = async () => {
     if (selectedFilesList.length === 0) {
