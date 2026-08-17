@@ -10,7 +10,7 @@ import AISettingsModal from './components/AISettingsModal';
 
 import { DEFAULT_GLOSSARY, PRONOUN_PRESETS, SAMPLE_SRT } from './data/defaultGlossary';
 import { parseSRT, generateSRT } from './utils/srtParser';
-import { localTranslateLine, translateBatchWithGemini, translateBatchWithOrimise } from './utils/translator';
+import { localTranslateLine, translateBatchWithGemini, translateBatchWithOrimise, translateSubtitlesWithThreadPool } from './utils/translator';
 import { getFilesFromDataTransfer, processZipFile, getSmartFileName } from './utils/fileScanner';
 import { loadProjectStateFromDB, saveProjectStateToDB } from './utils/dbStorage';
 import './App.css';
@@ -76,7 +76,7 @@ export default function App() {
   const [orimiseBaseUrl, setOrimiseBaseUrl] = useState(() => localStorage.getItem('tutien_orimise_url') || 'https://api.orimise.com/v1');
   const [geminiKey, setGeminiKey] = useState(() => localStorage.getItem('tutien_gemini_key') || '');
   const [aiModel, setAiModel] = useState(() => localStorage.getItem('tutien_ai_model') || 'gemini-2.5-flash');
-
+  const [concurrency, setConcurrency] = useState(() => Number(localStorage.getItem('tutien_concurrency')) || 4);
 
   const [customPrompt, setCustomPrompt] = useState('');
   const [isAISettingsOpen, setIsAISettingsOpen] = useState(false);
@@ -96,7 +96,8 @@ export default function App() {
     localStorage.setItem('tutien_orimise_url', orimiseBaseUrl);
     localStorage.setItem('tutien_gemini_key', geminiKey);
     localStorage.setItem('tutien_ai_model', aiModel);
-  }, [aiProvider, orimiseKey, orimiseBaseUrl, geminiKey, aiModel]);
+    localStorage.setItem('tutien_concurrency', concurrency);
+  }, [aiProvider, orimiseKey, orimiseBaseUrl, geminiKey, aiModel, concurrency]);
 
   // Native File System Access API: Pick SRT files with persistent fileHandle
   const handleOpenFilesNative = async () => {
@@ -435,7 +436,7 @@ export default function App() {
     ));
   };
 
-  // Batch AI Translate All Files in the series
+  // Batch AI Translate All Files in the series using Turbo Multi-Threading Pool
   const handleBatchTranslateAI = async () => {
     if (files.length === 0) return;
     const isOrimise = aiProvider === 'orimise';
@@ -454,46 +455,33 @@ export default function App() {
 
       for (let fIdx = 0; fIdx < updatedFiles.length; fIdx++) {
         const fileObj = updatedFiles[fIdx];
-        setBatchProgressText(`Đang xử lý File ${fIdx + 1}/${updatedFiles.length}: "${fileObj.name}"...`);
+        const totalLines = fileObj.subtitles.length;
+        setBatchProgressText(`⚡ [File ${fIdx + 1}/${updatedFiles.length}] Đang khởi chạy ${concurrency} luồng Turbo: "${fileObj.name}" (${totalLines} dòng)...`);
 
-        const BATCH_SIZE = 20;
-        const updatedMap = new Map();
-
-        for (let i = 0; i < fileObj.subtitles.length; i += BATCH_SIZE) {
-          const chunk = fileObj.subtitles.slice(i, i + BATCH_SIZE);
-          setBatchProgressText(`File ${fIdx + 1}/${updatedFiles.length} ("${fileObj.name}"): Dịch dòng ${i + 1} - ${Math.min(i + BATCH_SIZE, fileObj.subtitles.length)} / ${fileObj.subtitles.length}...`);
-
-          let resultMap;
-          if (isOrimise) {
-            resultMap = await translateBatchWithOrimise({
-              subtitles: chunk,
-              apiKey: orimiseKey,
-              baseUrl: orimiseBaseUrl,
-              systemPrompt: customPrompt,
-              glossary,
-              model: aiModel
-            });
-          } else {
-            resultMap = await translateBatchWithGemini({
-              subtitles: chunk,
-              apiKey: geminiKey,
-              systemPrompt: customPrompt,
-              glossary,
-              model: aiModel
-            });
+        const resultMap = await translateSubtitlesWithThreadPool({
+          subtitles: fileObj.subtitles,
+          isOrimise,
+          apiKey: activeKey,
+          baseUrl: orimiseBaseUrl,
+          systemPrompt: customPrompt,
+          glossary,
+          model: aiModel,
+          batchSize: 25,
+          concurrency: concurrency,
+          onProgress: (doneChunks, totalChunks, doneLines, total) => {
+            setBatchProgressText(
+              `⚡ [File ${fIdx + 1}/${updatedFiles.length}] Turbo ${concurrency} Luồng: "${fileObj.name}" — Xong ${doneChunks}/${totalChunks} khối (${Math.round((doneChunks / totalChunks) * 100)}%)`
+            );
           }
-
-          resultMap.forEach((val, key) => updatedMap.set(key, val));
-        }
+        });
 
         // Apply translated map to file
         fileObj.subtitles = fileObj.subtitles.map(sub => {
-          if (updatedMap.has(sub.index)) {
-            const newTranslated = updatedMap.get(sub.index);
+          if (resultMap.has(sub.index)) {
             return {
               ...sub,
               previousText: sub.translatedText,
-              translatedText: newTranslated,
+              translatedText: resultMap.get(sub.index),
               status: 'translated'
             };
           }
@@ -504,7 +492,7 @@ export default function App() {
         setFiles([...updatedFiles]);
       }
 
-      setBatchProgressText(`ĐÃ DỊCH HOÀN TẤT TẤT CẢ ${files.length} FILE SRT TRONG BỘ PHIM!`);
+      setBatchProgressText(`🎉 ĐÃ DỊCH HOÀN TẤT SIÊU TỐC TẤT CẢ ${files.length} FILE SRT TRONG BỘ PHIM!`);
       setTimeout(() => setBatchProgressText(''), 4000);
     } catch (err) {
       alert(`Lỗi khi dịch hàng loạt: ${err.message}`);
@@ -695,6 +683,7 @@ export default function App() {
               orimiseBaseUrl={orimiseBaseUrl}
               geminiKey={geminiKey}
               aiModel={aiModel}
+              concurrency={concurrency}
               customPrompt={customPrompt}
               activePresetId={activePresetId}
               showDiffLog={showDiffLog}
@@ -750,6 +739,8 @@ export default function App() {
         setGeminiKey={setGeminiKey}
         aiModel={aiModel}
         setAiModel={setAiModel}
+        concurrency={concurrency}
+        setConcurrency={setConcurrency}
         customPrompt={customPrompt}
         setCustomPrompt={setCustomPrompt}
       />

@@ -4,7 +4,7 @@ import {
   CheckCircle, Play, FileText, Zap, BookOpen, Layers, Eye, RefreshCw, ArrowRight, EyeOff, FolderPlus, Archive, Save
 } from 'lucide-react';
 import { parseSRT, generateSRT, generateVTT, shiftSubtitlesTime } from '../utils/srtParser';
-import { localTranslateLine, translateBatchWithGemini, translateBatchWithOrimise } from '../utils/translator';
+import { localTranslateLine, translateBatchWithGemini, translateBatchWithOrimise, translateSubtitlesWithThreadPool } from '../utils/translator';
 import { PRONOUN_PRESETS } from '../data/defaultGlossary';
 import DiffViewer from './DiffViewer';
 
@@ -26,6 +26,7 @@ export default function SubtitleEditor({
   orimiseBaseUrl,
   geminiKey,
   aiModel,
+  concurrency = 4,
   customPrompt,
   activePresetId,
   showDiffLog,
@@ -131,7 +132,7 @@ export default function SubtitleEditor({
     }));
   };
 
-  // AI Translate Batch
+  // AI Translate Batch with Turbo Multi-Threading Pool
   const handleAIBatchTranslate = async () => {
     const isOrimise = aiProvider === 'orimise';
     const activeKey = isOrimise ? orimiseKey : geminiKey;
@@ -149,52 +150,39 @@ export default function SubtitleEditor({
 
     setIsTranslating(true);
     const providerName = isOrimise ? `Orimise (${aiModel})` : `Gemini (${aiModel})`;
-    setTranslationProgress(`Đang dịch ${targetSubtitles.length} dòng bằng ${providerName}...`);
+    setTranslationProgress(`⚡ Đang khởi chạy ${concurrency} luồng Turbo dịch ${targetSubtitles.length} dòng qua ${providerName}...`);
 
     try {
-      const BATCH_SIZE = 20;
-      const updatedMap = new Map();
-
-      for (let i = 0; i < targetSubtitles.length; i += BATCH_SIZE) {
-        const chunk = targetSubtitles.slice(i, i + BATCH_SIZE);
-        setTranslationProgress(`Đang dịch dòng ${i + 1} - ${Math.min(i + BATCH_SIZE, targetSubtitles.length)} / ${targetSubtitles.length} qua ${providerName}...`);
-
-        let resultMap;
-        if (isOrimise) {
-          resultMap = await translateBatchWithOrimise({
-            subtitles: chunk,
-            apiKey: orimiseKey,
-            baseUrl: orimiseBaseUrl,
-            systemPrompt: customPrompt,
-            glossary,
-            model: aiModel
-          });
-        } else {
-          resultMap = await translateBatchWithGemini({
-            subtitles: chunk,
-            apiKey: geminiKey,
-            systemPrompt: customPrompt,
-            glossary,
-            model: aiModel
-          });
+      const resultMap = await translateSubtitlesWithThreadPool({
+        subtitles: targetSubtitles,
+        isOrimise,
+        apiKey: activeKey,
+        baseUrl: orimiseBaseUrl,
+        systemPrompt: customPrompt,
+        glossary,
+        model: aiModel,
+        batchSize: 25,
+        concurrency: concurrency,
+        onProgress: (doneChunks, totalChunks, doneLines, total) => {
+          setTranslationProgress(
+            `⚡ Turbo ${concurrency} Luồng (${providerName}): Đã xong ${doneChunks}/${totalChunks} khối (${Math.round((doneChunks / totalChunks) * 100)}%) — ${doneLines}/${total} dòng...`
+          );
         }
-
-        resultMap.forEach((val, key) => updatedMap.set(key, val));
-      }
+      });
 
       setSubtitles(subtitles.map(sub => {
-        if (updatedMap.has(sub.index)) {
+        if (resultMap.has(sub.index)) {
           return {
             ...sub,
             previousText: sub.translatedText,
-            translatedText: updatedMap.get(sub.index),
+            translatedText: resultMap.get(sub.index),
             status: 'translated'
           };
         }
         return sub;
       }));
 
-      setTranslationProgress(`Dịch AI thành công bằng ${providerName}!`);
+      setTranslationProgress(`🎉 Dịch AI hoàn tất siêu tốc bằng ${providerName}!`);
       setTimeout(() => setTranslationProgress(''), 3000);
     } catch (err) {
       alert(`Lỗi khi dịch AI: ${err.message}`);

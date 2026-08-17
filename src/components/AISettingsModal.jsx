@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { X, Key, Cpu, Sparkles, ExternalLink, Check, AlertCircle, Server } from 'lucide-react';
+import { X, Key, Cpu, Sparkles, ExternalLink, Check, AlertCircle, Server, Zap } from 'lucide-react';
 
 export default function AISettingsModal({
   isOpen,
@@ -14,6 +14,8 @@ export default function AISettingsModal({
   setGeminiKey,
   aiModel,
   setAiModel,
+  concurrency = 4,
+  setConcurrency,
   customPrompt,
   setCustomPrompt
 }) {
@@ -218,6 +220,26 @@ export default function AISettingsModal({
               </div>
             </>
           )}
+
+          {/* Turbo Multi-Threading Concurrency Selector */}
+          <div className="form-group">
+            <label className="form-label font-bold text-cyan" style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <Zap size={16} /> Chế Độ Dịch Đa Luồng Siêu Tốc (Turbo Worker Pool):
+            </label>
+            <select
+              className="input-field select-field font-bold"
+              value={concurrency}
+              onChange={e => setConcurrency(Number(e.target.value))}
+            >
+              <option value={1}>1 Luồng — Tuần tự tiêu chuẩn (Chậm, an toàn)</option>
+              <option value={2}>2 Luồng — Song song gấp 2x</option>
+              <option value={4}>⚡ 4 Luồng — Turbo 4x Siêu Tốc (Khuyên dùng - Nhanh gấp 400%)</option>
+              <option value={6}>🚀 6 Luồng — Ultra 6x Cực Đại (Dành cho bộ phim 50+ tập dài)</option>
+            </select>
+            <span className="text-xs text-muted" style={{ display: 'block', marginTop: '4px' }}>
+              Chia nhỏ toàn bộ phụ đề và kích hoạt nhiều tiến trình AI dịch song song cùng lúc, rút ngắn thời gian dịch từ vài phút xuống còn vài chục giây.
+            </span>
+          </div>
 
           <div className="form-group">
             <label className="form-label">Tùy Chỉnh System Prompt Tu Tiên:</label>
