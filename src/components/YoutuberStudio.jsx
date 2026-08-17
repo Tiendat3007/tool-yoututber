@@ -2,7 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import {
   Video, Sparkles, Copy, Check, Image as ImageIcon, Tag, FileText,
   Play, RefreshCw, Wand2, Type, Flame, Layers, Upload, Trash2, CheckSquare, Square, Download, Palette, BookOpen,
-  History, Plus, Edit2, Clock
+  History, Plus, Edit2, Clock, Search, Filter, ArrowUpDown, CheckCircle2
 } from 'lucide-react';
 
 import { generateYoutubeContent } from '../utils/youtuberGenerator';
@@ -149,6 +149,38 @@ export default function YoutuberStudio({
     selectedFreeModel
   ]);
 
+  // Search & Filter state for episode selection
+  const [searchQuery, setSearchQuery] = useState('');
+  const [statusFilter, setStatusFilter] = useState('all');
+  const [sortOption, setSortOption] = useState('natural');
+
+  // Filter & Sort files
+  const filteredFiles = files.filter(file => {
+    const matchesSearch = file.name.toLowerCase().includes(searchQuery.toLowerCase());
+    const translatedCount = file.subtitles.filter(s => s.status === 'translated' || s.status === 'edited').length;
+    const isDone = translatedCount === file.subtitles.length && file.subtitles.length > 0;
+
+    if (statusFilter === 'done') return matchesSearch && isDone;
+    if (statusFilter === 'pending') return matchesSearch && !isDone;
+    return matchesSearch;
+  });
+
+  const sortedFiles = [...filteredFiles].sort((a, b) => {
+    if (sortOption === 'natural') {
+      return a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: 'base' });
+    }
+    if (sortOption === 'name_asc') {
+      return a.name.localeCompare(b.name);
+    }
+    if (sortOption === 'name_desc') {
+      return b.name.localeCompare(a.name);
+    }
+    if (sortOption === 'lines_desc') {
+      return b.subtitles.length - a.subtitles.length;
+    }
+    return 0;
+  });
+
   const selectedFilesList = files.filter(f => selectedFileIds.includes(f.id));
   const totalSelectedSubtitles = selectedFilesList.reduce((sum, f) => sum + f.subtitles.length, 0);
 
@@ -171,6 +203,27 @@ export default function YoutuberStudio({
     if (files.length > 0) {
       setSelectedFileIds([files[0].id]);
     }
+  };
+
+  // Select all currently filtered files
+  const handleSelectAllFiltered = () => {
+    const idsToAdd = sortedFiles.map(f => f.id);
+    setSelectedFileIds(prev => Array.from(new Set([...prev, ...idsToAdd])));
+  };
+
+  // Deselect all currently filtered files
+  const handleDeselectAllFiltered = () => {
+    const idsToRemove = new Set(sortedFiles.map(f => f.id));
+    setSelectedFileIds(prev => {
+      const remaining = prev.filter(id => !idsToRemove.has(id));
+      return remaining.length > 0 ? remaining : (files.length > 0 ? [files[0].id] : []);
+    });
+  };
+
+  // Keep / Select ONLY the currently filtered files in 1 click
+  const handleKeepOnlyFiltered = () => {
+    if (sortedFiles.length === 0) return;
+    setSelectedFileIds(sortedFiles.map(f => f.id));
   };
 
   // Image Upload Handler for Reference Thumbnail Image (with Orimise API upload support)
@@ -664,21 +717,108 @@ ${fullImagePromptEn || generatedData.imagePromptEn}
               <CheckSquare size={16} />
               <span>Chọn Các Tập SRT Phân Tích Tổng Hợp ({selectedFileIds.length} / {files.length} tập chọn — Tổng {totalSelectedSubtitles} dòng thoại):</span>
             </label>
-            <div className="flex-center gap-2">
-              <button className="btn btn-secondary btn-xs font-bold" onClick={handleSelectAllFiles}>
-                [✓] Chọn Tất Cả
-              </button>
-              <button className="btn btn-secondary btn-xs" onClick={handleDeselectAllFiles}>
-                [✕] Chọn 1 Tập
-              </button>
+            <div className="filter-counter text-muted font-bold" style={{ fontSize: '0.8rem' }}>
+              Đang hiện: <strong className="highlight-cyan">{sortedFiles.length}</strong> / {files.length} tập
             </div>
           </div>
 
+          {/* Search, Filter & Bulk Selection Controls */}
+          {files.length > 0 && (
+            <div className="file-filter-toolbar mb-3" style={{ background: 'rgba(0,0,0,0.3)', padding: '8px 12px', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.06)' }}>
+              <div className="search-box" style={{ maxWidth: '320px', flex: 1 }}>
+                <Search size={15} className="search-icon" />
+                <input
+                  type="text"
+                  placeholder="🔍 Tìm mã tập (VD: c9, c2, b2, tập 1, SubGoc...)..."
+                  value={searchQuery}
+                  onChange={e => setSearchQuery(e.target.value)}
+                  className="input-field input-sm"
+                />
+                {searchQuery && (
+                  <button
+                    className="btn-clear-search text-muted"
+                    onClick={() => setSearchQuery('')}
+                  >
+                    ✕
+                  </button>
+                )}
+              </div>
+
+              <div className="filter-controls-group flex-wrap gap-2">
+                {/* Search Quick Selection Buttons */}
+                {searchQuery && sortedFiles.length > 0 ? (
+                  <>
+                    <button
+                      className="btn btn-green-glow btn-xs font-bold"
+                      onClick={handleKeepOnlyFiltered}
+                      title={`Bỏ chọn các tập khác và CHỈ CHỌN đúng ${sortedFiles.length} tập đang khớp với "${searchQuery}"`}
+                    >
+                      <CheckCircle2 size={13} /> CHỈ CHỌN {sortedFiles.length} TẬP ĐANG LỌC
+                    </button>
+                    <button
+                      className="btn btn-cyan btn-xs font-bold"
+                      onClick={handleSelectAllFiltered}
+                      title={`Thêm ${sortedFiles.length} tập đang lọc vào danh sách chọn`}
+                    >
+                      [✓] Thêm {sortedFiles.length} Tập
+                    </button>
+                    <button
+                      className="btn btn-secondary btn-xs text-red"
+                      onClick={handleDeselectAllFiltered}
+                      title={`Bỏ chọn ${sortedFiles.length} tập đang lọc`}
+                    >
+                      [✕] Bỏ {sortedFiles.length} Tập
+                    </button>
+                  </>
+                ) : (
+                  <>
+                    <button className="btn btn-secondary btn-xs font-bold" onClick={handleSelectAllFiles}>
+                      [✓] Chọn Tất Cả ({files.length} tập)
+                    </button>
+                    <button className="btn btn-secondary btn-xs" onClick={handleDeselectAllFiles}>
+                      [✕] Chọn 1 Tập
+                    </button>
+                  </>
+                )}
+
+                <div className="select-with-icon">
+                  <Filter size={13} className="text-cyan" />
+                  <select
+                    value={statusFilter}
+                    onChange={e => setStatusFilter(e.target.value)}
+                    className="input-field select-field input-xs"
+                  >
+                    <option value="all">Tất cả ({files.length})</option>
+                    <option value="pending">Chưa dịch</option>
+                    <option value="done">Đã dịch xong</option>
+                  </select>
+                </div>
+
+                <div className="select-with-icon">
+                  <ArrowUpDown size={13} className="text-cyan" />
+                  <select
+                    value={sortOption}
+                    onChange={e => setSortOption(e.target.value)}
+                    className="input-field select-field input-xs"
+                  >
+                    <option value="natural">Tự nhiên (1, 2, ... 10)</option>
+                    <option value="name_asc">Tên A &rarr; Z</option>
+                    <option value="name_desc">Tên Z &rarr; A</option>
+                    <option value="lines_desc">Số dòng (Nhiều &rarr; Ít)</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+          )}
+
           <div className="file-checkboxes-grid">
-            {files.map(f => {
+            {sortedFiles.map(f => {
               const isChecked = selectedFileIds.includes(f.id);
+              const translatedCount = f.subtitles.filter(s => s.status === 'translated' || s.status === 'edited').length;
+              const isDone = translatedCount === f.subtitles.length && f.subtitles.length > 0;
+
               return (
-                <label key={f.id} className={`file-checkbox-pill ${isChecked ? 'checked' : ''}`}>
+                <label key={f.id} className={`file-checkbox-pill ${isChecked ? 'checked' : ''} ${isDone ? 'done-border' : ''}`}>
                   <input
                     type="checkbox"
                     checked={isChecked}
@@ -686,9 +826,23 @@ ${fullImagePromptEn || generatedData.imagePromptEn}
                   />
                   <span className="file-pill-name" title={f.name}>{f.name}</span>
                   <span className="file-pill-lines">({f.subtitles.length} dòng)</span>
+                  {isDone && <span className="text-emerald" style={{ fontSize: '0.7rem', marginLeft: '4px' }}>✓</span>}
                 </label>
               );
             })}
+
+            {sortedFiles.length === 0 && files.length > 0 && (
+              <div className="empty-state-filter p-2 text-muted" style={{ fontSize: '0.85rem' }}>
+                Không tìm thấy tập nào khớp với từ khóa "<span className="highlight-cyan">{searchQuery}</span>".
+                <button
+                  className="btn btn-secondary btn-xs ml-2"
+                  onClick={() => { setSearchQuery(''); setStatusFilter('all'); }}
+                >
+                  Xóa bộ lọc
+                </button>
+              </div>
+            )}
+
             {files.length === 0 && <span className="text-muted">Chưa có file SRT nào trong danh sách. Hãy nạp file SRT ở tab Trình Dịch.</span>}
           </div>
         </div>
