@@ -2,7 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import {
   Video, Sparkles, Copy, Check, Image as ImageIcon, Tag, FileText,
   Play, RefreshCw, Wand2, Type, Flame, Layers, Upload, Trash2, CheckSquare, Square, Download, Palette, BookOpen,
-  History, Plus, Edit2, Clock, Search, Filter, ArrowUpDown, CheckCircle2
+  History, Plus, Edit2, Clock, Search, Filter, ArrowUpDown, CheckCircle2, ChevronDown, ChevronUp
 } from 'lucide-react';
 
 import { generateYoutubeContent } from '../utils/youtuberGenerator';
@@ -55,6 +55,7 @@ export default function YoutuberStudio({
 
   const [genre, setGenre] = useState('Tu Tiên / Tiên Hiệp');
   const [contentType, setContentType] = useState('Review Phim / Tóm Tắt Phim');
+  const [isEpisodesExpanded, setIsEpisodesExpanded] = useState(false);
 
   // History Sessions State
   const [historySessions, setHistorySessions] = useState([]);
@@ -737,8 +738,21 @@ ${fullImagePromptEn || generatedData.imagePromptEn}
               <CheckSquare size={16} />
               <span>Chọn Các Tập SRT Phân Tích Tổng Hợp ({selectedFileIds.length} / {files.length} tập chọn — Tổng {totalSelectedSubtitles} dòng thoại):</span>
             </label>
-            <div className="filter-counter text-muted font-bold" style={{ fontSize: '0.8rem' }}>
-              Đang hiện: <strong className="highlight-cyan">{sortedFiles.length}</strong> / {files.length} tập
+            <div className="flex-center gap-2">
+              <div className="filter-counter text-muted font-bold" style={{ fontSize: '0.8rem' }}>
+                Đang hiện: <strong className="highlight-cyan">{sortedFiles.length}</strong> / {files.length} tập
+              </div>
+
+              {files.length > 0 && (
+                <button
+                  className="btn btn-secondary btn-xs font-bold text-cyan flex-center gap-1"
+                  onClick={() => setIsEpisodesExpanded(prev => !prev)}
+                  title={isEpisodesExpanded ? "Thu gọn danh sách tập" : "Mở rộng danh sách tất cả các tập"}
+                >
+                  {isEpisodesExpanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+                  <span>{isEpisodesExpanded ? 'Thu Gọn Danh Sách' : `Mở Rộng (${sortedFiles.length} tập)`}</span>
+                </button>
+              )}
             </div>
           </div>
 
@@ -751,7 +765,10 @@ ${fullImagePromptEn || generatedData.imagePromptEn}
                   type="text"
                   placeholder="🔍 Tìm mã tập (VD: c9, c2, b2, tập 1, SubGoc...)..."
                   value={searchQuery}
-                  onChange={e => setSearchQuery(e.target.value)}
+                  onChange={e => {
+                    setSearchQuery(e.target.value);
+                    if (e.target.value && !isEpisodesExpanded) setIsEpisodesExpanded(true);
+                  }}
                   className="input-field input-sm"
                 />
                 {searchQuery && (
@@ -831,7 +848,7 @@ ${fullImagePromptEn || generatedData.imagePromptEn}
             </div>
           )}
 
-          <div className="file-checkboxes-grid">
+          <div className={`file-checkboxes-grid ${isEpisodesExpanded ? 'expanded' : 'collapsed'}`}>
             {sortedFiles.map(f => {
               const isChecked = selectedFileIds.includes(f.id);
               const translatedCount = f.subtitles.filter(s => s.status === 'translated' || s.status === 'edited').length;
@@ -865,6 +882,16 @@ ${fullImagePromptEn || generatedData.imagePromptEn}
 
             {files.length === 0 && <span className="text-muted">Chưa có file SRT nào trong danh sách. Hãy nạp file SRT ở tab Trình Dịch.</span>}
           </div>
+
+          {!isEpisodesExpanded && sortedFiles.length > 4 && (
+            <div
+              className="episodes-expand-hint"
+              onClick={() => setIsEpisodesExpanded(true)}
+              title="Bấm để mở rộng toàn bộ danh sách tập"
+            >
+              <span>▼ Còn {sortedFiles.length - 4} tập khác &bull; Bấm để mở rộng toàn bộ</span>
+            </div>
+          )}
         </div>
 
         <div className="studio-controls-grid">
