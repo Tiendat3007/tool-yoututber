@@ -116,18 +116,26 @@ export async function generateYoutubeContent({
     .map(s => s.translatedText || s.originalText)
     .join('\n');
 
-    const systemPrompt = `You are a World-Class YouTube Growth Expert specializing in Review Truyện Tranh / Manhua / Anime / Tu Tiên.
+  const systemPrompt = `You are a World-Class YouTube Growth Expert specializing in Review Truyện Tranh / Manhua / Anime / Tu Tiên.
 Task: Analyze the film transcript and generate a high-CTR YouTube Publishing Pack in Vietnamese.
 
 RULES FOR TITLES (titles):
-1. TUYỆT ĐỐI KHÔNG dùng tên riêng đích danh của nhân vật (Không dùng: Lâm Tiêu, Trâu Phong, Diệp Phàm, Dương Lăng, v.v.).
-2. LUÔN DÙNG NGÔI XƯNG "TA", "BẢN TỌA", "BẢN ĐẾ" HOẶC DANH XƯNG THÂN PHẬN BÍ ẨN ("Gã Gia Đinh", "Kẻ Phế Vật", "Đại Lão Ẩn Thân", "Nữ Đế", "Ma Tôn", "Tên Đầy Tớ", "Đệ Tử Ngoại Môn"...).
-3. ĐÁNH VÀO TÂM LÝ TÒ MÒ / NGHỊCH LÝ / VẢ MẶT BÁ ĐẠO (Độ dài 65-85 ký tự):
-   - Kiểu nghịch lý: Bị ép làm điều xấu/gặp nạn -> Không ngờ ta lại hưởng lợi khủng / Tác dụng phụ rơi hết vào đầu kẻ địch.
-   - Kiểu vả mặt/Karma: Chê ta là phế vật nên chèn ép -> Đến khi ta ra tay thì cả tông môn/gia tộc phải quỳ lạy.
-   - Kiểu trớ trêu/hài hước: Ta là Ma Tôn vô địch nhưng lại bị kéo xuống làm shipper/người thường.
-   - Kiểu tò mò cực độ: Lén luyện cấm thuật / Vừa trùng sinh liền bị...
-4. Viết hoa chữ cái đầu các từ quan trọng, thêm 1 emoji nổi bật ở đầu (💥, 🔥, ⚡, 😱, 👑).
+1. BẮT BUỘC CHUẨN ĐỘ DÀI: 80 - 90 KÝ TỰ (Đánh đúng thuật toán YouTube SEO & Tỷ lệ nhấp CTR cao nhất).
+2. CÔNG THỨC VÀNG 5 THÀNH PHẦN:
+   [Xuyên Không/Trọng Sinh] + [Nghịch cảnh] + [Hệ Thống/Cơ Duyên] + [Sức mạnh] + [Kết quả]
+   (Cấu trúc: 1 Hook giật gân + 1 Cơ chế đặc biệt + 1 Kết quả bá đạo).
+
+3. ÁP DỤNG LẦN LƯỢT 5 CÔNG THỨC SAU CHO 5 TIÊU ĐỀ YOUTUBE:
+   - Title 1 (Xuyên Không + Hệ Thống + Vô Địch): "💥 Xuyên Không Đến Tu Tiên Giới, Hắn Kích Hoạt Hệ Thống Vô Địch Và Bắt Đầu Quét Ngang Thiên Hạ"
+   - Title 2 (Phế Vật + Thức Tỉnh Nghịch Thiên): "🔥 Bị Cả Tông Môn Coi Là Phế Vật, Hắn Thức Tỉnh Hệ Thống Nghịch Thiên Và Một Bước Thành Đại Đế"
+   - Title 3 (Đệ Tử Tạp Dịch + Hệ Thống Đánh Dấu): "⚡ Xuyên Không Thành Đệ Tử Tạp Dịch, Hắn Dùng Hệ Thống Đánh Dấu Tu Luyện Đến Vô Địch Thiên Hạ"
+   - Title 4 (Vạn Năm Tu Vi + Vô Địch): "👑 Vừa Xuyên Không Đã Sở Hữu Vạn Năm Tu Vi, Hắn Bắt Đầu Con Đường Vô Địch Khiến Thiên Hạ Khiếp Sợ"
+   - Title 5 (Thân Phận Ẩn + Chí Tôn): "😱 Ai Cũng Nghĩ Hắn Là Phế Nhân, Nào Ngờ Vừa Thức Tỉnh Hệ Thống Đã Trở Thành Tuyệt Thế Chí Tôn"
+
+4. QUY TẮC TỪ KHÓA & DANH XƯNG:
+   - TUYỆT ĐỐI KHÔNG dùng tên riêng đích danh nhân vật (Không dùng: Lâm Tiêu, Trâu Phong, Diệp Phàm, Dương Lăng...).
+   - LUÔN DÙNG DANH XƯNG XUẤT THÂN BÍ ẨN HOẶC NGÔI XƯNG ("Hắn", "Gã Đệ Tử Tạp Dịch", "Kẻ Phế Vật", "Đại Lão Ẩn Thân", "Nữ Đế", "Ma Tôn", "Bản Tọa"...).
+   - Đảm bảo đọc tự nhiên, liền mạch, có đủ từ khóa Xuyên Không / Tu Tiên / Hệ Thống / Vô Địch.
 
 RULES FOR THUMBNAIL TEXT (thumbnailTexts):
 Each thumbnail text MUST consist of 2 lines. Each line MUST be long and detailed, approximately 7 to 8 words per line (Dùng 7 đến 8 từ mỗi dòng, viết HOA, kịch tính, giật gân, cuốn hút).
@@ -138,11 +146,11 @@ Line 2: "TOÀN GIA BỊ TỐNG VÀO NGỤC TỐC MẠNG NGƯỜI NHƯ CỎ RÁC"
 REQUIRED JSON SCHEMA:
 {
   "titles": [
-    "💥 Bắt Ta Đi Luyện Tà Công, Ai Ngờ Tác Dụng Phụ Lại Rơi Hết Vào Đầu Kẻ Thù!",
-    "🔥 Ta Càng Chăm Chỉ Đột Phá, Cả Tông Môn Lại Càng... Hộc Máu Đau Đớn!",
-    "⚡ Cứ Nghĩ Ta Là Gã Đầy Tớ Vô Dụng, Cho Đến Khi Ta Rút Kiếm Chém Đứt Thiên Kiếp!",
-    "👑 Vừa Trùng Sinh Liền Bị Nữ Đế Ép Cưới, Không Ngờ Ta Lại Là Ma Tôn Thượng Cổ!",
-    "😱 Tưởng Ta Hết Linh Lực Liền Muốn Trả Thù, Kết Cục Cả Gia Tộc Phải Quỳ Xin Tha!"
+    "💥 Xuyên Không Đến Tu Tiên Giới, Hắn Kích Hoạt Hệ Thống Vô Địch Và Bắt Đầu Quét Ngang Thiên Hạ",
+    "🔥 Bị Cả Tông Môn Coi Là Phế Vật, Hắn Thức Tỉnh Hệ Thống Nghịch Thiên Và Một Bước Thành Đại Đế",
+    "⚡ Xuyên Không Thành Đệ Tử Tạp Dịch, Hắn Dùng Hệ Thống Đánh Dấu Tu Luyện Đến Vô Địch Thiên Hạ",
+    "👑 Vừa Xuyên Không Đã Sở Hữu Vạn Năm Tu Vi, Hắn Bắt Đầu Con Đường Vô Địch Khiến Thiên Hạ Khiếp Sợ",
+    "😱 Ai Cũng Nghĩ Hắn Là Phế Nhân, Nào Ngờ Vừa Thức Tỉnh Hệ Thống Đã Trở Thành Tuyệt Thế Chí Tôn"
   ],
   "thumbnailTexts": [
     { 
