@@ -733,38 +733,36 @@ ${fullImagePromptEn || generatedData.imagePromptEn}
 
         {/* Multi-SRT File Selection Toolbar (Collapsible) */}
         <div className="multi-file-selector-box mb-3 mt-3">
-          <div
-            className="flex-between flex-wrap gap-2 cursor-pointer"
-            onClick={() => setIsEpisodesExpanded(prev => !prev)}
-            title="Bấm để Đóng / Mở Rộng chọn tập phim"
-            style={{ userSelect: 'none' }}
-          >
-            <div className="flex-center gap-2 flex-wrap">
-              <CheckSquare size={17} className="text-cyan" />
-              <span className="font-bold text-cyan" style={{ fontSize: '0.9rem' }}>
-                Chọn Các Tập SRT Phân Tích Tổng Hợp ({selectedFileIds.length} / {files.length} tập chọn — Tổng {totalSelectedSubtitles.toLocaleString()} dòng thoại):
-              </span>
-              <span className="badge-info text-xs font-bold" style={{ background: 'rgba(6, 182, 212, 0.15)', color: '#22d3ee', padding: '2px 8px', borderRadius: '12px', border: '1px solid rgba(6, 182, 212, 0.3)' }}>
-                📁 {formatFileRangeTitle(selectedFilesList)}
-              </span>
+          <div className="flex-between flex-wrap gap-2 mb-2">
+            <div>
+              <div className="flex-center gap-2 mb-1">
+                <CheckSquare size={16} className="text-cyan" />
+                <span className="text-muted font-bold" style={{ fontSize: '0.82rem' }}>
+                  Đang hiện: <strong className="highlight-cyan">{sortedFiles.length}</strong> / {files.length} tập
+                </span>
+              </div>
+
+              {files.length > 0 && (
+                <button
+                  type="button"
+                  className="btn btn-secondary btn-sm font-bold text-cyan flex-center gap-1 mt-1"
+                  onClick={() => setIsEpisodesExpanded(prev => !prev)}
+                  title={isEpisodesExpanded ? "Thu gọn danh sách tập" : "Mở rộng danh sách tất cả các tập"}
+                >
+                  {isEpisodesExpanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+                  <span>{isEpisodesExpanded ? 'Thu Gọn Danh Sách' : `Mở Rộng (${files.length} tập)`}</span>
+                </button>
+              )}
             </div>
 
-            <div className="flex-center gap-2">
-              <button
-                type="button"
-                className="btn btn-cyan btn-xs font-bold flex-center gap-1"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setIsEpisodesExpanded(prev => !prev);
-                }}
-              >
-                {isEpisodesExpanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
-                <span>{isEpisodesExpanded ? '▲ Thu Gọn' : `▼ Mở Rộng (${files.length} tập)`}</span>
-              </button>
+            <div className="text-right">
+              <span className="font-bold text-cyan" style={{ fontSize: '0.88rem' }}>
+                Chọn Các Tập SRT Phân Tích Tổng Hợp ({selectedFileIds.length} / {files.length} tập chọn — Tổng {totalSelectedSubtitles.toLocaleString()} dòng thoại):
+              </span>
             </div>
           </div>
 
-          {/* Full Selection Controls & Pill Grid (Visible ONLY when expanded) */}
+          {/* Full Selection Controls & Pill Grid (Visible ONLY when expanded - Ảnh 1) */}
           {isEpisodesExpanded && (
             <div className="mt-3" style={{ animation: 'fadeIn 0.2s ease' }}>
               {/* Search, Filter & Bulk Selection Controls */}
@@ -890,17 +888,6 @@ ${fullImagePromptEn || generatedData.imagePromptEn}
                 )}
 
                 {files.length === 0 && <span className="text-muted">Chưa có file SRT nào trong danh sách. Hãy nạp file SRT ở tab Trình Dịch.</span>}
-              </div>
-
-              {/* Bottom Quick Collapse Action */}
-              <div className="flex-center mt-2">
-                <button
-                  type="button"
-                  className="btn btn-secondary btn-xs font-bold text-muted"
-                  onClick={() => setIsEpisodesExpanded(false)}
-                >
-                  <ChevronUp size={13} /> Thu Gọn Danh Sách Tập Lại
-                </button>
               </div>
             </div>
           )}
