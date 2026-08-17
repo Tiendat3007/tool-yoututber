@@ -271,7 +271,9 @@ export const PRONOUN_PRESETS = [
       { from: /\b(Tôi|Mình)\b/gi, to: 'Ta' },
       { from: /\b(Bạn|Cậu|Anh|Cô)\b/gi, to: 'Ngươi' },
       { from: /\b(Anh ấy|Ông ấy)\b/gi, to: 'Hắn' },
-      { from: /\b(Cô ấy|Bà ấy)\b/gi, to: 'Nàng' }
+      { from: /\b(Cô ấy|Bà ấy)\b/gi, to: 'Nàng' },
+      { from: /\b(Y)\b/g, to: 'Hắn' },
+      { from: /\b(y)\b/g, to: 'hắn' }
     ]
   },
   {

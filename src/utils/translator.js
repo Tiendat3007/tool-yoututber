@@ -103,25 +103,25 @@ BẮT BUỘC TUÂN THỦ QUY TẮC CỐT LÕI (DỊCH SANG TIẾNG VIỆT CỔ T
    - Đặt theo vị trí: [Tên + Danh xưng] (VD: 苏师兄 -> Tô sư huynh, 林师姐 -> Lâm sư tỷ, 叶前辈 -> Diệp tiền bối, 陈长老 -> Trần trưởng lão, 王宗主 -> Vương tông chủ). CẤM đảo thành "Sư huynh Tô", "Sư tỷ Lâm".
    - 师尊 -> sư tôn, 师父 -> sư phụ, 前辈 -> tiền bối, 晚辈 -> vãn bối, 道友 -> đạo hữu, 阁下 -> các hạ.
    - Đại từ quyền uy: 本座 -> bổn tọa, 本尊 -> bổn tôn, 本帝 -> bổn đế, 本王 -> bổn vương. KHÔNG dịch thành "tôi".
-   - Nam nhân dùng "hắn/y", nữ nhân dùng "nàng", KHÔNG dịch 他 thành "anh ấy" trong bối cảnh cổ trang.
+   - Nam nhân BẮT BUỘC dùng "hắn" (TUYỆT ĐỐI KHÔNG DÙNG "y", KHÔNG dịch 他 thành "anh ấy"), nữ nhân dùng "nàng" trong bối cảnh cổ trang Tu Tiên.
 
-3. CẢNH GIỚI TU LUYỆN: 
+4. CẢNH GIỚI TU LUYỆN: 
    - 炼气(Luyện Khí), 筑基(Trúc Cơ), 金丹(Kim Đan), 元婴(Nguyên Anh), 化神(Hóa Thần), 炼虚(Luyện Hư), 合体(Hợp Thể), 大乘(Đại Thừa), 渡劫(Độ Kiếp).
    - Cấp bậc: 初期(sơ kỳ), 中期(trung kỳ), 后期(hậu kỳ), 巅峰(đỉnh phong), 圆满(viên mãn). VD: 化神巅峰 -> Hóa Thần đỉnh phong.
    - 突破 -> đột phá, 越级挑战 -> vượt cấp khiêu chiến.
 
-4. KHÁI NIỆM TU TIÊN & TẢI TÀI NGUYÊN:
+5. KHÁI NIỆM TU TIÊN & TẢI TÀI NGUYÊN:
    - 功法(công pháp), 武技(võ kỹ), 秘术(bí thuật), 神通(thần thông), 心法(tâm pháp).
    - 法宝(pháp bảo), 灵器(linh khí), 仙器(tiên khí), 飞剑(phi kiếm).
    - 丹药(đan dược), 筑基丹(Trúc Cơ Đan), 灵石(linh thạch), 天材地宝(thiên tài địa bảo).
    - 宗门(tông môn), 宗主(tông chủ), 太上长老(thái thượng trưởng lão), 掌门(chưởng môn).
 
-5. NGHĨA SÂU SẮC & KHẨU NGỮ:
+6. NGHĨA SÂU SẮC & KHẨU NGỮ:
    - 蝼蚁 -> "sâu kiến" (KHÔNG dịch con kiến), 找死 -> "tìm chết" / "muốn chết sao?", 不自量力 -> "không biết tự lượng sức".
    - 穿越 -> xuyên không, 重生 -> trọng sinh, 转世 -> chuyển thế, 夺舍 -> đoạt xá.
    - Hệ thống: 系统 -> hệ thống, 宿主 -> ký chủ, 任务 -> nhiệm vụ, 奖励 -> phần thưởng, 恭喜宿主 -> Chúc mừng ký chủ.
 
-6. NGUYÊN TẮC FORMAT ĐẦU RA: 
+7. NGUYÊN TẮC FORMAT ĐẦU RA: 
    - GIỮ NGUYÊN số ID dòng phụ đề.
    - Trả về BẮT BUỘC duy nhất định dạng JSON Array: [{"id": 1, "translatedText": "..."}, ...]. KHÔNG THÊM BẤT KỲ VĂN BẢN NÀO NGOÀI JSON ARRAY.`;
 
