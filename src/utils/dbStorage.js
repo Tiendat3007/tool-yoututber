@@ -70,7 +70,6 @@ export async function loadProjectStateFromDB() {
 }
 
 export async function saveYoutuberStudioStateToDB(studioState) {
-
   try {
     const db = await openDB();
     const tx = db.transaction(STORE_NAME, 'readwrite');
@@ -95,6 +94,62 @@ export async function loadYoutuberStudioStateFromDB() {
   } catch (err) {
     console.warn('Unable to restore youtuber studio state from IndexedDB:', err);
     return null;
+  }
+}
+
+export async function saveYoutuberHistoryToDB(sessions, activeSessionId) {
+  try {
+    const db = await openDB();
+    const tx = db.transaction(STORE_NAME, 'readwrite');
+    const store = tx.objectStore(STORE_NAME);
+    store.put(sessions, 'youtuber_history_sessions');
+    store.put(activeSessionId, 'youtuber_active_session_id');
+  } catch (err) {
+    console.warn('Unable to persist youtuber history sessions to IndexedDB:', err);
+  }
+}
+
+export async function loadYoutuberHistoryFromDB() {
+  try {
+    const db = await openDB();
+    const tx = db.transaction(STORE_NAME, 'readonly');
+    const store = tx.objectStore(STORE_NAME);
+
+    const getVal = (key) => new Promise((resolve) => {
+      const req = store.get(key);
+      req.onsuccess = () => resolve(req.result);
+      req.onerror = () => resolve(null);
+    });
+
+    const sessions = await getVal('youtuber_history_sessions');
+    const activeSessionId = await getVal('youtuber_active_session_id');
+
+    // Backward compatibility: If no history array yet but old single state exists, migrate it seamlessly
+    if (!Array.isArray(sessions) || sessions.length === 0) {
+      const oldState = await getVal('youtuber_studio_state');
+      if (oldState && oldState.generatedData) {
+        const migratedSession = {
+          id: `session_legacy_${Date.now()}`,
+          title: oldState.generatedData.titles?.[oldState.selectedTitleIndex || 0] || 'Phân Tích Ban Đầu',
+          createdAt: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) + ' ' + new Date().toLocaleDateString('vi-VN'),
+          fileNames: [],
+          ...oldState
+        };
+        return {
+          sessions: [migratedSession],
+          activeSessionId: migratedSession.id
+        };
+      }
+      return { sessions: [], activeSessionId: null };
+    }
+
+    return {
+      sessions: Array.isArray(sessions) ? sessions : [],
+      activeSessionId: activeSessionId || (sessions.length > 0 ? sessions[0].id : null)
+    };
+  } catch (err) {
+    console.warn('Unable to restore youtuber history sessions from IndexedDB:', err);
+    return { sessions: [], activeSessionId: null };
   }
 }
 

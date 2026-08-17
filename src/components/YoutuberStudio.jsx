@@ -1,20 +1,15 @@
 import React, { useState, useRef, useEffect } from 'react';
 import {
   Video, Sparkles, Copy, Check, Image as ImageIcon, Tag, FileText,
-  Play, RefreshCw, Wand2, Type, Flame, Layers, Upload, Trash2, CheckSquare, Square, Download, Palette, BookOpen
+  Play, RefreshCw, Wand2, Type, Flame, Layers, Upload, Trash2, CheckSquare, Square, Download, Palette, BookOpen,
+  History, Plus, Edit2, Clock
 } from 'lucide-react';
 
 import { generateYoutubeContent } from '../utils/youtuberGenerator';
 import { exportThumbnailHD, generateAIThumbnailImage, THUMBNAIL_COLOR_THEMES } from '../utils/thumbnailExporter';
 import { uploadReferenceImageToOrimise, generateOrimiseImage } from '../utils/orimiseImageApi';
 import { generateFreeAIImage, FREE_IMAGE_MODELS } from '../utils/freeImageApi';
-import { saveYoutuberStudioStateToDB, loadYoutuberStudioStateFromDB } from '../utils/dbStorage';
-
-
-
-
-
-
+import { saveYoutuberStudioStateToDB, loadYoutuberStudioStateFromDB, saveYoutuberHistoryToDB, loadYoutuberHistoryFromDB } from '../utils/dbStorage';
 
 export default function YoutuberStudio({
   files = [],
@@ -33,6 +28,12 @@ export default function YoutuberStudio({
 
   const [genre, setGenre] = useState('Tu Tiên / Tiên Hiệp');
   const [contentType, setContentType] = useState('Review Phim / Tóm Tắt Phim');
+
+  // History Sessions State
+  const [historySessions, setHistorySessions] = useState([]);
+  const [activeSessionId, setActiveSessionId] = useState(null);
+  const [editingSessionId, setEditingSessionId] = useState(null);
+  const [editSessionTitle, setEditSessionTitle] = useState('');
 
   // Reference Background Image State for Thumbnail Mockup
   const [referenceBgImage, setReferenceBgImage] = useState(null);
@@ -62,58 +63,78 @@ export default function YoutuberStudio({
   const [selectedAnalysisModel, setSelectedAnalysisModel] = useState(() => aiModel || 'claude-sonnet-5');
   const [isRestoring, setIsRestoring] = useState(true);
 
-  // Restore previous Youtuber Studio state from IndexedDB across page reloads (F5)
+  // Restore history sessions & active session from IndexedDB across page reloads (F5)
   useEffect(() => {
     let isMounted = true;
-    async function restoreStudioState() {
+    async function restoreStudioHistory() {
       try {
-        const saved = await loadYoutuberStudioStateFromDB();
-        if (saved && isMounted) {
-          if (saved.generatedData) setGeneratedData(saved.generatedData);
-          if (Array.isArray(saved.selectedFileIds) && saved.selectedFileIds.length > 0) {
-            // Keep selected files that still exist in current project
-            setSelectedFileIds(saved.selectedFileIds);
+        const { sessions, activeSessionId: loadedId } = await loadYoutuberHistoryFromDB();
+        if (isMounted) {
+          if (Array.isArray(sessions) && sessions.length > 0) {
+            setHistorySessions(sessions);
+            const targetId = loadedId && sessions.some(s => s.id === loadedId) ? loadedId : sessions[0].id;
+            setActiveSessionId(targetId);
+
+            const activeSess = sessions.find(s => s.id === targetId);
+            if (activeSess) {
+              if (activeSess.generatedData) setGeneratedData(activeSess.generatedData);
+              if (Array.isArray(activeSess.selectedFileIds)) setSelectedFileIds(activeSess.selectedFileIds);
+              if (typeof activeSess.selectedTitleIndex === 'number') setSelectedTitleIndex(activeSess.selectedTitleIndex);
+              if (typeof activeSess.selectedTextIndex === 'number') setSelectedTextIndex(activeSess.selectedTextIndex);
+              if (activeSess.customLine1 !== undefined) setCustomLine1(activeSess.customLine1);
+              if (activeSess.customLine2 !== undefined) setCustomLine2(activeSess.customLine2);
+              if (activeSess.referenceBgImage) setReferenceBgImage(activeSess.referenceBgImage);
+              if (activeSess.selectedThemeId) setSelectedThemeId(activeSess.selectedThemeId);
+              if (activeSess.genre) setGenre(activeSess.genre);
+              if (activeSess.contentType) setContentType(activeSess.contentType);
+              if (activeSess.selectedAnalysisModel) setSelectedAnalysisModel(activeSess.selectedAnalysisModel);
+              if (activeSess.selectedFreeModel) setSelectedFreeModel(activeSess.selectedFreeModel);
+            }
           }
-          if (typeof saved.selectedTitleIndex === 'number') setSelectedTitleIndex(saved.selectedTitleIndex);
-          if (typeof saved.selectedTextIndex === 'number') setSelectedTextIndex(saved.selectedTextIndex);
-          if (saved.customLine1 !== undefined) setCustomLine1(saved.customLine1);
-          if (saved.customLine2 !== undefined) setCustomLine2(saved.customLine2);
-          if (saved.referenceBgImage) setReferenceBgImage(saved.referenceBgImage);
-          if (saved.selectedThemeId) setSelectedThemeId(saved.selectedThemeId);
-          if (saved.genre) setGenre(saved.genre);
-          if (saved.contentType) setContentType(saved.contentType);
-          if (saved.selectedAnalysisModel) setSelectedAnalysisModel(saved.selectedAnalysisModel);
-          if (saved.selectedFreeModel) setSelectedFreeModel(saved.selectedFreeModel);
         }
       } catch (err) {
-        console.warn('Could not restore YoutuberStudio state:', err);
+        console.warn('Could not restore YoutuberStudio history:', err);
       } finally {
         if (isMounted) setIsRestoring(false);
       }
     }
-    restoreStudioState();
+    restoreStudioHistory();
     return () => { isMounted = false; };
   }, []);
 
-  // Auto-save state to IndexedDB whenever critical states change
+  // Sync edits to the active history session and persist to IndexedDB
   useEffect(() => {
-    if (isRestoring) return;
-    saveYoutuberStudioStateToDB({
-      generatedData,
-      selectedFileIds,
-      selectedTitleIndex,
-      selectedTextIndex,
-      customLine1,
-      customLine2,
-      referenceBgImage,
-      selectedThemeId,
-      genre,
-      contentType,
-      selectedAnalysisModel,
-      selectedFreeModel
+    if (isRestoring || !activeSessionId) return;
+
+    setHistorySessions(prevSessions => {
+      const sessIdx = prevSessions.findIndex(s => s.id === activeSessionId);
+      if (sessIdx < 0) return prevSessions;
+
+      const currentSess = prevSessions[sessIdx];
+      const updatedSess = {
+        ...currentSess,
+        generatedData,
+        selectedFileIds,
+        selectedTitleIndex,
+        selectedTextIndex,
+        customLine1,
+        customLine2,
+        referenceBgImage,
+        selectedThemeId,
+        genre,
+        contentType,
+        selectedAnalysisModel,
+        selectedFreeModel
+      };
+
+      const newSessions = [...prevSessions];
+      newSessions[sessIdx] = updatedSess;
+      saveYoutuberHistoryToDB(newSessions, activeSessionId);
+      return newSessions;
     });
   }, [
     isRestoring,
+    activeSessionId,
     generatedData,
     selectedFileIds,
     selectedTitleIndex,
@@ -387,8 +408,49 @@ ${fullImagePromptEn || generatedData.imagePromptEn}
       setSelectedTextIndex(0);
 
       const firstTextObj = result.thumbnailTexts?.[0] || { line1: 'TÔ SƯ HUYNH XUYÊN KHÔNG VỀ THỜI TIÊN CỔ', line2: 'TOÀN GIA BỊ TỐNG VÀO NGỤC TỤC' };
-      setCustomLine1(firstTextObj.line1);
-      setCustomLine2(firstTextObj.line2);
+      const newLine1 = firstTextObj.line1;
+      const newLine2 = firstTextObj.line2;
+      setCustomLine1(newLine1);
+      setCustomLine2(newLine2);
+
+      // Create or update history session
+      const epCount = selectedFilesList.length;
+      const epNames = selectedFilesList.map(f => f.name.replace(/\.srt$/i, '')).join(', ');
+      const defaultTitle = result.titles?.[0] || `${epNames} (${epCount} tập)`;
+      const newSessionId = activeSessionId || `session_${Date.now()}`;
+
+      const newSession = {
+        id: newSessionId,
+        title: defaultTitle,
+        createdAt: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) + ' ' + new Date().toLocaleDateString('vi-VN'),
+        fileNames: selectedFilesList.map(f => f.name),
+        selectedFileIds: [...selectedFileIds],
+        generatedData: result,
+        selectedTitleIndex: 0,
+        selectedTextIndex: 0,
+        customLine1: newLine1,
+        customLine2: newLine2,
+        referenceBgImage,
+        selectedThemeId,
+        genre,
+        contentType,
+        selectedAnalysisModel,
+        selectedFreeModel
+      };
+
+      setHistorySessions(prev => {
+        const existingIdx = prev.findIndex(s => s.id === newSessionId);
+        let updated;
+        if (existingIdx >= 0) {
+          updated = [...prev];
+          updated[existingIdx] = newSession;
+        } else {
+          updated = [newSession, ...prev];
+        }
+        saveYoutuberHistoryToDB(updated, newSessionId);
+        return updated;
+      });
+      setActiveSessionId(newSessionId);
     } catch (err) {
       alert(`Lỗi tạo nội dung YouTube: ${err.message}`);
     } finally {
@@ -396,12 +458,188 @@ ${fullImagePromptEn || generatedData.imagePromptEn}
     }
   };
 
+  // Switch to a chosen history session
+  const handleSelectSession = (session) => {
+    setActiveSessionId(session.id);
+    if (session.generatedData) setGeneratedData(session.generatedData);
+    if (Array.isArray(session.selectedFileIds)) setSelectedFileIds(session.selectedFileIds);
+    if (typeof session.selectedTitleIndex === 'number') setSelectedTitleIndex(session.selectedTitleIndex);
+    if (typeof session.selectedTextIndex === 'number') setSelectedTextIndex(session.selectedTextIndex);
+    setCustomLine1(session.customLine1 || '');
+    setCustomLine2(session.customLine2 || '');
+    if (session.referenceBgImage) setReferenceBgImage(session.referenceBgImage);
+    if (session.selectedThemeId) setSelectedThemeId(session.selectedThemeId);
+    if (session.genre) setGenre(session.genre);
+    if (session.contentType) setContentType(session.contentType);
+    if (session.selectedAnalysisModel) setSelectedAnalysisModel(session.selectedAnalysisModel);
+    if (session.selectedFreeModel) setSelectedFreeModel(session.selectedFreeModel);
+
+    saveYoutuberHistoryToDB(historySessions, session.id);
+  };
+
+  // Start fresh analysis without overwriting existing tabs
+  const handleCreateNewSession = () => {
+    setActiveSessionId(null);
+    setGeneratedData(null);
+    setCustomLine1('');
+    setCustomLine2('');
+    setReferenceBgImage(null);
+    setSelectedTitleIndex(0);
+    setSelectedTextIndex(0);
+    saveYoutuberHistoryToDB(historySessions, null);
+  };
+
+  // Delete a history session
+  const handleDeleteSession = (e, sessionId) => {
+    e.stopPropagation();
+    const updated = historySessions.filter(s => s.id !== sessionId);
+    setHistorySessions(updated);
+
+    if (activeSessionId === sessionId) {
+      if (updated.length > 0) {
+        handleSelectSession(updated[0]);
+      } else {
+        handleCreateNewSession();
+      }
+    } else {
+      saveYoutuberHistoryToDB(updated, activeSessionId);
+    }
+  };
+
+  // Save renamed session title
+  const handleSaveRenameSession = (sessionId) => {
+    if (!editSessionTitle.trim()) {
+      setEditingSessionId(null);
+      return;
+    }
+    setHistorySessions(prev => {
+      const updated = prev.map(s => s.id === sessionId ? { ...s, title: editSessionTitle.trim() } : s);
+      saveYoutuberHistoryToDB(updated, activeSessionId);
+      return updated;
+    });
+    setEditingSessionId(null);
+  };
+
+  // Clear all history
+  const handleClearAllHistory = () => {
+    if (window.confirm('Bạn có chắc chắn muốn xóa toàn bộ lịch sử các tab phân tích?')) {
+      setHistorySessions([]);
+      handleCreateNewSession();
+    }
+  };
 
   const currentTitle = generatedData?.titles?.[selectedTitleIndex] || 'TOÀN GIA BỊ BẮT XUYÊN KHÔNG ĐỘT PHÁ KIM ĐAN!';
 
-
   return (
     <div className="youtuber-studio-layout">
+      {/* History Sessions / Tabs Strip */}
+      <div className="history-sessions-panel">
+        <div className="history-sessions-header">
+          <div className="history-sessions-title">
+            <History size={18} className="text-cyan" />
+            <span>Lịch Sử Phân Tích ({historySessions.length} phiên đã lưu):</span>
+          </div>
+
+          <div className="flex-center gap-2">
+            <button
+              className="btn btn-cyan btn-sm font-bold"
+              onClick={handleCreateNewSession}
+              title="Mở một phiên phân tích mới để phân tích bộ phim/tập phim khác mà không làm mất kết quả cũ"
+            >
+              <Plus size={15} /> ➕ Phân Tích Phiên Mới
+            </button>
+
+            {historySessions.length > 1 && (
+              <button
+                className="btn btn-secondary btn-sm text-red"
+                onClick={handleClearAllHistory}
+                title="Xóa toàn bộ lịch sử các phiên phân tích"
+              >
+                <Trash2 size={14} /> Xóa Tất Cả
+              </button>
+            )}
+          </div>
+        </div>
+
+        {historySessions.length > 0 ? (
+          <div className="history-tabs-track">
+            {historySessions.map((session, idx) => {
+              const isActive = session.id === activeSessionId;
+              const isEditing = editingSessionId === session.id;
+
+              return (
+                <div
+                  key={session.id}
+                  className={`history-tab-card ${isActive ? 'active' : ''}`}
+                  onClick={() => handleSelectSession(session)}
+                  title="Bấm để xem lại kết quả phân tích của phiên này"
+                >
+                  <div className="history-tab-top">
+                    {isEditing ? (
+                      <input
+                        type="text"
+                        className="input-field input-xs"
+                        autoFocus
+                        value={editSessionTitle}
+                        onChange={e => setEditSessionTitle(e.target.value)}
+                        onBlur={() => handleSaveRenameSession(session.id)}
+                        onKeyDown={e => {
+                          if (e.key === 'Enter') handleSaveRenameSession(session.id);
+                          if (e.key === 'Escape') setEditingSessionId(null);
+                        }}
+                        onClick={e => e.stopPropagation()}
+                      />
+                    ) : (
+                      <span
+                        className="history-tab-name"
+                        onDoubleClick={(e) => {
+                          e.stopPropagation();
+                          setEditingSessionId(session.id);
+                          setEditSessionTitle(session.title || '');
+                        }}
+                      >
+                        {session.title || `Phiên #${idx + 1}`}
+                      </span>
+                    )}
+
+                    <div className="flex-center gap-1">
+                      <button
+                        className="history-tab-btn-del"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setEditingSessionId(session.id);
+                          setEditSessionTitle(session.title || '');
+                        }}
+                        title="Đổi tên tab này"
+                      >
+                        <Edit2 size={12} />
+                      </button>
+
+                      <button
+                        className="history-tab-btn-del"
+                        onClick={(e) => handleDeleteSession(e, session.id)}
+                        title="Xóa phiên phân tích này khỏi lịch sử"
+                      >
+                        ✕
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="history-tab-meta">
+                    <span>{session.fileNames?.length || session.selectedFileIds?.length || 1} tập</span>
+                    <span><Clock size={11} style={{ display: 'inline', marginRight: '3px' }} />{session.createdAt || 'Vừa xong'}</span>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        ) : (
+          <div className="text-xs text-muted" style={{ padding: '6px 2px' }}>
+            Chưa có phiên phân tích nào. Hãy chọn các tập phim SRT bên dưới rồi nhấn <strong>[🚀 Phân Tích Kịch Bản & Tạo Bộ Xuất Bản]</strong> để tự động lưu vào lịch sử!
+          </div>
+        )}
+      </div>
+
       {/* Top Banner Control Panel */}
       <div className="card-panel studio-banner">
         <div className="banner-title-group">
