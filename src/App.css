@@ -1529,9 +1529,9 @@
 
 .history-tab-card {
   flex: 0 0 auto;
-  min-width: 230px;
-  max-width: 320px;
-  background: rgba(17, 24, 39, 0.9);
+  min-width: 240px;
+  max-width: 340px;
+  background: rgba(17, 24, 39, 0.92);
   border: 1px solid rgba(255, 255, 255, 0.1);
   border-radius: 10px;
   padding: 10px 14px;
@@ -1540,7 +1540,7 @@
   position: relative;
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 6px;
 }
 
 .history-tab-card:hover {
@@ -1551,24 +1551,36 @@
 
 .history-tab-card.active {
   border-color: #22d3ee;
-  background: linear-gradient(135deg, rgba(8, 145, 178, 0.25) 0%, rgba(15, 23, 42, 0.95) 100%);
-  box-shadow: 0 0 16px rgba(34, 211, 238, 0.25), inset 0 0 12px rgba(34, 211, 238, 0.08);
+  background: linear-gradient(135deg, rgba(8, 145, 178, 0.28) 0%, rgba(15, 23, 42, 0.98) 100%);
+  box-shadow: 0 0 16px rgba(34, 211, 238, 0.3), inset 0 0 12px rgba(34, 211, 238, 0.1);
 }
 
 .history-tab-top {
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   justify-content: space-between;
   gap: 8px;
 }
 
-.history-tab-name {
-  font-size: 0.85rem;
-  font-weight: 700;
-  color: #f8fafc;
+.history-tab-filename {
+  font-size: 0.9rem;
+  font-weight: 800;
+  color: #22d3ee;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  line-height: 1.3;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.history-tab-storytitle {
+  font-size: 0.78rem;
+  color: #cbd5e1;
   line-height: 1.35;
   display: -webkit-box;
-  -webkit-line-clamp: 2;
+  -webkit-line-clamp: 1;
   -webkit-box-orient: vertical;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -1582,6 +1594,7 @@
   color: #94a3b8;
   border-top: 1px solid rgba(255, 255, 255, 0.08);
   padding-top: 6px;
+  margin-top: 2px;
 }
 
 .history-tab-btn-del {
@@ -1589,15 +1602,18 @@
   border: none;
   color: #94a3b8;
   cursor: pointer;
-  padding: 2px 4px;
+  padding: 4px 6px;
   border-radius: 4px;
   transition: all 0.15s ease;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   line-height: 1;
 }
 
 .history-tab-btn-del:hover {
   color: #ef4444;
-  background: rgba(239, 68, 68, 0.15);
+  background: rgba(239, 68, 68, 0.18);
 }
 
 /* Step Badges & Workflow Navigation */

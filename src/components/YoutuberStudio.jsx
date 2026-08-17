@@ -11,6 +11,33 @@ import { uploadReferenceImageToOrimise, generateOrimiseImage } from '../utils/or
 import { generateFreeAIImage, FREE_IMAGE_MODELS } from '../utils/freeImageApi';
 import { saveYoutuberStudioStateToDB, loadYoutuberStudioStateFromDB, saveYoutuberHistoryToDB, loadYoutuberHistoryFromDB } from '../utils/dbStorage';
 
+// Helper to generate concise episode range name (e.g. c3-1-3 or c3_01 - c3_22)
+function formatFileRangeTitle(fileList = []) {
+  if (!fileList || fileList.length === 0) return 'Tập Phim Mới';
+  const cleanNames = fileList.map(f => {
+    const raw = typeof f === 'string' ? f : (f.name || '');
+    return raw.replace(/\.srt$/i, '').replace(/^.*[\\/]/, '').trim();
+  });
+
+  if (cleanNames.length === 1) return cleanNames[0];
+
+  const first = cleanNames[0];
+  const last = cleanNames[cleanNames.length - 1];
+
+  // Try matching numeric range like c3-1 and c3-3 or c3_01 and c3_22
+  const matchFirst = first.match(/^(.*?)(\d+)$/);
+  const matchLast = last.match(/^(.*?)(\d+)$/);
+
+  if (matchFirst && matchLast && matchFirst[1] === matchLast[1]) {
+    const prefix = matchFirst[1].replace(/[-_]$/, '');
+    const num1 = parseInt(matchFirst[2], 10);
+    const num2 = parseInt(matchLast[2], 10);
+    return `${prefix}-${num1}-${num2}`;
+  }
+
+  return `${first} - ${last}`;
+}
+
 export default function YoutuberStudio({
   files = [],
   activeFile,
@@ -466,15 +493,14 @@ ${fullImagePromptEn || generatedData.imagePromptEn}
       setCustomLine1(newLine1);
       setCustomLine2(newLine2);
 
-      // Create or update history session
+      // Create or update history session with concise file range name (e.g. c3-1-3)
       const epCount = selectedFilesList.length;
-      const epNames = selectedFilesList.map(f => f.name.replace(/\.srt$/i, '')).join(', ');
-      const defaultTitle = result.titles?.[0] || `${epNames} (${epCount} tập)`;
+      const fileRangeTitle = formatFileRangeTitle(selectedFilesList);
       const newSessionId = activeSessionId || `session_${Date.now()}`;
 
       const newSession = {
         id: newSessionId,
-        title: defaultTitle,
+        title: fileRangeTitle,
         createdAt: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) + ' ' + new Date().toLocaleDateString('vi-VN'),
         fileNames: selectedFilesList.map(f => f.name),
         selectedFileIds: [...selectedFileIds],
@@ -643,19 +669,21 @@ ${fullImagePromptEn || generatedData.imagePromptEn}
                         onClick={e => e.stopPropagation()}
                       />
                     ) : (
-                      <span
-                        className="history-tab-name"
+                      <div
+                        className="history-tab-filename"
+                        title={session.title || formatFileRangeTitle(session.fileNames || session.selectedFileIds)}
                         onDoubleClick={(e) => {
                           e.stopPropagation();
                           setEditingSessionId(session.id);
                           setEditSessionTitle(session.title || '');
                         }}
                       >
-                        {session.title || `Phiên #${idx + 1}`}
-                      </span>
+                        <FileText size={14} className="text-cyan" />
+                        <span>{session.title || formatFileRangeTitle(session.fileNames || session.selectedFileIds)}</span>
+                      </div>
                     )}
 
-                    <div className="flex-center gap-1">
+                    <div className="flex-center gap-1" style={{ flexShrink: 0 }}>
                       <button
                         className="history-tab-btn-del"
                         onClick={(e) => {
@@ -677,6 +705,13 @@ ${fullImagePromptEn || generatedData.imagePromptEn}
                       </button>
                     </div>
                   </div>
+
+                  {/* 1-Line Subtitle Story Preview */}
+                  {session.generatedData?.titles?.[0] && (
+                    <div className="history-tab-storytitle" title={session.generatedData.titles[0]}>
+                      💥 {session.generatedData.titles[0]}
+                    </div>
+                  )}
 
                   <div className="history-tab-meta">
                     <span>{session.fileNames?.length || session.selectedFileIds?.length || 1} tập</span>
