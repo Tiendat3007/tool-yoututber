@@ -179,9 +179,9 @@ BƯỚC 2: TỔNG HỢP VÀ SÁNG TẠO BỘ METADATA YOUTUBE CHUẨN VIRAL
      + Mẫu #3 tương ứng và bổ trợ cho Tiêu đề #3.
      + Mẫu #4 tương ứng và bổ trợ cho Tiêu đề #4.
      + Mẫu #5 tương ứng và bổ trợ cho Tiêu đề #5.
-   - Mỗi mẫu gồm 2 dòng, mỗi dòng đúng 5 đến 8 từ, viết HOA, tương phản cực mạnh:
-     + line1 (Chữ vàng 3D đập mắt): Biến cố / Nghịch cảnh hiểm nghèo.
-     + line2 (Chữ xanh ngọc kịch tính): Thức tỉnh sức mạnh / Vả mặt phản đòn.
+   - Mỗi mẫu gồm 2 dòng, mỗi dòng DÀI KHOẢNG 7 ĐẾN 10 TỪ (viết HOA, cuốn hút, giàu hình tượng, kịch tính, đầy đủ ý nghĩa):
+     + line1 (Chữ vàng 3D đập mắt - 7 đến 10 từ): Nêu bật biến cố / nghịch cảnh hiểm nghèo của Tiêu đề đó.
+     + line2 (Chữ xanh ngọc kịch tính - 7 đến 10 từ): Nêu bật thức tỉnh sức mạnh / vả mặt phản đòn quét sạch kẻ thù của Tiêu đề đó.
 
 4. BẢNG MỐC THỜI GIAN PHÂN CẢNH YOUTUBE (timestamps):
    - Mảng 4 - 6 mốc thời gian diễn biến chính (VD: "00:00 Mở đầu: Xuyên Không...", "03:45 Nghịch Cảnh...", "12:10 Cao Trào...", "20:30 Kết Cục...").
@@ -204,26 +204,27 @@ REQUIRED OUTPUT JSON FORMAT (Return ONLY valid JSON):
   ],
   "thumbnailTexts": [
     {
-      "line1": "DÒNG 1 KHỚP TIÊU ĐỀ 1 NGHỊCH CẢNH 5-8 TỪ",
-      "line2": "DÒNG 2 KHỚP TIÊU ĐỀ 1 THỨC TỈNH 5-8 TỪ"
+      "line1": "TÔ SƯ HUYNH XUYÊN KHÔNG VỀ THỜI TIÊN CỔ",
+      "line2": "MỘT KIẾM CHÉM ĐỨT TOÀN BỘ XIỀNG XÍCH TÔNG MÔN"
     },
     {
-      "line1": "DÒNG 1 KHỚP TIÊU ĐỀ 2 BIẾN CỐ 5-8 TỪ",
-      "line2": "DÒNG 2 KHỚP TIÊU ĐỀ 2 VẢ MẶT PHẢN ĐÒN 5-8 TỪ"
+      "line1": "KẺ PHẾ VẬT BỊ CẢ TÔNG MÔN RUỒNG BỎ ĐUỔI ĐI",
+      "line2": "THỨC TỈNH THẦN MA QUYẾT QUÉT SẠCH THIÊN HẠ"
     },
     {
-      "line1": "DÒNG 1 KHỚP TIÊU ĐỀ 3 BẢO VẬT CƠ DUYÊN 5-8 TỪ",
-      "line2": "DÒNG 2 KHỚP TIÊU ĐỀ 3 SỨC MẠNH VÔ ĐỊCH 5-8 TỪ"
+      "line1": "TRỌNG SINH MANG THEO HỆ THỐNG VÔ ĐỊCH THẦN CẤP",
+      "line2": "MỘT BƯỚC ĐỘT PHÁ THÀNH ĐỈNH CAO THẦN MA"
     },
     {
-      "line1": "DÒNG 1 KHỚP TIÊU ĐỀ 4 MA TÔN THỨC TỈNH 5-8 TỪ",
-      "line2": "DÒNG 2 KHỚP TIÊU ĐỀ 4 BÁ QUYỀN THIÊN HẠ 5-8 TỪ"
+      "line1": "TOÀN GIA BỊ BẮT TỐNG VÀO NGỤC TỐI TU TIÊN",
+      "line2": "HẮN TRIỆU HỒI MA TÔN THẦN KIẾM PHẢN SÁT"
     },
     {
-      "line1": "DÒNG 1 KHỚP TIÊU ĐỀ 5 ĐẠI CHIẾN SINH TỬ 5-8 TỪ",
-      "line2": "DÒNG 2 KHỚP TIÊU ĐỀ 5 ĐỘT PHÁ QUÉT SẠCH 5-8 TỪ"
+      "line1": "ĐẠI CHIẾN SINH TỬ ĐỐI ĐẦU HÀNG TRĂM TRƯỞNG LÃO",
+      "line2": "MỘT CHIÊU QUYẾT ĐỊNH XÓA SỔ TOÀN BỘ ĐỊCH NHÂN"
     }
   ],
+
   "timestamps": [
     "00:00 Mở đầu: Xuyên Không Đến Tu Tiên Giới",
     "03:45 Biến cố: Toàn Gia Bị Tống Vào Hầm Ngục",
