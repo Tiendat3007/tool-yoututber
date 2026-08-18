@@ -163,12 +163,25 @@ BƯỚC 2: TỔNG HỢP VÀ SÁNG TẠO BỘ METADATA YOUTUBE CHUẨN VIRAL
    - Viết bài tóm tắt mạch lạc, cuốn hút (khoảng 350 - 550 chữ) kể lại toàn bộ diễn biến các tập phim từ mở đầu đến kết thúc để nhà sáng tạo video đọc hiểu trọn vẹn 100% câu chuyện.
 
 2. 5 TIÊU ĐỀ YOUTUBE CHUẨN 80–90 KÝ TỰ (titles):
-   - Áp dụng công thức: [Xuyên Không/Trọng Sinh] + [Nghịch Cảnh Trong Phim] + [Cơ Duyên/Hệ Thống] + [Sức Mạnh] + [Kết Quả Bá Đạo]
+   - Áp dụng công thức viral: [Xuyên Không/Trọng Sinh] + [Nghịch Cảnh Trong Phim] + [Cơ Duyên/Hệ Thống] + [Sức Mạnh] + [Kết Quả Bá Đạo]
    - Chuẩn độ dài 80 - 90 ký tự. Không dùng tên riêng đích danh (dùng: Hắn, Gã Đệ Tử Tạp Dịch, Kẻ Phế Vật, Ma Tôn...).
-   - Chia 5 góc độ hấp dẫn khác nhau dựa trên đúng cốt truyện đã đọc.
+   - Chia 5 góc độ hấp dẫn khác nhau dựa trên đúng cốt truyện đã đọc:
+     + Tiêu đề #1: Góc độ Xuyên Không / Trọng Sinh thức tỉnh.
+     + Tiêu đề #2: Góc độ Nghịch cảnh / Bị tông môn ruồng bỏ & vả mặt.
+     + Tiêu đề #3: Góc độ Thần kiếm / Hệ thống / Bảo vật vô địch.
+     + Tiêu đề #4: Góc độ Tu La / Ma Đạo / Bá vương giáng thế.
+     + Tiêu đề #5: Góc độ Đột phá cảnh giới / Quét sạch vạn giới.
 
-3. 3 MẪU CHỮ THUMBNAIL 2 DÒNG (thumbnailTexts):
-   - Mỗi dòng đúng 7 đến 8 từ, viết HOA, tương phản mạnh (Dòng 1: Nghịch cảnh/nguy hiểm - Dòng 2: Phản đòn/đột phá).
+3. 5 MẪU CHỮ THUMBNAIL 2 DÒNG TƯƠNG ỨNG 1-1 VỚI TỪNG TIÊU ĐỀ ĐÓ (thumbnailTexts):
+   - BẮT BUỘC TẠO ĐỦ 5 MẪU CHỮ THUMBNAIL KHỚP CHÍNH XÁC VỚI 5 TIÊU ĐỀ TRÊN:
+     + Mẫu #1 tương ứng và bổ trợ cho Tiêu đề #1.
+     + Mẫu #2 tương ứng và bổ trợ cho Tiêu đề #2.
+     + Mẫu #3 tương ứng và bổ trợ cho Tiêu đề #3.
+     + Mẫu #4 tương ứng và bổ trợ cho Tiêu đề #4.
+     + Mẫu #5 tương ứng và bổ trợ cho Tiêu đề #5.
+   - Mỗi mẫu gồm 2 dòng, mỗi dòng đúng 5 đến 8 từ, viết HOA, tương phản cực mạnh:
+     + line1 (Chữ vàng 3D đập mắt): Biến cố / Nghịch cảnh hiểm nghèo.
+     + line2 (Chữ xanh ngọc kịch tính): Thức tỉnh sức mạnh / Vả mặt phản đòn.
 
 4. BẢNG MỐC THỜI GIAN PHÂN CẢNH YOUTUBE (timestamps):
    - Mảng 4 - 6 mốc thời gian diễn biến chính (VD: "00:00 Mở đầu: Xuyên Không...", "03:45 Nghịch Cảnh...", "12:10 Cao Trào...", "20:30 Kết Cục...").
@@ -183,24 +196,32 @@ REQUIRED OUTPUT JSON FORMAT (Return ONLY valid JSON):
 {
   "storySummary": "Bài tóm tắt toàn bộ cốt truyện chi tiết, mạch lạc, dễ hiểu...",
   "titles": [
-    "💥 [Tiêu đề 1 chuẩn 80-90 ký tự dựa theo phim]",
-    "🔥 [Tiêu đề 2 chuẩn 80-90 ký tự dựa theo phim]",
-    "⚡ [Tiêu đề 3 chuẩn 80-90 ký tự dựa theo phim]",
-    "👑 [Tiêu đề 4 chuẩn 80-90 ký tự dựa theo phim]",
-    "😱 [Tiêu đề 5 chuẩn 80-90 ký tự dựa theo phim]"
+    "💥 [Tiêu đề 1 chuẩn 80-90 ký tự: Góc độ Xuyên Không/Trọng Sinh]",
+    "🔥 [Tiêu đề 2 chuẩn 80-90 ký tự: Góc độ Nghịch Cảnh Vả Mặt]",
+    "⚡ [Tiêu đề 3 chuẩn 80-90 ký tự: Góc độ Hệ Thống/Bảo Vật Vô Địch]",
+    "👑 [Tiêu đề 4 chuẩn 80-90 ký tự: Góc độ Ma Tôn/Tu La Bá Vương]",
+    "😱 [Tiêu đề 5 chuẩn 80-90 ký tự: Góc độ Đột Phá Quét Sạch Thiên Hạ]"
   ],
   "thumbnailTexts": [
     {
-      "line1": "DÒNG 1 NGHỊCH CẢNH CỦA PHIM ĐÚNG 7 ĐẾN 8 TỪ",
-      "line2": "DÒNG 2 PHẢN ĐÒN VẢ MẶT CỦA PHIM ĐÚNG 7 ĐẾN 8 TỪ"
+      "line1": "DÒNG 1 KHỚP TIÊU ĐỀ 1 NGHỊCH CẢNH 5-8 TỪ",
+      "line2": "DÒNG 2 KHỚP TIÊU ĐỀ 1 THỨC TỈNH 5-8 TỪ"
     },
     {
-      "line1": "DÒNG 1 BIẾN CỐ BẤT NGỜ ĐÚNG 7 ĐẾN 8 TỪ",
-      "line2": "DÒNG 2 ĐỘT PHÁ BÁ ĐẠO ĐÚNG 7 ĐẾN 8 TỪ"
+      "line1": "DÒNG 1 KHỚP TIÊU ĐỀ 2 BIẾN CỐ 5-8 TỪ",
+      "line2": "DÒNG 2 KHỚP TIÊU ĐỀ 2 VẢ MẶT PHẢN ĐÒN 5-8 TỪ"
     },
     {
-      "line1": "DÒNG 1 THÁCH THỨC SINH TỬ ĐÚNG 7 ĐẾN 8 TỪ",
-      "line2": "DÒNG 2 QUÉT NGANG THIÊN HẠ ĐÚNG 7 ĐẾN 8 TỪ"
+      "line1": "DÒNG 1 KHỚP TIÊU ĐỀ 3 BẢO VẬT CƠ DUYÊN 5-8 TỪ",
+      "line2": "DÒNG 2 KHỚP TIÊU ĐỀ 3 SỨC MẠNH VÔ ĐỊCH 5-8 TỪ"
+    },
+    {
+      "line1": "DÒNG 1 KHỚP TIÊU ĐỀ 4 MA TÔN THỨC TỈNH 5-8 TỪ",
+      "line2": "DÒNG 2 KHỚP TIÊU ĐỀ 4 BÁ QUYỀN THIÊN HẠ 5-8 TỪ"
+    },
+    {
+      "line1": "DÒNG 1 KHỚP TIÊU ĐỀ 5 ĐẠI CHIẾN SINH TỬ 5-8 TỪ",
+      "line2": "DÒNG 2 KHỚP TIÊU ĐỀ 5 ĐỘT PHÁ QUÉT SẠCH 5-8 TỪ"
     }
   ],
   "timestamps": [
@@ -214,7 +235,8 @@ REQUIRED OUTPUT JSON FORMAT (Return ONLY valid JSON):
   "imagePromptVi": "Mô tả ý tưởng hình ảnh thumbnail bằng tiếng Việt...",
   "description": "Mô tả video YouTube chi tiết theo các tập phim...",
   "tags": "tu tiên, tóm tắt phim, review phim tu tiên..."
-}`;
+}
+`;
 
 
   const userMessage = `THỂ LOẠI: ${genre}

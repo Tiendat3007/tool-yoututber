@@ -733,11 +733,11 @@ ${fullImagePromptEn || generatedData.imagePromptEn}
 
         {/* Multi-SRT File Selection Toolbar (Collapsible) */}
         <div className="multi-file-selector-box mb-3 mt-3">
-          <div className="flex-between flex-wrap gap-2 mb-2">
+          <div className="flex-between align-start flex-wrap gap-3 mb-2">
             <div>
-              <div className="flex-center gap-2 mb-1">
+              <div className="flex-center gap-2 mb-1" style={{ justifyContent: 'flex-start' }}>
                 <CheckSquare size={16} className="text-cyan" />
-                <span className="text-muted font-bold" style={{ fontSize: '0.82rem' }}>
+                <span className="text-muted font-bold" style={{ fontSize: '0.85rem' }}>
                   Đang hiện: <strong className="highlight-cyan">{sortedFiles.length}</strong> / {files.length} tập
                 </span>
               </div>
@@ -755,8 +755,8 @@ ${fullImagePromptEn || generatedData.imagePromptEn}
               )}
             </div>
 
-            <div className="text-right">
-              <span className="font-bold text-cyan" style={{ fontSize: '0.88rem' }}>
+            <div style={{ textAlign: 'right', maxWidth: '650px' }}>
+              <span className="font-bold text-cyan" style={{ fontSize: '0.92rem' }}>
                 Chọn Các Tập SRT Phân Tích Tổng Hợp ({selectedFileIds.length} / {files.length} tập chọn — Tổng {totalSelectedSubtitles.toLocaleString()} dòng thoại):
               </span>
             </div>
@@ -1010,8 +1010,15 @@ ${fullImagePromptEn || generatedData.imagePromptEn}
                   <div
                     key={idx}
                     className={`title-item-card ${isSelected ? 'selected' : ''}`}
-                    onClick={() => setSelectedTitleIndex(idx)}
-                    title="Bấm để chọn tiêu đề này hiển thị trên mockup"
+                    onClick={() => {
+                      setSelectedTitleIndex(idx);
+                      if (generatedData.thumbnailTexts && generatedData.thumbnailTexts[idx]) {
+                        setSelectedTextIndex(idx);
+                        setCustomLine1(generatedData.thumbnailTexts[idx].line1);
+                        setCustomLine2(generatedData.thumbnailTexts[idx].line2);
+                      }
+                    }}
+                    title={`Bấm để chọn Tiêu đề #${idx + 1} & Tự động nạp Chữ Thumbnail #${idx + 1} tương ứng lên Live Mockup`}
                   >
                     <div className="title-number">#{idx + 1}</div>
                     <div className="title-text" style={{ flex: 1 }}>{title}</div>
@@ -1033,14 +1040,14 @@ ${fullImagePromptEn || generatedData.imagePromptEn}
               })}
             </div>
 
-            {/* 2-Line Thumbnail Text Overlay Suggestions */}
+            {/* 5 Paired 2-Line Thumbnail Text Overlay Suggestions */}
             <div className="column-header mt-4">
               <Type size={20} className="text-purple" />
-              <h3>🖼️ Chữ Thumbnail 2 Dòng Ngắn Gọn Dễ Hiểu</h3>
+              <h3>🖼️ 5 Mẫu Chữ Thumbnail 2 Dòng (Khớp 1-1 Theo 5 Tiêu Đề)</h3>
             </div>
 
             <div className="thumbnail-texts-list">
-              {generatedData.thumbnailTexts.map((item, idx) => {
+              {(generatedData.thumbnailTexts || []).map((item, idx) => {
                 const isSelected = selectedTextIndex === idx;
                 return (
                   <div
@@ -1050,10 +1057,13 @@ ${fullImagePromptEn || generatedData.imagePromptEn}
                       setSelectedTextIndex(idx);
                       setCustomLine1(item.line1);
                       setCustomLine2(item.line2);
+                      if (generatedData.titles && generatedData.titles[idx]) {
+                        setSelectedTitleIndex(idx);
+                      }
                     }}
-                    title="Bấm để đưa mẫu chữ này lên ảnh bìa"
+                    title={`Bấm để đưa Chữ Thumbnail #${idx + 1} & Tiêu Đề #${idx + 1} lên Live Mockup`}
                   >
-                    <span className="overlay-badge">Mẫu {idx + 1}</span>
+                    <span className="overlay-badge">Mẫu #{idx + 1} (Khớp Tiêu Đề #{idx + 1})</span>
                     <div className="overlay-2line-preview" style={{ flex: 1 }}>
                       <div className="line1-gold">{item.line1}</div>
                       {item.line2 && <div className="line2-cyan">{item.line2}</div>}
