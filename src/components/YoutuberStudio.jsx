@@ -5,7 +5,7 @@ import {
   History, Plus, Edit2, Clock, Search, Filter, ArrowUpDown, CheckCircle2, ChevronDown, ChevronUp
 } from 'lucide-react';
 
-import { generateYoutubeContent, refineYoutubeWithPrompt } from '../utils/youtuberGenerator';
+import { generateYoutubeContent, regenerateTitlesAndThumbnailTexts, regenerateDescriptionOnly } from '../utils/youtuberGenerator';
 import { exportThumbnailHD, generateAIThumbnailImage, THUMBNAIL_COLOR_THEMES } from '../utils/thumbnailExporter';
 import { uploadReferenceImageToOrimise, generateOrimiseImage } from '../utils/orimiseImageApi';
 import { generateFreeAIImage, FREE_IMAGE_MODELS } from '../utils/freeImageApi';
@@ -55,7 +55,8 @@ export default function YoutuberStudio({
   orimiseKey,
   orimiseBaseUrl,
   geminiKey,
-  aiModel
+  aiModel,
+  onApplySubtitle
 }) {
   // Multi-file selection state: array of selected file IDs
   const [selectedFileIds, setSelectedFileIds] = useState(() => {
@@ -65,9 +66,13 @@ export default function YoutuberStudio({
 
   const [genre, setGenre] = useState('Tu Tiên / Tiên Hiệp');
   const [contentType, setContentType] = useState('Review Phim / Tóm Tắt Phim');
-  const [customPrompt, setCustomPrompt] = useState('');
-  const [isRefining, setIsRefining] = useState(false);
   const [isEpisodesExpanded, setIsEpisodesExpanded] = useState(false);
+
+  // Dedicated prompt inputs for Titles+Thumbnails and Description
+  const [titlePrompt, setTitlePrompt] = useState('');
+  const [isRegeneratingTitles, setIsRegeneratingTitles] = useState(false);
+  const [descPrompt, setDescPrompt] = useState('');
+  const [isRegeneratingDesc, setIsRegeneratingDesc] = useState(false);
 
   // History Sessions State
   const [historySessions, setHistorySessions] = useState([]);
@@ -492,7 +497,6 @@ ${fullImagePromptEn || generatedData.imagePromptEn}
         selectedFiles: selectedFilesList,
         genre,
         contentType,
-        customPrompt,
         aiProvider,
         apiKey,
         baseUrl: orimiseBaseUrl,
@@ -529,7 +533,6 @@ ${fullImagePromptEn || generatedData.imagePromptEn}
         selectedThemeId,
         genre,
         contentType,
-        customPrompt,
         selectedAnalysisModel,
         selectedFreeModel
       };
@@ -554,14 +557,14 @@ ${fullImagePromptEn || generatedData.imagePromptEn}
     }
   };
 
-  // Instant AI Refiner based on Custom Prompt without re-reading all SRTs
-  const handleRefineWithPrompt = async () => {
+  // 🪄 1. Re-render 5 Titles & 5 Paired 2-Line Thumbnail Texts according to prompt
+  const handleRegenerateTitles = async () => {
     if (!generatedData) {
-      alert('Vui lòng phân tích tạo content bằng AI trước khi tinh chỉnh!');
+      alert('Vui lòng phân tích tạo content bằng AI trước!');
       return;
     }
-    if (!customPrompt || !customPrompt.trim()) {
-      alert('Vui lòng nhập yêu cầu / prompt muốn AI tinh chỉnh vào ô bên dưới!');
+    if (!titlePrompt.trim()) {
+      alert('Vui lòng nhập prompt yêu cầu cho 5 Tiêu đề & Chữ Thumbnail!');
       return;
     }
     const apiKey = aiProvider === 'orimise' ? orimiseKey : geminiKey;
@@ -570,11 +573,11 @@ ${fullImagePromptEn || generatedData.imagePromptEn}
       return;
     }
 
-    setIsRefining(true);
+    setIsRegeneratingTitles(true);
     try {
-      const refined = await refineYoutubeWithPrompt({
-        currentData: generatedData,
-        customPrompt,
+      const res = await regenerateTitlesAndThumbnailTexts({
+        storySummary: generatedData.storySummary,
+        customPrompt: titlePrompt,
         genre,
         contentType,
         aiProvider,
@@ -583,29 +586,83 @@ ${fullImagePromptEn || generatedData.imagePromptEn}
         model: selectedAnalysisModel
       });
 
-      setGeneratedData(refined);
+      const updatedData = {
+        ...generatedData,
+        titles: res.titles,
+        thumbnailTexts: res.thumbnailTexts
+      };
+      setGeneratedData(updatedData);
+      setSelectedTitleIndex(0);
+      setSelectedTextIndex(0);
 
-      // Sync active title & thumbnail text
-      if (refined.thumbnailTexts && refined.thumbnailTexts[selectedTextIndex]) {
-        setCustomLine1(refined.thumbnailTexts[selectedTextIndex].line1);
-        setCustomLine2(refined.thumbnailTexts[selectedTextIndex].line2);
-      } else if (refined.thumbnailTexts?.[0]) {
-        setCustomLine1(refined.thumbnailTexts[0].line1);
-        setCustomLine2(refined.thumbnailTexts[0].line2);
+      if (res.thumbnailTexts?.[0]) {
+        setCustomLine1(res.thumbnailTexts[0].line1);
+        setCustomLine2(res.thumbnailTexts[0].line2);
       }
 
-      // Update session history
       if (activeSessionId) {
         setHistorySessions(prev => {
-          const updated = prev.map(s => s.id === activeSessionId ? { ...s, generatedData: refined, customPrompt } : s);
+          const updated = prev.map(s => s.id === activeSessionId ? { ...s, generatedData: updatedData } : s);
           saveYoutuberHistoryToDB(updated, activeSessionId);
           return updated;
         });
       }
     } catch (err) {
-      alert(`Lỗi AI tinh chỉnh: ${err.message}`);
+      alert(`Lỗi tạo lại Tiêu Đề & Thumbnail: ${err.message}`);
     } finally {
-      setIsRefining(false);
+      setIsRegeneratingTitles(false);
+    }
+  };
+
+  // 🪄 2. Re-render Description & Tags according to prompt
+  const handleRegenerateDesc = async () => {
+    if (!generatedData) {
+      alert('Vui lòng phân tích tạo content bằng AI trước!');
+      return;
+    }
+    if (!descPrompt.trim()) {
+      alert('Vui lòng nhập prompt yêu cầu cho phần Mô Tả Video!');
+      return;
+    }
+    const apiKey = aiProvider === 'orimise' ? orimiseKey : geminiKey;
+    if (!apiKey) {
+      alert(`Vui lòng nhập ${aiProvider === 'orimise' ? 'Orimise' : 'Google Gemini'} API Key trong Cấu Hình AI!`);
+      return;
+    }
+
+    setIsRegeneratingDesc(true);
+    try {
+      const res = await regenerateDescriptionOnly({
+        storySummary: generatedData.storySummary,
+        timestamps: generatedData.timestamps || [],
+        currentDescription: generatedData.description || '',
+        customPrompt: descPrompt,
+        genre,
+        contentType,
+        aiProvider,
+        apiKey,
+        baseUrl: orimiseBaseUrl,
+        model: selectedAnalysisModel
+      });
+
+      const updatedData = {
+        ...generatedData,
+        description: res.description,
+        tags: res.tags || generatedData.tags
+      };
+      setGeneratedData(updatedData);
+
+      if (activeSessionId) {
+        setHistorySessions(prev => {
+          const updated = prev.map(s => s.id === activeSessionId ? { ...s, generatedData: updatedData } : s);
+          saveYoutuberHistoryToDB(updated, activeSessionId);
+          return updated;
+        });
+      }
+    } catch (err) {
+      alert(`Lỗi viết lại Mô Tả: ${err.message}`);
+    } finally {
+      setIsRegeneratingDesc(false);
     }
   };
 
@@ -1031,95 +1088,6 @@ ${fullImagePromptEn || generatedData.imagePromptEn}
             </button>
           </div>
         </div>
-
-        {/* 🪄 Smart Custom AI Prompt & Refinement Box */}
-        <div className="custom-prompt-container">
-          <div className="flex-between align-center flex-wrap gap-2 mb-2">
-            <div className="flex-center gap-2">
-              <Sparkles size={16} className="text-purple" />
-              <span className="font-bold text-purple" style={{ fontSize: '0.88rem' }}>
-                ✨ Yêu Cầu / Prompt Tùy Chỉnh Cho AI (Tùy Chọn):
-              </span>
-              <span className="badge-info text-xs" style={{ background: 'rgba(168, 85, 247, 0.15)', color: '#c084fc', padding: '2px 8px', borderRadius: '10px' }}>
-                Tự Động Đổi Title, Thumbnail, Tóm Tắt & Mô Tả
-              </span>
-            </div>
-
-            {customPrompt && (
-              <button
-                type="button"
-                className="btn btn-secondary btn-xs text-muted"
-                onClick={() => setCustomPrompt('')}
-                title="Xóa prompt hiện tại"
-              >
-                ✕ Xóa Prompt
-              </button>
-            )}
-          </div>
-
-          {/* Prompt Preset Chips */}
-          <div className="prompt-chips-wrapper">
-            {PROMPT_PRESETS.map((preset, pIdx) => {
-              const isActive = customPrompt.includes(preset.text);
-              return (
-                <button
-                  key={pIdx}
-                  type="button"
-                  className={`prompt-preset-chip ${isActive ? 'active' : ''}`}
-                  onClick={() => {
-                    if (customPrompt.includes(preset.text)) {
-                      setCustomPrompt(prev => prev.replace(preset.text, '').trim());
-                    } else {
-                      setCustomPrompt(prev => prev ? `${prev}. ${preset.text}` : preset.text);
-                    }
-                  }}
-                  title={preset.text}
-                >
-                  {preset.label}
-                </button>
-              );
-            })}
-          </div>
-
-          {/* Textarea Input */}
-          <div className="prompt-textarea-wrapper">
-            <textarea
-              className="prompt-textarea"
-              value={customPrompt}
-              onChange={e => setCustomPrompt(e.target.value)}
-              placeholder="💡 Nhập yêu cầu riêng để AI tạo Title, Thumbnail, Tóm tắt, Mô tả theo ý bạn (VD: Tập trung vào cảnh main vả mặt ở tập 5, viết tiêu đề theo phong cách Ma Tôn tàn nhẫn, thêm lời cảm ơn người xem trong mô tả, chữ thumbnail thật kịch tính...)..."
-              rows={2}
-            />
-          </div>
-
-          {/* Quick Refine Action Toolbar if Content Already Generated */}
-          {generatedData && (
-            <div className="flex-between align-center flex-wrap gap-2 mt-2">
-              <span className="text-xs text-muted">
-                ⚡ Đã có dữ liệu phân tích. Bạn có thể bấm nút bên phải để AI tinh chỉnh siêu tốc trong 1 giây mà không cần quét lại file!
-              </span>
-              <button
-                type="button"
-                className="btn btn-purple-glow btn-sm font-bold flex-center gap-1"
-                onClick={handleRefineWithPrompt}
-                disabled={isRefining || !customPrompt.trim()}
-                title="Dùng AI tinh chỉnh tức thì toàn bộ Tiêu đề, Chữ Thumbnail, Tóm tắt và Mô tả theo đúng prompt"
-              >
-                {isRefining ? (
-                  <>
-                    <RefreshCw size={14} className="spinner" />
-                    <span>Đang Tinh Chỉnh AI...</span>
-                  </>
-                ) : (
-                  <>
-                    <Wand2 size={14} />
-                    <span>🪄 AI Tinh Chỉnh Nhanh (1 Giây)</span>
-                  </>
-                )}
-              </button>
-            </div>
-          )}
-        </div>
       </div>
 
 
@@ -1160,6 +1128,33 @@ ${fullImagePromptEn || generatedData.imagePromptEn}
               <Flame size={20} className="text-amber" />
               <h3>📌 5 Tiêu Đề YouTube (Clickbait SEO)</h3>
             </div>
+
+            {/* 💡 Inline Prompt Input for Re-rendering Titles & 2-Line Text Thumbnails */}
+            <div className="inline-prompt-box mb-3 p-2 rounded" style={{ background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(6, 182, 212, 0.3)' }}>
+              <div className="flex-center gap-2">
+                <input
+                  type="text"
+                  className="input-field input-sm font-semibold"
+                  style={{ background: 'rgba(0,0,0,0.4)', border: '1px solid rgba(34, 211, 238, 0.25)', color: '#e2e8f0', fontSize: '0.82rem' }}
+                  placeholder="💡 Nhập prompt tạo lại 5 Title & Thumbnail (VD: Giật gân, tập trung vả mặt...)..."
+                  value={titlePrompt}
+                  onChange={e => setTitlePrompt(e.target.value)}
+                  onKeyDown={e => e.key === 'Enter' && handleRegenerateTitles()}
+                />
+                <button
+                  type="button"
+                  className="btn btn-cyan btn-sm font-bold flex-center gap-1"
+                  style={{ whiteSpace: 'nowrap', padding: '6px 12px' }}
+                  onClick={handleRegenerateTitles}
+                  disabled={isRegeneratingTitles || !titlePrompt.trim()}
+                  title="Tạo lại 5 Tiêu Đề và 5 Mẫu Chữ Thumbnail theo prompt riêng này"
+                >
+                  {isRegeneratingTitles ? <RefreshCw size={14} className="spinner" /> : <Wand2 size={14} />}
+                  <span>{isRegeneratingTitles ? 'Đang tạo...' : 'Render Lại'}</span>
+                </button>
+              </div>
+            </div>
+
 
             <div className="titles-list">
               {generatedData.titles.map((title, idx) => {
@@ -1495,6 +1490,32 @@ ${fullImagePromptEn || generatedData.imagePromptEn}
                 {copiedField === 'desc' ? <Check size={14} className="text-emerald" /> : <Copy size={14} />}
                 <span>Sao Chép Mô Tả</span>
               </button>
+            </div>
+
+            {/* 💡 Inline Prompt Input for Re-rendering Description & Tags */}
+            <div className="inline-prompt-box mb-3 p-2 rounded" style={{ background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(168, 85, 247, 0.3)' }}>
+              <div className="flex-center gap-2">
+                <input
+                  type="text"
+                  className="input-field input-sm font-semibold"
+                  style={{ background: 'rgba(0,0,0,0.4)', border: '1px solid rgba(168, 85, 247, 0.25)', color: '#e2e8f0', fontSize: '0.82rem' }}
+                  placeholder="💡 Nhập prompt viết lại Mô Tả (VD: Thêm lời cảm ơn, link donate, kêu gọi Subscribe...)..."
+                  value={descPrompt}
+                  onChange={e => setDescPrompt(e.target.value)}
+                  onKeyDown={e => e.key === 'Enter' && handleRegenerateDesc()}
+                />
+                <button
+                  type="button"
+                  className="btn btn-purple-glow btn-sm font-bold flex-center gap-1"
+                  style={{ whiteSpace: 'nowrap', padding: '6px 12px' }}
+                  onClick={handleRegenerateDesc}
+                  disabled={isRegeneratingDesc || !descPrompt.trim()}
+                  title="Viết lại nội dung mô tả video và thẻ tags theo prompt riêng này"
+                >
+                  {isRegeneratingDesc ? <RefreshCw size={14} className="spinner" /> : <Wand2 size={14} />}
+                  <span>{isRegeneratingDesc ? 'Đang viết...' : 'Render Lại'}</span>
+                </button>
+              </div>
             </div>
 
             <textarea

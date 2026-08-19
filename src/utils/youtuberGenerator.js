@@ -382,10 +382,10 @@ HÃY THỰC HIỆN ĐÚNG QUY TRÌNH 2 BƯỚC:
   };
 }
 
-// 🪄 Smart Instant AI Refiner based on Creator Custom Prompt
-export async function refineYoutubeWithPrompt({
-  currentData,
-  customPrompt,
+// 🪄 1. Dedicated AI Generator for 5 Titles & 5 Paired Thumbnail Texts according to prompt
+export async function regenerateTitlesAndThumbnailTexts({
+  storySummary = '',
+  customPrompt = '',
   genre = 'Tu Tiên / Tiên Hiệp',
   contentType = 'Review Phim / Tóm Tắt Phim',
   aiProvider = 'orimise',
@@ -396,65 +396,179 @@ export async function refineYoutubeWithPrompt({
   if (!apiKey) {
     throw new Error('Chưa nhập API Key trong Cấu Hình AI!');
   }
-
   if (!customPrompt || !customPrompt.trim()) {
-    throw new Error('Vui lòng nhập yêu cầu / prompt tùy chỉnh muốn AI thay đổi!');
+    throw new Error('Vui lòng nhập prompt yêu cầu cho Tiêu đề & Chữ Thumbnail!');
   }
 
-  if (!currentData) {
-    throw new Error('Chưa có dữ liệu phân tích để tinh chỉnh!');
-  }
+  const systemPrompt = `You are an Elite YouTube Creative Director & Clickbait SEO Specialist.
+Based on the provided story synopsis, your task is to generate 5 Viral YouTube Titles (80-90 chars) and 5 strictly paired 2-Line Text Thumbnails (7-10 words/line) strictly following the Creator's Custom Prompt.
 
-  const systemPrompt = `You are an Elite YouTube Creative Director & Viral Content Strategist.
-Your task is to refine, rewrite, and adapt the existing YouTube Creator Metadata (storySummary, 5 titles, 5 thumbnailTexts, timestamps, imagePromptEn, imagePromptVi, description, tags) according to the user's specific Custom Prompt.
+RULES:
+1. 5 TIÊU ĐỀ YOUTUBE CHUẨN 80-90 KÝ TỰ (titles):
+   - Chuẩn độ dài 80 - 90 ký tự. Không dùng tên riêng đích danh (dùng: Hắn, Kẻ Phế Vật, Ma Tôn, Gã Đệ Tử...).
+   - Áp dụng phong cách, góc nhìn hoặc yêu cầu từ Prompt của Creator.
+2. 5 MẪU CHỮ THUMBNAIL 2 DÒNG KHỚP 1-1 VỚI 5 TIÊU ĐỀ (thumbnailTexts):
+   - Mẫu #i khớp chính xác với Tiêu đề #i.
+   - line1 (Vàng 3D - 7 đến 10 từ): Biến cố / Nghịch cảnh hiểm nghèo.
+   - line2 (Xanh ngọc - 7 đến 10 từ): Thức tỉnh sức mạnh / Vả mặt phản đòn.
 
-STRICT INSTRUCTIONS:
-1. Retain the core characters and plot points from the existing story.
-2. Skillfully rewrite and adapt ALL 5 Titles (80-90 chars), ALL 5 Thumbnail Texts (2 lines, 7-10 words/line), Story Summary, Description, Image Prompts, and Tags to match the requested style, tone, focus, or instructions in the Custom Prompt.
-3. Return ONLY valid JSON in the exact schema below:
-
+REQUIRED OUTPUT JSON FORMAT (Return ONLY valid JSON):
 {
-  "storySummary": "Bài tóm tắt đã được tinh chỉnh theo prompt...",
   "titles": [
-    "💥 [Tiêu đề 1 tinh chỉnh chuẩn 80-90 ký tự]",
-    "🔥 [Tiêu đề 2 tinh chỉnh chuẩn 80-90 ký tự]",
-    "⚡ [Tiêu đề 3 tinh chỉnh chuẩn 80-90 ký tự]",
-    "👑 [Tiêu đề 4 tinh chỉnh chuẩn 80-90 ký tự]",
-    "😱 [Tiêu đề 5 tinh chỉnh chuẩn 80-90 ký tự]"
+    "💥 [Tiêu đề 1 chuẩn 80-90 ký tự theo prompt]",
+    "🔥 [Tiêu đề 2 chuẩn 80-90 ký tự theo prompt]",
+    "⚡ [Tiêu đề 3 chuẩn 80-90 ký tự theo prompt]",
+    "👑 [Tiêu đề 4 chuẩn 80-90 ký tự theo prompt]",
+    "😱 [Tiêu đề 5 chuẩn 80-90 ký tự theo prompt]"
   ],
   "thumbnailTexts": [
-    { "line1": "DÒNG 1 TINH CHỈNH 7-10 TỪ", "line2": "DÒNG 2 TINH CHỈNH 7-10 TỪ" },
-    { "line1": "DÒNG 1 TINH CHỈNH 7-10 TỪ", "line2": "DÒNG 2 TINH CHỈNH 7-10 TỪ" },
-    { "line1": "DÒNG 1 TINH CHỈNH 7-10 TỪ", "line2": "DÒNG 2 TINH CHỈNH 7-10 TỪ" },
-    { "line1": "DÒNG 1 TINH CHỈNH 7-10 TỪ", "line2": "DÒNG 2 TINH CHỈNH 7-10 TỪ" },
-    { "line1": "DÒNG 1 TINH CHỈNH 7-10 TỪ", "line2": "DÒNG 2 TINH CHỈNH 7-10 TỪ" }
-  ],
-  "timestamps": [
-    "00:00 Mở đầu: ...",
-    "04:15 Biến cố: ..."
-  ],
-  "imagePromptEn": "16:9 Midjourney prompt adapted to the new theme...",
-  "imagePromptVi": "Mô tả ý tưởng hình ảnh tiếng Việt...",
-  "description": "Mô tả video YouTube đã cập nhật...",
-  "tags": "tu tiên, review phim, tags mới..."
+    { "line1": "DÒNG 1 KHỚP TIÊU ĐỀ 1 (7-10 TỪ)", "line2": "DÒNG 2 KHỚP TIÊU ĐỀ 1 (7-10 TỪ)" },
+    { "line1": "DÒNG 1 KHỚP TIÊU ĐỀ 2 (7-10 TỪ)", "line2": "DÒNG 2 KHỚP TIÊU ĐỀ 2 (7-10 TỪ)" },
+    { "line1": "DÒNG 1 KHỚP TIÊU ĐỀ 3 (7-10 TỪ)", "line2": "DÒNG 2 KHỚP TIÊU ĐỀ 3 (7-10 TỪ)" },
+    { "line1": "DÒNG 1 KHỚP TIÊU ĐỀ 4 (7-10 TỪ)", "line2": "DÒNG 2 KHỚP TIÊU ĐỀ 4 (7-10 TỪ)" },
+    { "line1": "DÒNG 1 KHỚP TIÊU ĐỀ 5 (7-10 TỪ)", "line2": "DÒNG 2 KHỚP TIÊU ĐỀ 5 (7-10 TỪ)" }
+  ]
 }`;
 
   const userMessage = `THỂ LOẠI: ${genre}
 ĐỊNH DẠNG: ${contentType}
 
-=== 🎯 YÊU CẦU PROMPT TINH CHỈNH TỪ CREATOR: ===
+=== 🎯 PROMPT YÊU CẦU TỪ CREATOR: ===
 ${customPrompt.trim()}
 
-=== DỮ LIỆU METADATA HIỆN TẠI ===
-${JSON.stringify({
-  titles: currentData.titles,
-  thumbnailTexts: currentData.thumbnailTexts,
-  storySummary: currentData.storySummary,
-  description: currentData.description,
-  tags: currentData.tags
-}, null, 2)}
+=== TÓM TẮT CỐT TRUYỆN GỐC ===
+${storySummary}
 
-HÃY TINH CHỈNH VÀ VIẾT LẠI TOÀN BỘ BỘ METADATA TRÊN THEO ĐÚNG YÊU CẦU PROMPT. XUẤT RA 1 ĐỐI TƯỢNG JSON DUY NHẤT:`;
+HÃY TẠO 5 TIÊU ĐỀ VÀ 5 MẪU CHỮ THUMBNAIL 2 DÒNG MỚI THEO ĐÚNG PROMPT TRÊN. XUẤT RA 1 ĐỐI TƯỢNG JSON DUY NHẤT:`;
+
+  let rawText = '';
+
+  if (aiProvider === 'orimise') {
+    const endpoint = baseUrl.endsWith('/chat/completions')
+      ? baseUrl
+      : `${baseUrl.replace(/\/$/, '')}/chat/completions`;
+
+    const reqBody = {
+      model: model,
+      messages: [
+        { role: 'system', content: systemPrompt },
+        { role: 'user', content: userMessage }
+      ],
+      temperature: 0.75
+    };
+
+    const res = await fetch(endpoint, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${apiKey}`
+      },
+      body: JSON.stringify(reqBody)
+    });
+
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.error?.message || `API Error: ${res.status} ${res.statusText}`);
+    }
+
+    const data = await res.json();
+    rawText = data.choices?.[0]?.message?.content || '';
+  } else {
+    const targetModel = model.includes('gemini') ? model : 'gemini-2.5-flash';
+    const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${targetModel}:generateContent?key=${apiKey}`;
+
+    const res = await fetch(geminiUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        contents: [
+          { role: 'user', parts: [{ text: `${systemPrompt}\n\n${userMessage}` }] }
+        ],
+        generationConfig: {
+          temperature: 0.75,
+          responseMimeType: "application/json"
+        }
+      })
+    });
+
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.error?.message || `Gemini Error: ${res.status} ${res.statusText}`);
+    }
+
+    const data = await res.json();
+    rawText = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
+  }
+
+  const parsed = safeParseAIJson(rawText);
+  if (!parsed || !Array.isArray(parsed.titles) || parsed.titles.length === 0) {
+    throw new Error('AI không tạo được danh sách tiêu đề mới. Vui lòng thử lại!');
+  }
+
+  let formattedTexts = [];
+  if (Array.isArray(parsed.thumbnailTexts) && parsed.thumbnailTexts.length > 0) {
+    formattedTexts = parsed.thumbnailTexts.map(t => ({
+      line1: (typeof t === 'object' ? (t.line1 || t.text1 || '') : t).toString().trim(),
+      line2: (typeof t === 'object' ? (t.line2 || t.text2 || '') : '').toString().trim()
+    }));
+  }
+
+  return {
+    titles: parsed.titles,
+    thumbnailTexts: formattedTexts
+  };
+}
+
+
+// 🪄 2. Dedicated AI Generator for Description & Metadata according to prompt
+export async function regenerateDescriptionOnly({
+  storySummary = '',
+  timestamps = [],
+  currentDescription = '',
+  customPrompt = '',
+  genre = 'Tu Tiên / Tiên Hiệp',
+  contentType = 'Review Phim / Tóm Tắt Phim',
+  aiProvider = 'orimise',
+  apiKey,
+  baseUrl = 'https://api.orimise.com/v1',
+  model = 'claude-sonnet-5'
+}) {
+  if (!apiKey) {
+    throw new Error('Chưa nhập API Key trong Cấu Hình AI!');
+  }
+  if (!customPrompt || !customPrompt.trim()) {
+    throw new Error('Vui lòng nhập prompt yêu cầu cho phần Mô Tả Video!');
+  }
+
+  const systemPrompt = `You are an Elite YouTube Creative Director & SEO Copywriter.
+Rewrite and optimize the YouTube Video Description and SEO Tags based on the provided story synopsis and timestamps, strictly following the Creator's Custom Prompt (e.g. adding call-to-actions, donate/social links, changing tone, highlighting key arcs).
+
+RULES:
+1. Include engaging hook paragraphs.
+2. Embed the timestamps naturally if provided.
+3. Add a rich set of 15-20 relevant YouTube SEO tags.
+4. Return ONLY valid JSON:
+{
+  "description": "Nội dung mô tả YouTube hoàn chỉnh, hấp dẫn...",
+  "tags": "tag1, tag2, tag3, ..."
+}`;
+
+  const userMessage = `THỂ LOẠI: ${genre}
+ĐỊNH DẠNG: ${contentType}
+
+=== 🎯 PROMPT YÊU CẦU CHO MÔ TẢ: ===
+${customPrompt.trim()}
+
+=== TÓM TẮT CỐT TRUYỆN GỐC ===
+${storySummary}
+
+=== MỐC THỜI GIAN (TIMESTAMPS) ===
+${timestamps.join('\n')}
+
+=== MÔ TẢ HIỆN TẠI ===
+${currentDescription}
+
+HÃY VIẾT LẠI MÔ TẢ YOUTUBE VÀ DANH SÁCH TAGS MỚI THEO ĐÚNG PROMPT TRÊN. XUẤT RA 1 ĐỐI TƯỢNG JSON DUY NHẤT:`;
 
   let rawText = '';
 
@@ -483,13 +597,12 @@ HÃY TINH CHỈNH VÀ VIẾT LẠI TOÀN BỘ BỘ METADATA TRÊN THEO ĐÚNG Y�
 
     if (!res.ok) {
       const err = await res.json().catch(() => ({}));
-      throw new Error(err.error?.message || `Orimise API Error: ${res.status} ${res.statusText}`);
+      throw new Error(err.error?.message || `API Error: ${res.status} ${res.statusText}`);
     }
 
     const data = await res.json();
     rawText = data.choices?.[0]?.message?.content || '';
   } else {
-    // Direct Gemini API
     const targetModel = model.includes('gemini') ? model : 'gemini-2.5-flash';
     const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${targetModel}:generateContent?key=${apiKey}`;
 
@@ -509,7 +622,7 @@ HÃY TINH CHỈNH VÀ VIẾT LẠI TOÀN BỘ BỘ METADATA TRÊN THEO ĐÚNG Y�
 
     if (!res.ok) {
       const err = await res.json().catch(() => ({}));
-      throw new Error(err.error?.message || `Gemini API Error: ${res.status} ${res.statusText}`);
+      throw new Error(err.error?.message || `Gemini Error: ${res.status} ${res.statusText}`);
     }
 
     const data = await res.json();
@@ -517,50 +630,20 @@ HÃY TINH CHỈNH VÀ VIẾT LẠI TOÀN BỘ BỘ METADATA TRÊN THEO ĐÚNG Y�
   }
 
   const parsed = safeParseAIJson(rawText);
-  if (!parsed) {
-    throw new Error('AI không trả về đúng định dạng JSON. Vui lòng thử lại!');
+  if (!parsed || !parsed.description) {
+    throw new Error('AI không tạo được mô tả mới. Vui lòng thử lại!');
   }
 
-  let formattedTexts = [];
-  if (Array.isArray(parsed.thumbnailTexts) && parsed.thumbnailTexts.length > 0) {
-    formattedTexts = parsed.thumbnailTexts.map(t => {
-      if (typeof t === 'object' && t !== null) {
-        return {
-          line1: t.line1 || t.text1 || t.topLine || '',
-          line2: t.line2 || t.text2 || t.bottomLine || ''
-        };
-      }
-      if (typeof t === 'string') {
-        const parts = t.split(/[\n|]/);
-        return {
-          line1: parts[0]?.trim() || t,
-          line2: parts[1]?.trim() || ''
-        };
-      }
-      return { line1: 'VỪA XUYÊN KHÔNG ĐÃ BỊ TỐNG VÀO HẦM NGỤC', line2: '' };
-    });
-  } else {
-    formattedTexts = currentData.thumbnailTexts || [];
-  }
-
-  let finalDescription = parsed.description || currentData.description || '';
-  const parsedTimestamps = Array.isArray(parsed.timestamps) ? parsed.timestamps : (currentData.timestamps || []);
-  if (parsedTimestamps.length > 0 && !finalDescription.includes('00:00')) {
-    finalDescription = `${finalDescription}\n\n📌 MỐC THỜI GIAN VIDEO:\n${parsedTimestamps.join('\n')}`;
+  let finalDescription = parsed.description;
+  if (timestamps.length > 0 && !finalDescription.includes('00:00')) {
+    finalDescription = `${finalDescription}\n\n📌 MỐC THỜI GIAN VIDEO:\n${timestamps.join('\n')}`;
   }
 
   return {
-    titles: (Array.isArray(parsed.titles) && parsed.titles.length > 0)
-      ? parsed.titles
-      : (currentData.titles || []),
-    thumbnailTexts: formattedTexts,
-    storySummary: parsed.storySummary || parsed.summary || currentData.storySummary || '',
-    timestamps: parsedTimestamps,
-    imagePromptEn: parsed.imagePromptEn || parsed.prompt || currentData.imagePromptEn || '',
-    imagePromptVi: parsed.imagePromptVi || currentData.imagePromptVi || '',
     description: finalDescription,
-    tags: parsed.tags || currentData.tags || ''
+    tags: parsed.tags || ''
   };
 }
+
 
 
