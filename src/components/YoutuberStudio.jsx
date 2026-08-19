@@ -5,21 +5,17 @@ import {
   History, Plus, Edit2, Clock, Search, Filter, ArrowUpDown, CheckCircle2, ChevronDown, ChevronUp
 } from 'lucide-react';
 
-import { generateYoutubeContent, regenerateTitlesAndThumbnailTexts, regenerateDescriptionOnly } from '../utils/youtuberGenerator';
+import {
+  generateYoutubeContent,
+  regenerateTitlesAndThumbnailTexts,
+  regenerateDescriptionOnly,
+  regenerateStorySummaryOnly,
+  regenerateImagePromptOnly
+} from '../utils/youtuberGenerator';
 import { exportThumbnailHD, generateAIThumbnailImage, THUMBNAIL_COLOR_THEMES } from '../utils/thumbnailExporter';
 import { uploadReferenceImageToOrimise, generateOrimiseImage } from '../utils/orimiseImageApi';
 import { generateFreeAIImage, FREE_IMAGE_MODELS } from '../utils/freeImageApi';
 import { saveYoutuberStudioStateToDB, loadYoutuberStudioStateFromDB, saveYoutuberHistoryToDB, loadYoutuberHistoryFromDB } from '../utils/dbStorage';
-
-// Preset prompts for YouTube Studio
-const PROMPT_PRESETS = [
-  { label: '🔥 Tập trung vả mặt', text: 'Tập trung sâu vào những phân đoạn nhân vật chính vả mặt kẻ thù, nghịch chuyển càn khôn, tạo cảm giác thỏa mãn cực độ.' },
-  { label: '⚡ Giật gân, bí ẩn', text: 'Viết tiêu đề và chữ thumbnail theo phong cách giật gân, khơi gợi trí tò mò mạnh mẽ, tạo cảm giác hồi hộp gay cấn.' },
-  { label: '👑 Sức mạnh & Hệ thống', text: 'Nhấn mạnh vào công pháp vô địch, hệ thống thần cấp, thức tỉnh bảo vật cổ xưa và sức mạnh áp đảo.' },
-  { label: '🖤 Ma Tu / Hắc Ám', text: 'Phong cách Ma Tôn, Tu La tàn nhẫn, sát phạt quyết đoán, một mình đối đầu cả thiên hạ.' },
-  { label: '🤣 Hài hước, bựa', text: 'Tông giọng hóm hỉnh, bắt trend, giật tít hài hước khiến người xem thích thú.' },
-  { label: '📝 Kêu gọi đăng ký & Donate', text: 'Trong phần mô tả, hãy chèn thêm lời kêu gọi Like, Subscribe và ủng hộ kênh thật tự nhiên, cuốn hút.' }
-];
 
 // Helper to generate concise episode range name (e.g. c3-1-3 or c3_01 - c3_22)
 function formatFileRangeTitle(fileList = []) {
@@ -68,9 +64,16 @@ export default function YoutuberStudio({
   const [contentType, setContentType] = useState('Review Phim / Tóm Tắt Phim');
   const [isEpisodesExpanded, setIsEpisodesExpanded] = useState(false);
 
-  // Dedicated prompt inputs for Titles+Thumbnails and Description
+  // Dedicated prompt inputs for ALL sections (Step 2, Step 3, Step 4, Step 5)
+  const [summaryPrompt, setSummaryPrompt] = useState('');
+  const [isRegeneratingSummary, setIsRegeneratingSummary] = useState(false);
+
   const [titlePrompt, setTitlePrompt] = useState('');
   const [isRegeneratingTitles, setIsRegeneratingTitles] = useState(false);
+
+  const [imageIdeaPrompt, setImageIdeaPrompt] = useState('');
+  const [isRegeneratingImagePrompt, setIsRegeneratingImagePrompt] = useState(false);
+
   const [descPrompt, setDescPrompt] = useState('');
   const [isRegeneratingDesc, setIsRegeneratingDesc] = useState(false);
 
@@ -557,7 +560,56 @@ ${fullImagePromptEn || generatedData.imagePromptEn}
     }
   };
 
-  // 🪄 1. Re-render 5 Titles & 5 Paired 2-Line Thumbnail Texts according to prompt
+  // 🪄 1. Re-render Story Summary according to prompt
+  const handleRegenerateSummary = async () => {
+    if (!generatedData) {
+      alert('Vui lòng phân tích tạo content bằng AI trước!');
+      return;
+    }
+    if (!summaryPrompt.trim()) {
+      alert('Vui lòng nhập prompt yêu cầu cho Tóm Tắt Cốt Truyện!');
+      return;
+    }
+    const apiKey = aiProvider === 'orimise' ? orimiseKey : geminiKey;
+    if (!apiKey) {
+      alert(`Vui lòng nhập ${aiProvider === 'orimise' ? 'Orimise' : 'Google Gemini'} API Key trong Cấu Hình AI!`);
+      return;
+    }
+
+    setIsRegeneratingSummary(true);
+    try {
+      const res = await regenerateStorySummaryOnly({
+        storySummary: generatedData.storySummary,
+        customPrompt: summaryPrompt,
+        genre,
+        contentType,
+        aiProvider,
+        apiKey,
+        baseUrl: orimiseBaseUrl,
+        model: selectedAnalysisModel
+      });
+
+      const updatedData = {
+        ...generatedData,
+        storySummary: res.storySummary
+      };
+      setGeneratedData(updatedData);
+
+      if (activeSessionId) {
+        setHistorySessions(prev => {
+          const updated = prev.map(s => s.id === activeSessionId ? { ...s, generatedData: updatedData } : s);
+          saveYoutuberHistoryToDB(updated, activeSessionId);
+          return updated;
+        });
+      }
+    } catch (err) {
+      alert(`Lỗi tạo lại Tóm Tắt: ${err.message}`);
+    } finally {
+      setIsRegeneratingSummary(false);
+    }
+  };
+
+  // 🪄 2. Re-render 5 Titles & 5 Paired 2-Line Thumbnail Texts according to prompt
   const handleRegenerateTitles = async () => {
     if (!generatedData) {
       alert('Vui lòng phân tích tạo content bằng AI trước!');
@@ -614,7 +666,57 @@ ${fullImagePromptEn || generatedData.imagePromptEn}
     }
   };
 
-  // 🪄 2. Re-render Description & Tags according to prompt
+  // 🪄 3. Re-render AI Image Prompts (En & Vi) according to prompt
+  const handleRegenerateImagePrompt = async () => {
+    if (!generatedData) {
+      alert('Vui lòng phân tích tạo content bằng AI trước!');
+      return;
+    }
+    if (!imageIdeaPrompt.trim()) {
+      alert('Vui lòng nhập prompt yêu cầu cho Ý Tưởng & Prompt Vẽ Ảnh!');
+      return;
+    }
+    const apiKey = aiProvider === 'orimise' ? orimiseKey : geminiKey;
+    if (!apiKey) {
+      alert(`Vui lòng nhập ${aiProvider === 'orimise' ? 'Orimise' : 'Google Gemini'} API Key trong Cấu Hình AI!`);
+      return;
+    }
+
+    setIsRegeneratingImagePrompt(true);
+    try {
+      const res = await regenerateImagePromptOnly({
+        storySummary: generatedData.storySummary,
+        customPrompt: imageIdeaPrompt,
+        genre,
+        contentType,
+        aiProvider,
+        apiKey,
+        baseUrl: orimiseBaseUrl,
+        model: selectedAnalysisModel
+      });
+
+      const updatedData = {
+        ...generatedData,
+        imagePromptEn: res.imagePromptEn,
+        imagePromptVi: res.imagePromptVi
+      };
+      setGeneratedData(updatedData);
+
+      if (activeSessionId) {
+        setHistorySessions(prev => {
+          const updated = prev.map(s => s.id === activeSessionId ? { ...s, generatedData: updatedData } : s);
+          saveYoutuberHistoryToDB(updated, activeSessionId);
+          return updated;
+        });
+      }
+    } catch (err) {
+      alert(`Lỗi tạo lại Prompt Vẽ Ảnh: ${err.message}`);
+    } finally {
+      setIsRegeneratingImagePrompt(false);
+    }
+  };
+
+  // 🪄 4. Re-render Description & Tags according to prompt
   const handleRegenerateDesc = async () => {
     if (!generatedData) {
       alert('Vui lòng phân tích tạo content bằng AI trước!');
@@ -665,6 +767,7 @@ ${fullImagePromptEn || generatedData.imagePromptEn}
       setIsRegeneratingDesc(false);
     }
   };
+
 
   // Switch to a chosen history session
   const handleSelectSession = (session) => {
@@ -1113,11 +1216,36 @@ ${fullImagePromptEn || generatedData.imagePromptEn}
                 </button>
               </div>
 
+              {/* 💡 Inline Prompt Input for Re-rendering Story Summary */}
+              <div className="prompt-inline-action-bar emerald">
+                <Sparkles size={15} className="text-emerald" />
+                <input
+                  type="text"
+                  className="prompt-inline-input"
+                  placeholder="💡 Nhập prompt viết lại Tóm Tắt (VD: Chi tiết hơn phân cảnh đại chiến, rút ngắn lại, phong cách gay cấn...)..."
+                  value={summaryPrompt}
+                  onChange={e => setSummaryPrompt(e.target.value)}
+                  onKeyDown={e => e.key === 'Enter' && handleRegenerateSummary()}
+                />
+                <button
+                  type="button"
+                  className="btn btn-green-glow btn-sm font-bold flex-center gap-1"
+                  style={{ whiteSpace: 'nowrap', padding: '5px 12px' }}
+                  onClick={handleRegenerateSummary}
+                  disabled={isRegeneratingSummary || !summaryPrompt.trim()}
+                  title="Viết lại tóm tắt cốt truyện theo prompt riêng này"
+                >
+                  {isRegeneratingSummary ? <RefreshCw size={14} className="spinner" /> : <Wand2 size={14} />}
+                  <span>{isRegeneratingSummary ? 'Đang viết...' : 'Render Lại'}</span>
+                </button>
+              </div>
+
               <div className="story-summary-box">
                 <p className="story-summary-text">{generatedData.storySummary}</p>
               </div>
             </div>
           )}
+
 
           <div className="studio-results-grid">
 
@@ -1456,6 +1584,30 @@ ${fullImagePromptEn || generatedData.imagePromptEn}
                 </button>
               </div>
 
+              {/* 💡 Inline Prompt Input for Re-rendering AI Image Prompts */}
+              <div className="prompt-inline-action-bar purple mb-2">
+                <Sparkles size={15} className="text-purple" />
+                <input
+                  type="text"
+                  className="prompt-inline-input"
+                  placeholder="💡 Nhập prompt tạo lại Ý Tưởng & Prompt Ảnh (VD: Rồng thần hoàng kim bốc cháy, ma tôn huyết kiếm...)..."
+                  value={imageIdeaPrompt}
+                  onChange={e => setImageIdeaPrompt(e.target.value)}
+                  onKeyDown={e => e.key === 'Enter' && handleRegenerateImagePrompt()}
+                />
+                <button
+                  type="button"
+                  className="btn btn-purple-glow btn-sm font-bold flex-center gap-1"
+                  style={{ whiteSpace: 'nowrap', padding: '5px 12px' }}
+                  onClick={handleRegenerateImagePrompt}
+                  disabled={isRegeneratingImagePrompt || !imageIdeaPrompt.trim()}
+                  title="Tạo lại prompt vẽ ảnh tiếng Anh và mô tả tiếng Việt theo prompt riêng này"
+                >
+                  {isRegeneratingImagePrompt ? <RefreshCw size={14} className="spinner" /> : <Wand2 size={14} />}
+                  <span>{isRegeneratingImagePrompt ? 'Đang tạo...' : 'Render Lại'}</span>
+                </button>
+              </div>
+
               <textarea
                 className="input-field textarea-field font-mono text-cyan"
                 rows={4}
@@ -1463,6 +1615,7 @@ ${fullImagePromptEn || generatedData.imagePromptEn}
                 readOnly
               />
             </div>
+
 
             <div className="prompt-section mt-3">
               <div className="prompt-header">

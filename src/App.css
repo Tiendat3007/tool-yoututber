@@ -1826,6 +1826,17 @@
   box-shadow: 0 0 14px rgba(192, 132, 252, 0.25);
 }
 
+.prompt-inline-action-bar.emerald {
+  border-color: rgba(16, 185, 129, 0.35);
+  background: linear-gradient(135deg, rgba(16, 185, 129, 0.08) 0%, rgba(15, 23, 42, 0.85) 100%);
+}
+
+.prompt-inline-action-bar.emerald:focus-within {
+  border-color: #34d399;
+  box-shadow: 0 0 14px rgba(52, 211, 153, 0.25);
+}
+
+
 .prompt-inline-input {
   flex: 1;
   background: transparent;

@@ -645,5 +645,223 @@ HÃY VIẾT LẠI MÔ TẢ YOUTUBE VÀ DANH SÁCH TAGS MỚI THEO ĐÚNG PROMPT 
   };
 }
 
+// 🪄 3. Dedicated AI Generator for Story Summary according to prompt
+export async function regenerateStorySummaryOnly({
+  storySummary = '',
+  customPrompt = '',
+  genre = 'Tu Tiên / Tiên Hiệp',
+  contentType = 'Review Phim / Tóm Tắt Phim',
+  aiProvider = 'orimise',
+  apiKey,
+  baseUrl = 'https://api.orimise.com/v1',
+  model = 'claude-sonnet-5'
+}) {
+  if (!apiKey) {
+    throw new Error('Chưa nhập API Key trong Cấu Hình AI!');
+  }
+  if (!customPrompt || !customPrompt.trim()) {
+    throw new Error('Vui lòng nhập prompt yêu cầu cho Tóm Tắt Cốt Truyện!');
+  }
+
+  const systemPrompt = `You are an Elite YouTube Creative Director & Scriptwriter.
+Your task is to rewrite, expand, or adjust the YouTube Story Summary Synopsis based on the provided existing story and the Creator's Custom Prompt.
+
+RULES:
+1. Write a gripping, coherent synopsis (300-600 words) in Vietnamese.
+2. Accurately reflect all modifications requested in the prompt (tone, focus, pacing, humor, dark themes, etc.).
+3. Return ONLY valid JSON:
+{
+  "storySummary": "Bài tóm tắt cốt truyện hoàn chỉnh đã được viết lại..."
+}`;
+
+  const userMessage = `THỂ LOẠI: ${genre}
+ĐỊNH DẠNG: ${contentType}
+
+=== 🎯 PROMPT YÊU CẦU CHO TÓM TẮT CỐT TRUYỆN: ===
+${customPrompt.trim()}
+
+=== TÓM TẮT CỐT TRUYỆN GỐC ===
+${storySummary}
+
+HÃY VIẾT LẠI TÓM TẮT CỐT TRUYỆN THEO ĐÚNG PROMPT TRÊN. XUẤT RA 1 ĐỐI TƯỢNG JSON DUY NHẤT:`;
+
+  let rawText = '';
+
+  if (aiProvider === 'orimise') {
+    const endpoint = baseUrl.endsWith('/chat/completions')
+      ? baseUrl
+      : `${baseUrl.replace(/\/$/, '')}/chat/completions`;
+
+    const reqBody = {
+      model: model,
+      messages: [
+        { role: 'system', content: systemPrompt },
+        { role: 'user', content: userMessage }
+      ],
+      temperature: 0.7
+    };
+
+    const res = await fetch(endpoint, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${apiKey}`
+      },
+      body: JSON.stringify(reqBody)
+    });
+
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.error?.message || `API Error: ${res.status} ${res.statusText}`);
+    }
+
+    const data = await res.json();
+    rawText = data.choices?.[0]?.message?.content || '';
+  } else {
+    const targetModel = model.includes('gemini') ? model : 'gemini-2.5-flash';
+    const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${targetModel}:generateContent?key=${apiKey}`;
+
+    const res = await fetch(geminiUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        contents: [
+          { role: 'user', parts: [{ text: `${systemPrompt}\n\n${userMessage}` }] }
+        ],
+        generationConfig: {
+          temperature: 0.7,
+          responseMimeType: "application/json"
+        }
+      })
+    });
+
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.error?.message || `Gemini Error: ${res.status} ${res.statusText}`);
+    }
+
+    const data = await res.json();
+    rawText = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
+  }
+
+  const parsed = safeParseAIJson(rawText);
+  if (!parsed || !parsed.storySummary) {
+    throw new Error('AI không tạo được tóm tắt mới. Vui lòng thử lại!');
+  }
+
+  return {
+    storySummary: parsed.storySummary
+  };
+}
 
 
+// 🪄 4. Dedicated AI Generator for Midjourney/Flux Image Prompts according to prompt
+export async function regenerateImagePromptOnly({
+  storySummary = '',
+  customPrompt = '',
+  genre = 'Tu Tiên / Tiên Hiệp',
+  contentType = 'Review Phim / Tóm Tắt Phim',
+  aiProvider = 'orimise',
+  apiKey,
+  baseUrl = 'https://api.orimise.com/v1',
+  model = 'claude-sonnet-5'
+}) {
+  if (!apiKey) {
+    throw new Error('Chưa nhập API Key trong Cấu Hình AI!');
+  }
+  if (!customPrompt || !customPrompt.trim()) {
+    throw new Error('Vui lòng nhập prompt yêu cầu cho Ý Tưởng Vẽ Ảnh Thumbnail!');
+  }
+
+  const systemPrompt = `You are an Elite Midjourney & Digital Art Prompt Engineer.
+Create a hyper-detailed 16:9 YouTube Thumbnail Art Prompt in English and a concise Vietnamese visual explanation based on the story and the Creator's Custom Prompt.
+
+RULES:
+1. imagePromptEn: Hyper-detailed prompt with lighting, atmosphere, cinematography, 8k render, --ar 16:9 --v 6.1 --style raw.
+2. imagePromptVi: Gợi ý bối cảnh và nhân vật bằng tiếng Việt dễ hiểu.
+3. Return ONLY valid JSON:
+{
+  "imagePromptEn": "Hyper realistic 16:9 cinematic anime render...",
+  "imagePromptVi": "Mô tả bối cảnh và thần thái nhân vật bằng tiếng Việt..."
+}`;
+
+  const userMessage = `THỂ LOẠI: ${genre}
+ĐỊNH DẠNG: ${contentType}
+
+=== 🎯 PROMPT YÊU CẦU VẼ ẢNH TỪ CREATOR: ===
+${customPrompt.trim()}
+
+=== TÓM TẮT CỐT TRUYỆN GỐC ===
+${storySummary}
+
+HÃY TẠO PROMPT VẼ ẢNH TIẾNG ANH VÀ Ý TƯỞNG TIẾNG VIỆT THEO ĐÚNG PROMPT TRÊN. XUẤT RA 1 ĐỐI TƯỢNG JSON DUY NHẤT:`;
+
+  let rawText = '';
+
+  if (aiProvider === 'orimise') {
+    const endpoint = baseUrl.endsWith('/chat/completions')
+      ? baseUrl
+      : `${baseUrl.replace(/\/$/, '')}/chat/completions`;
+
+    const reqBody = {
+      model: model,
+      messages: [
+        { role: 'system', content: systemPrompt },
+        { role: 'user', content: userMessage }
+      ],
+      temperature: 0.8
+    };
+
+    const res = await fetch(endpoint, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${apiKey}`
+      },
+      body: JSON.stringify(reqBody)
+    });
+
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.error?.message || `API Error: ${res.status} ${res.statusText}`);
+    }
+
+    const data = await res.json();
+    rawText = data.choices?.[0]?.message?.content || '';
+  } else {
+    const targetModel = model.includes('gemini') ? model : 'gemini-2.5-flash';
+    const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${targetModel}:generateContent?key=${apiKey}`;
+
+    const res = await fetch(geminiUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        contents: [
+          { role: 'user', parts: [{ text: `${systemPrompt}\n\n${userMessage}` }] }
+        ],
+        generationConfig: {
+          temperature: 0.8,
+          responseMimeType: "application/json"
+        }
+      })
+    });
+
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.error?.message || `Gemini Error: ${res.status} ${res.statusText}`);
+    }
+
+    const data = await res.json();
+    rawText = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
+  }
+
+  const parsed = safeParseAIJson(rawText);
+  if (!parsed || !parsed.imagePromptEn) {
+    throw new Error('AI không tạo được prompt vẽ ảnh mới. Vui lòng thử lại!');
+  }
+
+  return {
+    imagePromptEn: parsed.imagePromptEn,
+    imagePromptVi: parsed.imagePromptVi || ''
+  };
+}
