@@ -1130,29 +1130,27 @@ ${fullImagePromptEn || generatedData.imagePromptEn}
             </div>
 
             {/* 💡 Inline Prompt Input for Re-rendering Titles & 2-Line Text Thumbnails */}
-            <div className="inline-prompt-box mb-3 p-2 rounded" style={{ background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(6, 182, 212, 0.3)' }}>
-              <div className="flex-center gap-2">
-                <input
-                  type="text"
-                  className="input-field input-sm font-semibold"
-                  style={{ background: 'rgba(0,0,0,0.4)', border: '1px solid rgba(34, 211, 238, 0.25)', color: '#e2e8f0', fontSize: '0.82rem' }}
-                  placeholder="💡 Nhập prompt tạo lại 5 Title & Thumbnail (VD: Giật gân, tập trung vả mặt...)..."
-                  value={titlePrompt}
-                  onChange={e => setTitlePrompt(e.target.value)}
-                  onKeyDown={e => e.key === 'Enter' && handleRegenerateTitles()}
-                />
-                <button
-                  type="button"
-                  className="btn btn-cyan btn-sm font-bold flex-center gap-1"
-                  style={{ whiteSpace: 'nowrap', padding: '6px 12px' }}
-                  onClick={handleRegenerateTitles}
-                  disabled={isRegeneratingTitles || !titlePrompt.trim()}
-                  title="Tạo lại 5 Tiêu Đề và 5 Mẫu Chữ Thumbnail theo prompt riêng này"
-                >
-                  {isRegeneratingTitles ? <RefreshCw size={14} className="spinner" /> : <Wand2 size={14} />}
-                  <span>{isRegeneratingTitles ? 'Đang tạo...' : 'Render Lại'}</span>
-                </button>
-              </div>
+            <div className="prompt-inline-action-bar cyan">
+              <Sparkles size={15} className="text-cyan" />
+              <input
+                type="text"
+                className="prompt-inline-input"
+                placeholder="💡 Nhập prompt tạo lại 5 Title & Thumbnail (VD: Giật gân, tập trung vả mặt...)..."
+                value={titlePrompt}
+                onChange={e => setTitlePrompt(e.target.value)}
+                onKeyDown={e => e.key === 'Enter' && handleRegenerateTitles()}
+              />
+              <button
+                type="button"
+                className="btn btn-cyan btn-sm font-bold flex-center gap-1"
+                style={{ whiteSpace: 'nowrap', padding: '5px 12px' }}
+                onClick={handleRegenerateTitles}
+                disabled={isRegeneratingTitles || !titlePrompt.trim()}
+                title="Tạo lại 5 Tiêu Đề và 5 Mẫu Chữ Thumbnail theo prompt riêng này"
+              >
+                {isRegeneratingTitles ? <RefreshCw size={14} className="spinner" /> : <Wand2 size={14} />}
+                <span>{isRegeneratingTitles ? 'Đang tạo...' : 'Render Lại'}</span>
+              </button>
             </div>
 
 
@@ -1493,29 +1491,27 @@ ${fullImagePromptEn || generatedData.imagePromptEn}
             </div>
 
             {/* 💡 Inline Prompt Input for Re-rendering Description & Tags */}
-            <div className="inline-prompt-box mb-3 p-2 rounded" style={{ background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(168, 85, 247, 0.3)' }}>
-              <div className="flex-center gap-2">
-                <input
-                  type="text"
-                  className="input-field input-sm font-semibold"
-                  style={{ background: 'rgba(0,0,0,0.4)', border: '1px solid rgba(168, 85, 247, 0.25)', color: '#e2e8f0', fontSize: '0.82rem' }}
-                  placeholder="💡 Nhập prompt viết lại Mô Tả (VD: Thêm lời cảm ơn, link donate, kêu gọi Subscribe...)..."
-                  value={descPrompt}
-                  onChange={e => setDescPrompt(e.target.value)}
-                  onKeyDown={e => e.key === 'Enter' && handleRegenerateDesc()}
-                />
-                <button
-                  type="button"
-                  className="btn btn-purple-glow btn-sm font-bold flex-center gap-1"
-                  style={{ whiteSpace: 'nowrap', padding: '6px 12px' }}
-                  onClick={handleRegenerateDesc}
-                  disabled={isRegeneratingDesc || !descPrompt.trim()}
-                  title="Viết lại nội dung mô tả video và thẻ tags theo prompt riêng này"
-                >
-                  {isRegeneratingDesc ? <RefreshCw size={14} className="spinner" /> : <Wand2 size={14} />}
-                  <span>{isRegeneratingDesc ? 'Đang viết...' : 'Render Lại'}</span>
-                </button>
-              </div>
+            <div className="prompt-inline-action-bar purple">
+              <Sparkles size={15} className="text-purple" />
+              <input
+                type="text"
+                className="prompt-inline-input"
+                placeholder="💡 Nhập prompt viết lại Mô Tả (VD: Thêm lời cảm ơn, link donate, kêu gọi Subscribe...)..."
+                value={descPrompt}
+                onChange={e => setDescPrompt(e.target.value)}
+                onKeyDown={e => e.key === 'Enter' && handleRegenerateDesc()}
+              />
+              <button
+                type="button"
+                className="btn btn-purple-glow btn-sm font-bold flex-center gap-1"
+                style={{ whiteSpace: 'nowrap', padding: '5px 12px' }}
+                onClick={handleRegenerateDesc}
+                disabled={isRegeneratingDesc || !descPrompt.trim()}
+                title="Viết lại nội dung mô tả video và thẻ tags theo prompt riêng này"
+              >
+                {isRegeneratingDesc ? <RefreshCw size={14} className="spinner" /> : <Wand2 size={14} />}
+                <span>{isRegeneratingDesc ? 'Đang viết...' : 'Render Lại'}</span>
+              </button>
             </div>
 
             <textarea
