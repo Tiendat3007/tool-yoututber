@@ -5,11 +5,21 @@ import {
   History, Plus, Edit2, Clock, Search, Filter, ArrowUpDown, CheckCircle2, ChevronDown, ChevronUp
 } from 'lucide-react';
 
-import { generateYoutubeContent } from '../utils/youtuberGenerator';
+import { generateYoutubeContent, refineYoutubeWithPrompt } from '../utils/youtuberGenerator';
 import { exportThumbnailHD, generateAIThumbnailImage, THUMBNAIL_COLOR_THEMES } from '../utils/thumbnailExporter';
 import { uploadReferenceImageToOrimise, generateOrimiseImage } from '../utils/orimiseImageApi';
 import { generateFreeAIImage, FREE_IMAGE_MODELS } from '../utils/freeImageApi';
 import { saveYoutuberStudioStateToDB, loadYoutuberStudioStateFromDB, saveYoutuberHistoryToDB, loadYoutuberHistoryFromDB } from '../utils/dbStorage';
+
+// Preset prompts for YouTube Studio
+const PROMPT_PRESETS = [
+  { label: '🔥 Tập trung vả mặt', text: 'Tập trung sâu vào những phân đoạn nhân vật chính vả mặt kẻ thù, nghịch chuyển càn khôn, tạo cảm giác thỏa mãn cực độ.' },
+  { label: '⚡ Giật gân, bí ẩn', text: 'Viết tiêu đề và chữ thumbnail theo phong cách giật gân, khơi gợi trí tò mò mạnh mẽ, tạo cảm giác hồi hộp gay cấn.' },
+  { label: '👑 Sức mạnh & Hệ thống', text: 'Nhấn mạnh vào công pháp vô địch, hệ thống thần cấp, thức tỉnh bảo vật cổ xưa và sức mạnh áp đảo.' },
+  { label: '🖤 Ma Tu / Hắc Ám', text: 'Phong cách Ma Tôn, Tu La tàn nhẫn, sát phạt quyết đoán, một mình đối đầu cả thiên hạ.' },
+  { label: '🤣 Hài hước, bựa', text: 'Tông giọng hóm hỉnh, bắt trend, giật tít hài hước khiến người xem thích thú.' },
+  { label: '📝 Kêu gọi đăng ký & Donate', text: 'Trong phần mô tả, hãy chèn thêm lời kêu gọi Like, Subscribe và ủng hộ kênh thật tự nhiên, cuốn hút.' }
+];
 
 // Helper to generate concise episode range name (e.g. c3-1-3 or c3_01 - c3_22)
 function formatFileRangeTitle(fileList = []) {
@@ -55,6 +65,8 @@ export default function YoutuberStudio({
 
   const [genre, setGenre] = useState('Tu Tiên / Tiên Hiệp');
   const [contentType, setContentType] = useState('Review Phim / Tóm Tắt Phim');
+  const [customPrompt, setCustomPrompt] = useState('');
+  const [isRefining, setIsRefining] = useState(false);
   const [isEpisodesExpanded, setIsEpisodesExpanded] = useState(false);
 
   // History Sessions State
@@ -115,6 +127,7 @@ export default function YoutuberStudio({
               if (activeSess.selectedThemeId) setSelectedThemeId(activeSess.selectedThemeId);
               if (activeSess.genre) setGenre(activeSess.genre);
               if (activeSess.contentType) setContentType(activeSess.contentType);
+              if (activeSess.customPrompt) setCustomPrompt(activeSess.customPrompt);
               if (activeSess.selectedAnalysisModel) setSelectedAnalysisModel(activeSess.selectedAnalysisModel);
               if (activeSess.selectedFreeModel) setSelectedFreeModel(activeSess.selectedFreeModel);
             }
@@ -128,6 +141,7 @@ export default function YoutuberStudio({
     }
     restoreStudioHistory();
     return () => { isMounted = false; };
+
   }, []);
 
   // Sync edits to the active history session and persist to IndexedDB
@@ -478,6 +492,7 @@ ${fullImagePromptEn || generatedData.imagePromptEn}
         selectedFiles: selectedFilesList,
         genre,
         contentType,
+        customPrompt,
         aiProvider,
         apiKey,
         baseUrl: orimiseBaseUrl,
@@ -514,6 +529,7 @@ ${fullImagePromptEn || generatedData.imagePromptEn}
         selectedThemeId,
         genre,
         contentType,
+        customPrompt,
         selectedAnalysisModel,
         selectedFreeModel
       };
@@ -535,6 +551,61 @@ ${fullImagePromptEn || generatedData.imagePromptEn}
       alert(`Lỗi tạo nội dung YouTube: ${err.message}`);
     } finally {
       setIsGenerating(false);
+    }
+  };
+
+  // Instant AI Refiner based on Custom Prompt without re-reading all SRTs
+  const handleRefineWithPrompt = async () => {
+    if (!generatedData) {
+      alert('Vui lòng phân tích tạo content bằng AI trước khi tinh chỉnh!');
+      return;
+    }
+    if (!customPrompt || !customPrompt.trim()) {
+      alert('Vui lòng nhập yêu cầu / prompt muốn AI tinh chỉnh vào ô bên dưới!');
+      return;
+    }
+    const apiKey = aiProvider === 'orimise' ? orimiseKey : geminiKey;
+    if (!apiKey) {
+      alert(`Vui lòng nhập ${aiProvider === 'orimise' ? 'Orimise' : 'Google Gemini'} API Key trong Cấu Hình AI!`);
+      return;
+    }
+
+    setIsRefining(true);
+    try {
+      const refined = await refineYoutubeWithPrompt({
+        currentData: generatedData,
+        customPrompt,
+        genre,
+        contentType,
+        aiProvider,
+        apiKey,
+        baseUrl: orimiseBaseUrl,
+        model: selectedAnalysisModel
+      });
+
+      setGeneratedData(refined);
+
+      // Sync active title & thumbnail text
+      if (refined.thumbnailTexts && refined.thumbnailTexts[selectedTextIndex]) {
+        setCustomLine1(refined.thumbnailTexts[selectedTextIndex].line1);
+        setCustomLine2(refined.thumbnailTexts[selectedTextIndex].line2);
+      } else if (refined.thumbnailTexts?.[0]) {
+        setCustomLine1(refined.thumbnailTexts[0].line1);
+        setCustomLine2(refined.thumbnailTexts[0].line2);
+      }
+
+      // Update session history
+      if (activeSessionId) {
+        setHistorySessions(prev => {
+          const updated = prev.map(s => s.id === activeSessionId ? { ...s, generatedData: refined, customPrompt } : s);
+          saveYoutuberHistoryToDB(updated, activeSessionId);
+          return updated;
+        });
+      }
+    } catch (err) {
+      alert(`Lỗi AI tinh chỉnh: ${err.message}`);
+    } finally {
+      setIsRefining(false);
     }
   };
 
@@ -960,7 +1031,97 @@ ${fullImagePromptEn || generatedData.imagePromptEn}
             </button>
           </div>
         </div>
+
+        {/* 🪄 Smart Custom AI Prompt & Refinement Box */}
+        <div className="custom-prompt-container">
+          <div className="flex-between align-center flex-wrap gap-2 mb-2">
+            <div className="flex-center gap-2">
+              <Sparkles size={16} className="text-purple" />
+              <span className="font-bold text-purple" style={{ fontSize: '0.88rem' }}>
+                ✨ Yêu Cầu / Prompt Tùy Chỉnh Cho AI (Tùy Chọn):
+              </span>
+              <span className="badge-info text-xs" style={{ background: 'rgba(168, 85, 247, 0.15)', color: '#c084fc', padding: '2px 8px', borderRadius: '10px' }}>
+                Tự Động Đổi Title, Thumbnail, Tóm Tắt & Mô Tả
+              </span>
+            </div>
+
+            {customPrompt && (
+              <button
+                type="button"
+                className="btn btn-secondary btn-xs text-muted"
+                onClick={() => setCustomPrompt('')}
+                title="Xóa prompt hiện tại"
+              >
+                ✕ Xóa Prompt
+              </button>
+            )}
+          </div>
+
+          {/* Prompt Preset Chips */}
+          <div className="prompt-chips-wrapper">
+            {PROMPT_PRESETS.map((preset, pIdx) => {
+              const isActive = customPrompt.includes(preset.text);
+              return (
+                <button
+                  key={pIdx}
+                  type="button"
+                  className={`prompt-preset-chip ${isActive ? 'active' : ''}`}
+                  onClick={() => {
+                    if (customPrompt.includes(preset.text)) {
+                      setCustomPrompt(prev => prev.replace(preset.text, '').trim());
+                    } else {
+                      setCustomPrompt(prev => prev ? `${prev}. ${preset.text}` : preset.text);
+                    }
+                  }}
+                  title={preset.text}
+                >
+                  {preset.label}
+                </button>
+              );
+            })}
+          </div>
+
+          {/* Textarea Input */}
+          <div className="prompt-textarea-wrapper">
+            <textarea
+              className="prompt-textarea"
+              value={customPrompt}
+              onChange={e => setCustomPrompt(e.target.value)}
+              placeholder="💡 Nhập yêu cầu riêng để AI tạo Title, Thumbnail, Tóm tắt, Mô tả theo ý bạn (VD: Tập trung vào cảnh main vả mặt ở tập 5, viết tiêu đề theo phong cách Ma Tôn tàn nhẫn, thêm lời cảm ơn người xem trong mô tả, chữ thumbnail thật kịch tính...)..."
+              rows={2}
+            />
+          </div>
+
+          {/* Quick Refine Action Toolbar if Content Already Generated */}
+          {generatedData && (
+            <div className="flex-between align-center flex-wrap gap-2 mt-2">
+              <span className="text-xs text-muted">
+                ⚡ Đã có dữ liệu phân tích. Bạn có thể bấm nút bên phải để AI tinh chỉnh siêu tốc trong 1 giây mà không cần quét lại file!
+              </span>
+              <button
+                type="button"
+                className="btn btn-purple-glow btn-sm font-bold flex-center gap-1"
+                onClick={handleRefineWithPrompt}
+                disabled={isRefining || !customPrompt.trim()}
+                title="Dùng AI tinh chỉnh tức thì toàn bộ Tiêu đề, Chữ Thumbnail, Tóm tắt và Mô tả theo đúng prompt"
+              >
+                {isRefining ? (
+                  <>
+                    <RefreshCw size={14} className="spinner" />
+                    <span>Đang Tinh Chỉnh AI...</span>
+                  </>
+                ) : (
+                  <>
+                    <Wand2 size={14} />
+                    <span>🪄 AI Tinh Chỉnh Nhanh (1 Giây)</span>
+                  </>
+                )}
+              </button>
+            </div>
+          )}
+        </div>
       </div>
+
 
       {/* Main Results Grid */}
       {generatedData ? (

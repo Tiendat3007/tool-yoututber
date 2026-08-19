@@ -98,6 +98,7 @@ export async function generateYoutubeContent({
   selectedFiles = [],
   genre = 'Tu Tiên / Tiên Hiệp',
   contentType = 'Review Phim / Tóm Tắt Phim',
+  customPrompt = '',
   aiProvider = 'orimise',
   apiKey,
   baseUrl = 'https://api.orimise.com/v1',
@@ -239,19 +240,23 @@ REQUIRED OUTPUT JSON FORMAT (Return ONLY valid JSON):
 }
 `;
 
+  const customPromptDirective = customPrompt && customPrompt.trim()
+    ? `\n\n=== 🎯 YÊU CẦU ĐẶC BIỆT TỪ CREATOR (CUSTOM PROMPT): ===\n${customPrompt.trim()}\n=> LƯU Ý BẮT BUỘC: Hãy đặc biệt ưu tiên áp dụng đúng yêu cầu tùy chỉnh này khi tạo Tóm Tắt Cốt Truyện, 5 Tiêu Đề, 5 Mẫu Chữ Thumbnail, Mô Tả Video và Thẻ Tags!\n`
+    : '';
 
   const userMessage = `THỂ LOẠI: ${genre}
 ĐỊNH DẠNG: ${contentType}
 DANH SÁCH TẬP PHIM (${selectedFiles.length} TẬP): ${fileNames}
-
+${customPromptDirective}
 === NỘI DUNG TOÀN BỘ 100% PHỤ ĐỀ SRT CỦA TẤT CẢ CÁC TẬP ===
 ${fullTranscriptContext}
 === HẾT TOÀN BỘ PHỤ ĐỀ SRT ===
 
 HÃY THỰC HIỆN ĐÚNG QUY TRÌNH 2 BƯỚC:
 1. Đọc và hiểu toàn bộ 100% nội dung phụ đề trên để viết bài TÓM TẮT CỐT TRUYỆN CHI TIẾT (storySummary).
-2. Tạo 5 Tiêu Đề chuẩn 80-90 ký tự + 3 Mẫu Chữ Thumbnail 2 Dòng (7-8 từ/dòng) + Prompt Ảnh khớp 100% với phim.
+2. Tạo 5 Tiêu Đề chuẩn 80-90 ký tự + 5 Mẫu Chữ Thumbnail 2 Dòng (7-10 từ/dòng) + Prompt Ảnh khớp 100% với phim ${customPrompt ? 'và tuân theo đúng yêu cầu đặc biệt của Creator' : ''}.
 3. Xuất ra 1 đối tượng JSON duy nhất:`;
+
 
 
   let rawText = '';
@@ -374,6 +379,187 @@ HÃY THỰC HIỆN ĐÚNG QUY TRÌNH 2 BƯỚC:
     imagePromptVi: parsed.imagePromptVi || '',
     description: finalDescription,
     tags: parsed.tags || ''
+  };
+}
+
+// 🪄 Smart Instant AI Refiner based on Creator Custom Prompt
+export async function refineYoutubeWithPrompt({
+  currentData,
+  customPrompt,
+  genre = 'Tu Tiên / Tiên Hiệp',
+  contentType = 'Review Phim / Tóm Tắt Phim',
+  aiProvider = 'orimise',
+  apiKey,
+  baseUrl = 'https://api.orimise.com/v1',
+  model = 'claude-sonnet-5'
+}) {
+  if (!apiKey) {
+    throw new Error('Chưa nhập API Key trong Cấu Hình AI!');
+  }
+
+  if (!customPrompt || !customPrompt.trim()) {
+    throw new Error('Vui lòng nhập yêu cầu / prompt tùy chỉnh muốn AI thay đổi!');
+  }
+
+  if (!currentData) {
+    throw new Error('Chưa có dữ liệu phân tích để tinh chỉnh!');
+  }
+
+  const systemPrompt = `You are an Elite YouTube Creative Director & Viral Content Strategist.
+Your task is to refine, rewrite, and adapt the existing YouTube Creator Metadata (storySummary, 5 titles, 5 thumbnailTexts, timestamps, imagePromptEn, imagePromptVi, description, tags) according to the user's specific Custom Prompt.
+
+STRICT INSTRUCTIONS:
+1. Retain the core characters and plot points from the existing story.
+2. Skillfully rewrite and adapt ALL 5 Titles (80-90 chars), ALL 5 Thumbnail Texts (2 lines, 7-10 words/line), Story Summary, Description, Image Prompts, and Tags to match the requested style, tone, focus, or instructions in the Custom Prompt.
+3. Return ONLY valid JSON in the exact schema below:
+
+{
+  "storySummary": "Bài tóm tắt đã được tinh chỉnh theo prompt...",
+  "titles": [
+    "💥 [Tiêu đề 1 tinh chỉnh chuẩn 80-90 ký tự]",
+    "🔥 [Tiêu đề 2 tinh chỉnh chuẩn 80-90 ký tự]",
+    "⚡ [Tiêu đề 3 tinh chỉnh chuẩn 80-90 ký tự]",
+    "👑 [Tiêu đề 4 tinh chỉnh chuẩn 80-90 ký tự]",
+    "😱 [Tiêu đề 5 tinh chỉnh chuẩn 80-90 ký tự]"
+  ],
+  "thumbnailTexts": [
+    { "line1": "DÒNG 1 TINH CHỈNH 7-10 TỪ", "line2": "DÒNG 2 TINH CHỈNH 7-10 TỪ" },
+    { "line1": "DÒNG 1 TINH CHỈNH 7-10 TỪ", "line2": "DÒNG 2 TINH CHỈNH 7-10 TỪ" },
+    { "line1": "DÒNG 1 TINH CHỈNH 7-10 TỪ", "line2": "DÒNG 2 TINH CHỈNH 7-10 TỪ" },
+    { "line1": "DÒNG 1 TINH CHỈNH 7-10 TỪ", "line2": "DÒNG 2 TINH CHỈNH 7-10 TỪ" },
+    { "line1": "DÒNG 1 TINH CHỈNH 7-10 TỪ", "line2": "DÒNG 2 TINH CHỈNH 7-10 TỪ" }
+  ],
+  "timestamps": [
+    "00:00 Mở đầu: ...",
+    "04:15 Biến cố: ..."
+  ],
+  "imagePromptEn": "16:9 Midjourney prompt adapted to the new theme...",
+  "imagePromptVi": "Mô tả ý tưởng hình ảnh tiếng Việt...",
+  "description": "Mô tả video YouTube đã cập nhật...",
+  "tags": "tu tiên, review phim, tags mới..."
+}`;
+
+  const userMessage = `THỂ LOẠI: ${genre}
+ĐỊNH DẠNG: ${contentType}
+
+=== 🎯 YÊU CẦU PROMPT TINH CHỈNH TỪ CREATOR: ===
+${customPrompt.trim()}
+
+=== DỮ LIỆU METADATA HIỆN TẠI ===
+${JSON.stringify({
+  titles: currentData.titles,
+  thumbnailTexts: currentData.thumbnailTexts,
+  storySummary: currentData.storySummary,
+  description: currentData.description,
+  tags: currentData.tags
+}, null, 2)}
+
+HÃY TINH CHỈNH VÀ VIẾT LẠI TOÀN BỘ BỘ METADATA TRÊN THEO ĐÚNG YÊU CẦU PROMPT. XUẤT RA 1 ĐỐI TƯỢNG JSON DUY NHẤT:`;
+
+  let rawText = '';
+
+  if (aiProvider === 'orimise') {
+    const endpoint = baseUrl.endsWith('/chat/completions')
+      ? baseUrl
+      : `${baseUrl.replace(/\/$/, '')}/chat/completions`;
+
+    const reqBody = {
+      model: model,
+      messages: [
+        { role: 'system', content: systemPrompt },
+        { role: 'user', content: userMessage }
+      ],
+      temperature: 0.7
+    };
+
+    const res = await fetch(endpoint, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${apiKey}`
+      },
+      body: JSON.stringify(reqBody)
+    });
+
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.error?.message || `Orimise API Error: ${res.status} ${res.statusText}`);
+    }
+
+    const data = await res.json();
+    rawText = data.choices?.[0]?.message?.content || '';
+  } else {
+    // Direct Gemini API
+    const targetModel = model.includes('gemini') ? model : 'gemini-2.5-flash';
+    const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${targetModel}:generateContent?key=${apiKey}`;
+
+    const res = await fetch(geminiUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        contents: [
+          { role: 'user', parts: [{ text: `${systemPrompt}\n\n${userMessage}` }] }
+        ],
+        generationConfig: {
+          temperature: 0.7,
+          responseMimeType: "application/json"
+        }
+      })
+    });
+
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.error?.message || `Gemini API Error: ${res.status} ${res.statusText}`);
+    }
+
+    const data = await res.json();
+    rawText = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
+  }
+
+  const parsed = safeParseAIJson(rawText);
+  if (!parsed) {
+    throw new Error('AI không trả về đúng định dạng JSON. Vui lòng thử lại!');
+  }
+
+  let formattedTexts = [];
+  if (Array.isArray(parsed.thumbnailTexts) && parsed.thumbnailTexts.length > 0) {
+    formattedTexts = parsed.thumbnailTexts.map(t => {
+      if (typeof t === 'object' && t !== null) {
+        return {
+          line1: t.line1 || t.text1 || t.topLine || '',
+          line2: t.line2 || t.text2 || t.bottomLine || ''
+        };
+      }
+      if (typeof t === 'string') {
+        const parts = t.split(/[\n|]/);
+        return {
+          line1: parts[0]?.trim() || t,
+          line2: parts[1]?.trim() || ''
+        };
+      }
+      return { line1: 'VỪA XUYÊN KHÔNG ĐÃ BỊ TỐNG VÀO HẦM NGỤC', line2: '' };
+    });
+  } else {
+    formattedTexts = currentData.thumbnailTexts || [];
+  }
+
+  let finalDescription = parsed.description || currentData.description || '';
+  const parsedTimestamps = Array.isArray(parsed.timestamps) ? parsed.timestamps : (currentData.timestamps || []);
+  if (parsedTimestamps.length > 0 && !finalDescription.includes('00:00')) {
+    finalDescription = `${finalDescription}\n\n📌 MỐC THỜI GIAN VIDEO:\n${parsedTimestamps.join('\n')}`;
+  }
+
+  return {
+    titles: (Array.isArray(parsed.titles) && parsed.titles.length > 0)
+      ? parsed.titles
+      : (currentData.titles || []),
+    thumbnailTexts: formattedTexts,
+    storySummary: parsed.storySummary || parsed.summary || currentData.storySummary || '',
+    timestamps: parsedTimestamps,
+    imagePromptEn: parsed.imagePromptEn || parsed.prompt || currentData.imagePromptEn || '',
+    imagePromptVi: parsed.imagePromptVi || currentData.imagePromptVi || '',
+    description: finalDescription,
+    tags: parsed.tags || currentData.tags || ''
   };
 }
 
