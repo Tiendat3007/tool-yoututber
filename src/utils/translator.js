@@ -46,11 +46,42 @@ export function localTranslateLine(originalText, glossary, activePronounRules = 
   return text;
 }
 
-// Master System Prompt generator enforcing 46 Tu Tien rules + JSON spec
+// Post-Translation Vietnamese Text Polisher & Sanitizer
+export function cleanAndPolishVietnamese(text) {
+  if (!text || typeof text !== 'string') return '';
+  let cleaned = text.trim();
+
+  // 1. Remove unnecessary spaces before punctuation: "xin chào !" -> "xin chào!"
+  cleaned = cleaned.replace(/\s+([,.:!?;…])/g, '$1');
+
+  // 2. Ensure space after punctuation if followed by word character: "sư phụ,ngươi" -> "sư phụ, ngươi"
+  cleaned = cleaned.replace(/([,.:;!])([a-zA-Zà-ỹÀ-Ỹ0-9])/g, '$1 $2');
+
+  // 3. Normalize multiple whitespace into single space
+  cleaned = cleaned.replace(/[ \t]+/g, ' ');
+
+  // 4. Normalize ellipsis ...
+  cleaned = cleaned.replace(/\.{3,}/g, '...');
+
+  // 5. Capitalize first letter of sentence if needed
+  if (cleaned.length > 0) {
+    const firstChar = cleaned.charAt(0);
+    // Only capitalize if not starting with quotes or special character
+    if (/^[a-zà-ỹ]/.test(firstChar)) {
+      cleaned = firstChar.toUpperCase() + cleaned.slice(1);
+    }
+  }
+
+  return cleaned;
+}
+
+// Master System Prompt generator enforcing 46 Tu Tien rules + JSON glossary spec
 // Filter active glossary terms that actually appear in this batch of subtitles, plus top high-frequency terms
 export function extractRelevantGlossary(subtitles = [], glossary = []) {
   const combinedText = (subtitles || []).map(s => s.originalText || '').join(' ');
-  const activeTerms = (glossary || []).filter(g => g.enabled && g.zh && g.vi);
+  const activeTerms = (glossary || [])
+    .filter(g => g.enabled && g.zh && g.vi)
+    .sort((a, b) => b.zh.length - a.zh.length);
 
   const relevantDict = {};
   let count = 0;
@@ -63,13 +94,13 @@ export function extractRelevantGlossary(subtitles = [], glossary = []) {
     }
   });
 
-  // 2. Second priority: if fewer than 40 terms matched, add important high-priority terms
-  if (count < 40) {
+  // 2. Second priority: if fewer than 50 terms matched, add important high-priority terms
+  if (count < 50) {
     for (const g of activeTerms) {
       if (!relevantDict[g.zh]) {
         relevantDict[g.zh] = g.vi;
         count++;
-        if (count >= 50) break;
+        if (count >= 60) break;
       }
     }
   }
@@ -82,48 +113,60 @@ export function buildSystemPrompt(glossary = [], customPrompt = '', relevantGlos
   const glossaryDict = relevantGlossary || extractRelevantGlossary([], glossary);
   const termsJsonString = JSON.stringify(glossaryDict, null, 2);
 
-  const masterPrompt = `You are an automated Data Processing & Localization Engine for video subtitle software.
-Your task is to process Chinese/Vietnamese subtitle input data and translate/re-edit each item into fluent Vietnamese Xianxia/Tu Tien ancient style text.
-Output MUST be a pure JSON array: [{"id": 1, "translatedText": "..."}].
+  const masterPrompt = `You are an Elite Video Localization Director & Xianxia / Ancient Vietnamese Subtitle Specialist.
+Your mission is to translate and localize video subtitles into natural, evocative, and culturally rich Vietnamese text (Xianxia / Tu Tiên / Cổ Trang / Đô Thị).
 
-BẮT BUỘC TUÂN THỦ QUY TẮC CỐT LÕI (DỊCH SANG TIẾNG VIỆT CỔ TRANG TU TIÊN):
+OUTPUT SPECIFICATION:
+You MUST output ONLY a pure JSON array containing the exact structure:
+[
+  { "id": 1, "translatedText": "Nội dung câu thoại dịch tiếng Việt..." }
+]
 
-1. BẢNG TỪ ĐIỂN JSON GLOSSARY BẮT BUỘC (QUAN TRỌNG NHẤT):
+QUY TẮC DỊCH THUẬT BẬC THẦY (CHUYÊN NGHIỆP - TỰ NHIÊN - CHUẨN XÁC):
+
+1. BẢNG TỪ ĐIỂN JSON GLOSSARY BẮT BUỘC (ĐỘ ƯU TIÊN TUYỆT ĐỐI #1):
    - Khi dịch câu thoại, nếu gặp bất kỳ thuật ngữ, danh xưng, cảnh giới hoặc tên riêng nào có trong "glossary_dict" bên dưới, BẮT BUỘC 100% phải dịch chính xác sang từ tiếng Việt đã chỉ định trong JSON.
    - TUYỆT ĐỐI KHÔNG ĐƯỢC TỰ Ý ĐỔI TỪ HOẶC DÙNG TỪ ĐỒNG NGHĨA KHÁC.
    BẢNG JSON GLOSSARY:
    ${termsJsonString}
 
 2. LIÊN KẾT MẠCH TRUYỆN & NGỮ CẢNH LIỀN TRƯỚC (CONTEXT-AWARE):
-   - Trong mỗi khối phụ đề gửi đến có kèm mục "NGỮ CẢNH CÂU THOẠI LIỀN TRƯỚC".
-   - BẮT BUỘC đọc ngữ cảnh trước để xác định rõ ai đang nói với ai, quan hệ nhân vật (sư đồ, kẻ thù, đạo lữ, tôn chủ - thuộc hạ) nhằm giữ ĐẠI TỪ XƯNG HÔ (ta - ngươi, hắn - nàng, bổn tọa, tiền bối, sư tôn) ĐỒNG NHẤT 100% xuyên suốt các khối.
-   - TUYỆT ĐỐI KHÔNG dịch các câu trong phần ngữ cảnh liền trước, CHỈ DỊCH các câu trong "DANH SÁCH PHỤ ĐỀ MỤC TIÊU".
+   - Đọc kỹ phần "NGỮ CẢNH CÂU THOẠI LIỀN TRƯỚC" để hiểu mạch diễn biến, quan hệ nhân vật (sư đồ, kẻ thù, đạo lữ, tôn chủ - thuộc hạ, huynh đệ).
+   - Duy trì ĐẠI TỪ XƯNG HÔ (ta - ngươi, hắn - nàng, bổn tọa, tiền bối, sư tôn, đồ nhi) ĐỒNG NHẤT 100% xuyên suốt các khối thoại.
+   - CHỈ DỊCH các câu trong "DANH SÁCH PHỤ ĐỀ MỤC TIÊU CẦN DỊCH", TUYỆT ĐỐI KHÔNG dịch lại phần ngữ cảnh liền trước.
 
-3. XƯNG HÔ & TÊN: 
+3. QUY CHUẨN XƯNG HÔ & DANH XƯNG CỔ TRANG:
    - Đặt theo vị trí: [Tên + Danh xưng] (VD: 苏师兄 -> Tô sư huynh, 林师姐 -> Lâm sư tỷ, 叶前辈 -> Diệp tiền bối, 陈长老 -> Trần trưởng lão, 王宗主 -> Vương tông chủ). CẤM đảo thành "Sư huynh Tô", "Sư tỷ Lâm".
-   - 师尊 -> sư tôn, 师父 -> sư phụ, 前辈 -> tiền bối, 晚辈 -> vãn bối, 道友 -> đạo hữu, 阁下 -> các hạ.
-   - Đại từ quyền uy: 本座 -> bổn tọa, 本尊 -> bổn tôn, 本帝 -> bổn đế, 本王 -> bổn vương. KHÔNG dịch thành "tôi".
+   - 师尊 -> sư tôn, 师父 -> sư phụ, 前辈 -> tiền bối, 晚辈 -> vãn bối, 道友 -> đạo hữu, 阁下 -> các hạ, 弟子 -> đệ tử, 徒儿 -> đồ nhi.
+   - Đại từ quyền uy: 本座 -> bổn tọa, 本尊 -> bổn tôn, 本帝 -> bổn đế, 本王 -> bổn vương. CẤM dịch thành "tôi".
    - Nam nhân BẮT BUỘC dùng "hắn" (TUYỆT ĐỐI KHÔNG DÙNG "y", KHÔNG dịch 他 thành "anh ấy"), nữ nhân dùng "nàng" trong bối cảnh cổ trang Tu Tiên.
 
-4. CẢNH GIỚI TU LUYỆN: 
+4. BẢNG THÀNH NGỮ 4 CHỮ & KHẨU KHÍ GIAO CHIẾN (BATTLE CRY & IDIOMS):
+   - 放肆 / 狂妄 -> "Càn rỡ!" / "Cuồng vọng!"
+   - 休想 / 妄想 -> "Đừng hòng!" / "Mơ tưởng!"
+   - 受死吧 / 纳命来 -> "Chịu chết đi!" / "Nộp mạng đi!"
+   - 何方神圣 -> "Thần thánh phương nào?"
+   - 灰飞烟灭 / 神魂俱灭 -> "Tan thành tro bụi" / "Thần hồn câu diệt!"
+   - 不知死活 / 不知天高地厚 -> "Không biết sống chết!" / "Không biết trời cao đất dày!"
+   - 手下留情 / 得罪了 -> "Hạ thủ lưu tình!" / "Đắc tội rồi!"
+   - 同归于尽 -> "Đồng quy vu tận!" / "Cùng chết!"
+   - 插翅难逃 -> "Chắp cánh khó thoát!"
+   - 死不足惜 -> "Vạn lần đáng chết!" / "Chết không đáng tiếc!"
+
+5. CẢNH GIỚI TU LUYỆN & HỆ THỐNG CÔNG PHÁP:
    - 炼气(Luyện Khí), 筑基(Trúc Cơ), 金丹(Kim Đan), 元婴(Nguyên Anh), 化神(Hóa Thần), 炼虚(Luyện Hư), 合体(Hợp Thể), 大乘(Đại Thừa), 渡劫(Độ Kiếp).
    - Cấp bậc: 初期(sơ kỳ), 中期(trung kỳ), 后期(hậu kỳ), 巅峰(đỉnh phong), 圆满(viên mãn). VD: 化神巅峰 -> Hóa Thần đỉnh phong.
-   - 突破 -> đột phá, 越级挑战 -> vượt cấp khiêu chiến.
-
-5. KHÁI NIỆM TU TIÊN & TẢI TÀI NGUYÊN:
-   - 功法(công pháp), 武技(võ kỹ), 秘术(bí thuật), 神通(thần thông), 心法(tâm pháp).
-   - 法宝(pháp bảo), 灵器(linh khí), 仙器(tiên khí), 飞剑(phi kiếm).
-   - 丹药(đan dược), 筑基丹(Trúc Cơ Đan), 灵石(linh thạch), 天材地宝(thiên tài địa bảo).
-   - 宗门(tông môn), 宗主(tông chủ), 太上长老(thái thượng trưởng lão), 掌门(chưởng môn).
-
-6. NGHĨA SÂU SẮC & KHẨU NGỮ:
-   - 蝼蚁 -> "sâu kiến" (KHÔNG dịch con kiến), 找死 -> "tìm chết" / "muốn chết sao?", 不自量力 -> "không biết tự lượng sức".
-   - 穿越 -> xuyên không, 重生 -> trọng sinh, 转世 -> chuyển thế, 夺舍 -> đoạt xá.
+   - 功法(công pháp), 武技(võ kỹ), 秘术(bí thuật), 神通(thần thông), 心法(tâm pháp), 法宝(pháp bảo), 灵石(linh thạch).
    - Hệ thống: 系统 -> hệ thống, 宿主 -> ký chủ, 任务 -> nhiệm vụ, 奖励 -> phần thưởng, 恭喜宿主 -> Chúc mừng ký chủ.
 
-7. NGUYÊN TẮC FORMAT ĐẦU RA: 
-   - GIỮ NGUYÊN số ID dòng phụ đề.
-   - Trả về BẮT BUỘC duy nhất định dạng JSON Array: [{"id": 1, "translatedText": "..."}, ...]. KHÔNG THÊM BẤT KỲ VĂN BẢN NÀO NGOÀI JSON ARRAY.`;
+6. VĂN PHONG PHIM LỒNG TIẾNG CHUYÊN NGHIỆP (FLUENCY & TIMING):
+   - Dịch thoát ý tự nhiên, nhịp điệu sinh động như bản lồng tiếng phim truyền hình / hoạt hình 3D cao cấp.
+   - Tránh câu văn dài dòng, lủng củng; tối ưu độ dài từng dòng để khán giả xem video đọc kịp mà vẫn thấm trọn cảm xúc.
+   - Giữ nguyên các từ cảm thán và khẩu khí mạnh mẽ trong các pha giao tranh.
+
+7. NGUYÊN TẮC FORMAT ĐẦU RA JSON:
+   - Giữ nguyên chính xác số "id" của từng câu thoại.
+   - Trả về BẮT BUỘC duy nhất định dạng JSON Array: [{"id": 1, "translatedText": "..."}]. KHÔNG THÊM BẤT KỲ VĂN BẢN NÀO NGOÀI JSON ARRAY.`;
 
   if (customPrompt && customPrompt.trim()) {
     return `${masterPrompt}
@@ -137,15 +180,15 @@ ${customPrompt.trim()}
 }
 
 
-// Helper to safely parse JSON array from any model response
+// Helper to safely parse and reconstruct JSON array from any model response with resilience
 function parseJSONArrayFromText(rawText) {
   if (!rawText) return [];
 
-  // Try extracting json code block
+  // 1. Try extracting json code block ```json ... ```
   const codeBlockMatch = rawText.match(/```(?:json)?\s*([\s\S]*?)\s*```/i);
   let textToParse = codeBlockMatch ? codeBlockMatch[1] : rawText;
 
-  // Try extracting JSON array pattern [...]
+  // 2. Try extracting JSON array pattern [...]
   const arrayMatch = textToParse.match(/\[\s*\{[\s\S]*\}\s*\]/);
   if (arrayMatch) {
     textToParse = arrayMatch[0];
@@ -157,30 +200,57 @@ function parseJSONArrayFromText(rawText) {
     }
   }
 
+  // 3. Direct JSON Parse attempt
   try {
     const res = JSON.parse(textToParse.trim());
-    if (Array.isArray(res)) return res;
-    if (res && Array.isArray(res.subtitles)) return res.subtitles;
-    if (res && Array.isArray(res.translations)) return res.translations;
-    return [];
+    const list = Array.isArray(res) ? res : (res.subtitles || res.translations || res.results || res.data || []);
+    if (Array.isArray(list)) {
+      return list.map(item => ({
+        id: item.id !== undefined ? Number(item.id) : item.index,
+        translatedText: cleanAndPolishVietnamese(item.translatedText || item.translation || item.text_vi || item.vi || '')
+      }));
+    }
   } catch (e) {
-    // Attempt relaxed cleanup for trailing commas
+    // 4. Relaxed cleanup for trailing commas and unescaped line breaks
     try {
-      const cleaned = textToParse.replace(/,\s*([\]}])/g, '$1').trim();
+      const cleaned = textToParse
+        .replace(/,\s*([\]}])/g, '$1') // remove trailing commas
+        .replace(/[\r\n]+/g, ' ')       // remove raw newlines inside string literals
+        .trim();
       const res = JSON.parse(cleaned);
-      if (Array.isArray(res)) return res;
-      if (res && Array.isArray(res.subtitles)) return res.subtitles;
-      if (res && Array.isArray(res.translations)) return res.translations;
-      return [];
+      const list = Array.isArray(res) ? res : (res.subtitles || res.translations || res.results || res.data || []);
+      if (Array.isArray(list)) {
+        return list.map(item => ({
+          id: item.id !== undefined ? Number(item.id) : item.index,
+          translatedText: cleanAndPolishVietnamese(item.translatedText || item.translation || item.text_vi || item.vi || '')
+        }));
+      }
     } catch (e2) {
-      // If AI returned conversational refusal text
+      // 5. Advanced Regex Extractor fallback for damaged JSON strings
+      const fallbackList = [];
+      const itemRegex = /\{\s*["']?id["']?\s*:\s*(\d+)\s*,\s*["']?(?:translatedText|translation|text_vi|vi)["']?\s*:\s*["']([\s\S]*?)["']\s*\}/gi;
+      let match;
+      while ((match = itemRegex.exec(rawText)) !== null) {
+        fallbackList.push({
+          id: Number(match[1]),
+          translatedText: cleanAndPolishVietnamese(match[2])
+        });
+      }
+
+      if (fallbackList.length > 0) {
+        return fallbackList;
+      }
+
       if (rawText.toLowerCase().includes('không thể') || rawText.toLowerCase().includes('cannot') || rawText.toLowerCase().includes('software engineering') || rawText.toLowerCase().includes('clarify')) {
         throw new Error(`Mô hình trên Orimise hiện được cấu hình kèm Persona CLI nên hay trả về câu từ chối. Vui lòng chọn mô hình "gemini-2.5-flash" hoặc "claude-sonnet-5" trong Cấu Hình AI để dịch mượt 100%!`);
       }
       throw new Error(`Kết quả từ AI không đúng định dạng JSON array. Nội dung nhận được: "${rawText.substring(0, 100)}..."`);
     }
   }
+
+  return [];
 }
+
 
 
 // Orimise API Translator (OpenAI Compatible Format)
