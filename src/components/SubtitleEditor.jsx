@@ -29,10 +29,12 @@ export default function SubtitleEditor({
   concurrency = 4,
   setConcurrency,
   customPrompt,
+  setCustomPrompt,
   activePresetId,
   showDiffLog,
   setShowDiffLog
 }) {
+
 
   const [searchTerm, setSearchTerm] = useState('');
   const [filterStatus, setFilterStatus] = useState('all');
@@ -440,7 +442,32 @@ export default function SubtitleEditor({
         <>
           {/* Main Toolbar */}
           <div className="toolbar-panel card-panel">
+            {/* 💡 Inline Custom AI Translation Prompt for Current File */}
+            <div className="prompt-inline-action-bar purple mb-2" style={{ width: '100%' }}>
+              <Sparkles size={15} className="text-purple" />
+              <input
+                type="text"
+                className="prompt-inline-input"
+                placeholder="💡 Nhập prompt yêu cầu dịch AI cho file này (VD: Sư tôn - Đồ nhi, dịch sát nghĩa câu thoại ngắn, phong cách đô thị hào môn...)..."
+                value={customPrompt || ''}
+                onChange={e => setCustomPrompt && setCustomPrompt(e.target.value)}
+                onKeyDown={e => e.key === 'Enter' && handleAIBatchTranslate()}
+              />
+              {customPrompt && (
+                <button
+                  type="button"
+                  className="btn-icon text-muted"
+                  onClick={() => setCustomPrompt && setCustomPrompt('')}
+                  title="Xóa prompt dịch"
+                  style={{ padding: '0 4px', fontSize: '0.8rem' }}
+                >
+                  ✕
+                </button>
+              )}
+            </div>
+
             <div className="toolbar-group">
+
               <button
                 className="btn btn-cyan btn-sm"
                 onClick={handleApplyGlossaryBatch}

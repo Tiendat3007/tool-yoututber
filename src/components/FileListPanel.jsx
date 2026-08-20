@@ -23,8 +23,11 @@ export default function FileListPanel({
   isBatchProcessing,
   batchProgressText,
   concurrency = 4,
-  setConcurrency
+  setConcurrency,
+  customPrompt,
+  setCustomPrompt
 }) {
+
 
   const fileInputRef = useRef(null);
   const folderInputRef = useRef(null);
@@ -308,7 +311,32 @@ export default function FileListPanel({
             <span>Thao Tác Hàng Loạt Cho Bộ Phim ({files.length} file):</span>
           </div>
 
+          {/* 💡 Inline Custom AI Translation Prompt for Entire Series */}
+          <div className="prompt-inline-action-bar cyan mt-2 mb-2" style={{ width: '100%' }}>
+            <Sparkles size={15} className="text-cyan" />
+            <input
+              type="text"
+              className="prompt-inline-input"
+              placeholder="💡 Nhập prompt yêu cầu dịch AI cho cả bộ phim (VD: Dịch phong cách Ma Tu hắc ám, Main xưng Ta - gọi Ngươi, dịch hài hước bắt trend, dịch ngắn gọn...)..."
+              value={customPrompt || ''}
+              onChange={e => setCustomPrompt && setCustomPrompt(e.target.value)}
+              onKeyDown={e => e.key === 'Enter' && onBatchTranslateAI()}
+            />
+            {customPrompt && (
+              <button
+                type="button"
+                className="btn-icon text-muted"
+                onClick={() => setCustomPrompt && setCustomPrompt('')}
+                title="Xóa prompt dịch"
+                style={{ padding: '0 4px', fontSize: '0.8rem' }}
+              >
+                ✕
+              </button>
+            )}
+          </div>
+
           <div className="batch-btn-group">
+
             {setConcurrency && (
               <div className="select-with-icon select-concurrency" title="Chọn số luồng AI dịch song song cùng lúc">
                 <Zap size={14} className="text-cyan" />

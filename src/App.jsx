@@ -90,7 +90,7 @@ export default function App() {
   const [aiModel, setAiModel] = useState(() => localStorage.getItem('tutien_ai_model') || 'gemini-2.5-flash');
   const [concurrency, setConcurrency] = useState(() => Number(localStorage.getItem('tutien_concurrency')) || 4);
 
-  const [customPrompt, setCustomPrompt] = useState('');
+  const [customPrompt, setCustomPrompt] = useState(() => localStorage.getItem('tutien_custom_prompt') || '');
   const [isAISettingsOpen, setIsAISettingsOpen] = useState(false);
 
   // Batch progress state
@@ -109,7 +109,9 @@ export default function App() {
     localStorage.setItem('tutien_gemini_key', geminiKey);
     localStorage.setItem('tutien_ai_model', aiModel);
     localStorage.setItem('tutien_concurrency', concurrency);
-  }, [aiProvider, orimiseKey, orimiseBaseUrl, geminiKey, aiModel, concurrency]);
+    localStorage.setItem('tutien_custom_prompt', customPrompt);
+  }, [aiProvider, orimiseKey, orimiseBaseUrl, geminiKey, aiModel, concurrency, customPrompt]);
+
 
   // Native File System Access API: Pick SRT files with persistent fileHandle
   const handleOpenFilesNative = async () => {
@@ -675,6 +677,8 @@ export default function App() {
               batchProgressText={batchProgressText}
               concurrency={concurrency}
               setConcurrency={setConcurrency}
+              customPrompt={customPrompt}
+              setCustomPrompt={setCustomPrompt}
             />
 
             {/* Subtitle Line Editor for Active File */}
@@ -700,10 +704,12 @@ export default function App() {
               concurrency={concurrency}
               setConcurrency={setConcurrency}
               customPrompt={customPrompt}
+              setCustomPrompt={setCustomPrompt}
               activePresetId={activePresetId}
               showDiffLog={showDiffLog}
               setShowDiffLog={setShowDiffLog}
             />
+
           </>
         )}
 

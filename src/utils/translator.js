@@ -125,8 +125,17 @@ BẮT BUỘC TUÂN THỦ QUY TẮC CỐT LÕI (DỊCH SANG TIẾNG VIỆT CỔ T
    - GIỮ NGUYÊN số ID dòng phụ đề.
    - Trả về BẮT BUỘC duy nhất định dạng JSON Array: [{"id": 1, "translatedText": "..."}, ...]. KHÔNG THÊM BẤT KỲ VĂN BẢN NÀO NGOÀI JSON ARRAY.`;
 
-  return customPrompt || masterPrompt;
+  if (customPrompt && customPrompt.trim()) {
+    return `${masterPrompt}
+
+=== 🎯 YÊU CẦU & CHỈ DẪN DỊCH ĐẶC BIỆT TỪ CREATOR (CUSTOM PROMPT): ===
+${customPrompt.trim()}
+(BẮT BUỘC tuân thủ chỉ dẫn phong cách, tông giọng, xưng hô hoặc lưu ý đặc biệt trên khi dịch)`;
+  }
+
+  return masterPrompt;
 }
+
 
 // Helper to safely parse JSON array from any model response
 function parseJSONArrayFromText(rawText) {
