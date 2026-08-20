@@ -270,22 +270,29 @@ export async function translateBatchWithOrimise({
   const relevantGlossary = extractRelevantGlossary(subtitles, glossary);
   const finalSystemPrompt = buildSystemPrompt(glossary, systemPrompt, relevantGlossary);
 
+  const contextList = (contextSubtitles || []).map(s => ({
+    id: s.index,
+    context_text: s.translatedText || s.originalText
+  }));
+
   const inputPayload = subtitles.map(sub => ({
     id: sub.index,
     text: sub.originalText
   }));
 
-  let contextBlock = '';
-  if (contextSubtitles && contextSubtitles.length > 0) {
-    const contextItems = contextSubtitles.map(s => `[Dòng ${s.index}]: ${s.translatedText || s.originalText}`).join('\n');
-    contextBlock = `NGỮ CẢNH CÂU THOẠI LIỀN TRƯỚC (Dùng để hiểu mạch truyện & giữ nhất quán xưng hô đại từ, TUYỆT ĐỐI KHÔNG DỊCH LẠI CÁC CÂU NÀY):\n${contextItems}\n\n`;
+  const jsonUploadPayload = {
+    task: "translate_and_localize_subtitles",
+    instructions: "Dịch danh sách 'subtitles_to_translate' sang tiếng Việt cổ trang / tiên hiệp theo đúng 'glossary_dict'. Đọc 'context_history' để giữ nhất quán xưng hô đại từ. Xuất duy nhất 1 JSON array: [{\"id\": 1, \"translatedText\": \"...\"}]",
+    glossary_dict: relevantGlossary,
+    context_history: contextList,
+    subtitles_to_translate: inputPayload
+  };
+
+  if (systemPrompt && systemPrompt.trim()) {
+    jsonUploadPayload.creator_custom_prompt = systemPrompt.trim();
   }
 
-  const userContent = `BẢNG TỪ ĐIỂN JSON GLOSSARY BẮT BUỘC DÙNG KHI DỊCH:
-${JSON.stringify(relevantGlossary, null, 2)}
-
-${contextBlock}DANH SÁCH PHỤ ĐỀ MỤC TIÊU CẦN DỊCH (Xuất duy nhất JSON array [{"id": 1, "translatedText": "..."}]):
-${JSON.stringify(inputPayload, null, 2)}`;
+  const userContent = JSON.stringify(jsonUploadPayload, null, 2);
 
   const endpoint = baseUrl.endsWith('/chat/completions')
     ? baseUrl
@@ -355,22 +362,29 @@ export async function translateBatchWithGemini({
   const relevantGlossary = extractRelevantGlossary(subtitles, glossary);
   const finalSystemPrompt = buildSystemPrompt(glossary, systemPrompt, relevantGlossary);
 
+  const contextList = (contextSubtitles || []).map(s => ({
+    id: s.index,
+    context_text: s.translatedText || s.originalText
+  }));
+
   const inputPayload = subtitles.map(sub => ({
     id: sub.index,
     text: sub.originalText
   }));
 
-  let contextBlock = '';
-  if (contextSubtitles && contextSubtitles.length > 0) {
-    const contextItems = contextSubtitles.map(s => `[Dòng ${s.index}]: ${s.translatedText || s.originalText}`).join('\n');
-    contextBlock = `NGỮ CẢNH CÂU THOẠI LIỀN TRƯỚC (Dùng để hiểu mạch truyện & giữ nhất quán xưng hô đại từ, TUYỆT ĐỐI KHÔNG DỊCH LẠI CÁC CÂU NÀY):\n${contextItems}\n\n`;
+  const jsonUploadPayload = {
+    task: "translate_and_localize_subtitles",
+    instructions: "Dịch danh sách 'subtitles_to_translate' sang tiếng Việt cổ trang / tiên hiệp theo đúng 'glossary_dict'. Đọc 'context_history' để giữ nhất quán xưng hô đại từ. Xuất duy nhất 1 JSON array: [{\"id\": 1, \"translatedText\": \"...\"}]",
+    glossary_dict: relevantGlossary,
+    context_history: contextList,
+    subtitles_to_translate: inputPayload
+  };
+
+  if (systemPrompt && systemPrompt.trim()) {
+    jsonUploadPayload.creator_custom_prompt = systemPrompt.trim();
   }
 
-  const userContent = `BẢNG TỪ ĐIỂN JSON GLOSSARY BẮT BUỘC DÙNG KHI DỊCH:
-${JSON.stringify(relevantGlossary, null, 2)}
-
-${contextBlock}DANH SÁCH PHỤ ĐỀ MỤC TIÊU CẦN DỊCH (Xuất duy nhất JSON array [{"id": 1, "translatedText": "..."}]):
-${JSON.stringify(inputPayload, null, 2)}`;
+  const userContent = JSON.stringify(jsonUploadPayload, null, 2);
 
   const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
 
@@ -390,6 +404,7 @@ ${JSON.stringify(inputPayload, null, 2)}`;
       responseMimeType: 'application/json'
     }
   };
+
 
   const response = await fetch(url, {
     method: 'POST',
