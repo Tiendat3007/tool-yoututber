@@ -205,10 +205,9 @@ export default function App() {
 
 
 
-  // Native File System Access API: Pick SRT files with persistent fileHandle
+  // Native File System Access API: Pick SRT files with persistent fileHandle & De-duplication
   const handleOpenFilesNative = async () => {
     if (!window.showOpenFilePicker) {
-      // Fallback to standard input click
       return false;
     }
 
@@ -222,8 +221,20 @@ export default function App() {
       });
 
       const newFileObjs = [];
+      const existingNameSet = new Set(files.map(f => f.name.toLowerCase().trim()));
+      let duplicateCount = 0;
+
       for (let i = 0; i < fileHandles.length; i++) {
         const handle = fileHandles[i];
+        if (!handle.name.toLowerCase().endsWith('.srt')) continue;
+
+        const normName = handle.name.toLowerCase().trim();
+        if (existingNameSet.has(normName)) {
+          duplicateCount++;
+          continue;
+        }
+        existingNameSet.add(normName);
+
         const file = await handle.getFile();
         const text = await file.text();
         const parsed = parseSRT(text);
@@ -231,7 +242,7 @@ export default function App() {
           newFileObjs.push({
             id: `file_fs_${Date.now()}_${i}_${Math.random().toString(36).substring(2, 6)}`,
             name: file.name,
-            fileHandle: handle, // <--- SAVES NATIVE FILE HANDLE FOR INSTANT DIRECT SAVE!
+            fileHandle: handle,
             subtitles: parsed.map(s => ({ ...s, previousText: s.originalText }))
           });
         }
@@ -245,6 +256,12 @@ export default function App() {
           }
           return updated;
         });
+        const msg = `✅ Đã nạp ${newFileObjs.length} file SRT mới!` +
+          (duplicateCount > 0 ? ` (Đã tự động bỏ qua ${duplicateCount} file đã tồn tại)` : '');
+        setBatchProgressText(msg);
+        setTimeout(() => setBatchProgressText(''), 4000);
+      } else if (duplicateCount > 0) {
+        alert(`Tất cả ${duplicateCount} file bạn vừa chọn ĐÃ CÓ SẴN trong hệ thống rồi, không thêm trùng lặp!`);
       }
       return true;
     } catch (err) {
@@ -255,34 +272,47 @@ export default function App() {
     }
   };
 
-  // Native Directory Access API: Pick FOLDER with persistent file handles for all subfiles
+  // Native Directory Access API: Pick FOLDER with automatic .SRT filtering & De-duplication
   const handleOpenFolderNative = async () => {
-
     if (!window.showDirectoryPicker) {
       return false;
     }
 
     try {
       const dirHandle = await window.showDirectoryPicker({ mode: 'readwrite' });
-      setBatchProgressText(`Đang quét đệ quy mọi file SRT từ thư mục "${dirHandle.name}"...`);
+      setBatchProgressText(`Đang quét đệ quy và lọc file .SRT từ thư mục "${dirHandle.name}"...`);
 
       const scannedFileObjs = [];
+      const existingNameSet = new Set(files.map(f => f.name.toLowerCase().trim()));
+      let duplicateCount = 0;
+      let nonSrtCount = 0;
 
       async function scanDir(directoryHandle, pathPrefix = '') {
         for await (const entry of directoryHandle.values()) {
           const currentPath = pathPrefix ? `${pathPrefix} / ${entry.name}` : entry.name;
 
-          if (entry.kind === 'file' && entry.name.toLowerCase().endsWith('.srt')) {
-            const file = await entry.getFile();
-            const text = await file.text();
-            const parsed = parseSRT(text);
-            if (parsed.length > 0) {
-              scannedFileObjs.push({
-                id: `file_dir_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
-                name: currentPath,
-                fileHandle: entry, // <--- BOUND FILE HANDLE DIRECTLY ON DISK!
-                subtitles: parsed.map(s => ({ ...s, previousText: s.originalText }))
-              });
+          if (entry.kind === 'file') {
+            if (entry.name.toLowerCase().endsWith('.srt')) {
+              const normPath = currentPath.toLowerCase().trim();
+              if (existingNameSet.has(normPath)) {
+                duplicateCount++;
+                continue;
+              }
+              existingNameSet.add(normPath);
+
+              const file = await entry.getFile();
+              const text = await file.text();
+              const parsed = parseSRT(text);
+              if (parsed.length > 0) {
+                scannedFileObjs.push({
+                  id: `file_dir_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
+                  name: currentPath,
+                  fileHandle: entry,
+                  subtitles: parsed.map(s => ({ ...s, previousText: s.originalText }))
+                });
+              }
+            } else {
+              nonSrtCount++;
             }
           } else if (entry.kind === 'directory') {
             await scanDir(entry, currentPath);
@@ -300,10 +330,16 @@ export default function App() {
           }
           return updated;
         });
-        setBatchProgressText(`Đã nạp thành công ${scannedFileObjs.length} file SRT từ thư mục "${dirHandle.name}" kèm liên kết tự động lưu đè!`);
-        setTimeout(() => setBatchProgressText(''), 4000);
+        const msg = `✅ Đã lọc và nạp ${scannedFileObjs.length} file .SRT mới từ thư mục "${dirHandle.name}"!` +
+          (duplicateCount > 0 ? ` (Đã bỏ qua ${duplicateCount} file SRT đã tồn tại)` : '') +
+          (nonSrtCount > 0 ? ` [Tự động lọc bỏ ${nonSrtCount} file khác]` : '');
+        setBatchProgressText(msg);
+        setTimeout(() => setBatchProgressText(''), 4500);
+      } else if (duplicateCount > 0) {
+        alert(`Tất cả ${duplicateCount} file .srt trong thư mục "${dirHandle.name}" đều ĐÃ TỒN TẠI trong danh sách, không thêm trùng lặp!`);
+        setBatchProgressText('');
       } else {
-        alert(`Không tìm thấy file .srt nào trong thư mục "${dirHandle.name}".`);
+        alert(`Không tìm thấy file .srt nào trong thư mục "${dirHandle.name}". (Đã quét ${nonSrtCount} file không phải .srt)`);
         setBatchProgressText('');
       }
 
@@ -317,10 +353,13 @@ export default function App() {
     }
   };
 
-
-  // Handle uploading multiple SRT files
+  // Handle uploading multiple SRT files with De-duplication
   const handleAddFiles = (uploadedFiles) => {
     if (!uploadedFiles || uploadedFiles.length === 0) return;
+
+    const existingNameSet = new Set(files.map(f => f.name.toLowerCase().trim()));
+    let duplicateCount = 0;
+    let validCount = 0;
 
     uploadedFiles.forEach((file, idx) => {
       // Check if it's a zip file
@@ -331,13 +370,21 @@ export default function App() {
 
       if (!file.name.toLowerCase().endsWith('.srt')) return;
 
+      const displayName = getSmartFileName(file);
+      const normName = displayName.toLowerCase().trim();
+
+      if (existingNameSet.has(normName)) {
+        duplicateCount++;
+        return;
+      }
+      existingNameSet.add(normName);
+      validCount++;
+
       const reader = new FileReader();
       reader.onload = (e) => {
         const text = e.target.result;
         const parsed = parseSRT(text);
         if (parsed.length > 0) {
-          const displayName = getSmartFileName(file);
-
           const fileObj = {
             id: `file_${Date.now()}_${idx}_${Math.random().toString(36).substring(2, 6)}`,
             name: displayName,
@@ -348,6 +395,9 @@ export default function App() {
           };
 
           setFiles(prev => {
+            if (prev.some(f => f.name.toLowerCase().trim() === normName)) {
+              return prev;
+            }
             const updated = [...prev, fileObj];
             if (!activeFileId || prev.length === 0) {
               setActiveFileId(fileObj.id);
@@ -358,6 +408,13 @@ export default function App() {
       };
       reader.readAsText(file);
     });
+
+    if (duplicateCount > 0) {
+      setTimeout(() => {
+        setBatchProgressText(`⚡ Đã tự động bỏ qua ${duplicateCount} file SRT trùng lặp đã có sẵn trong danh sách.`);
+        setTimeout(() => setBatchProgressText(''), 4000);
+      }, 500);
+    }
   };
 
   // Handle Folder Upload (Recursive webkitdirectory selection)
@@ -366,31 +423,40 @@ export default function App() {
     const srtFiles = folderFiles.filter(f => f.name.toLowerCase().endsWith('.srt'));
 
     if (srtFiles.length === 0) {
-      alert('Không tìm thấy file .srt nào trong thư mục đã chọn.');
+      alert(`Đã lọc thư mục: Không tìm thấy file .srt nào trong tổng số ${folderFiles.length} file đã chọn.`);
       return;
     }
 
     handleAddFiles(srtFiles);
   };
 
-
-  // Handle Drag & Drop items (supports dropped folders with subdirectories)
+  // Handle Drag & Drop items (supports dropped folders with subdirectories & de-duplication)
   const handleDropDataTransfer = async (dataTransfer) => {
     if (dataTransfer.items && dataTransfer.items.length > 0) {
       try {
         const scannedSrtFiles = await getFilesFromDataTransfer(dataTransfer.items);
         if (scannedSrtFiles.length > 0) {
+          const existingNameSet = new Set(files.map(f => f.name.toLowerCase().trim()));
+          let duplicateCount = 0;
+
           scannedSrtFiles.forEach(({ file, fullPath }, idx) => {
+            const parts = fullPath.split('/');
+            const fileName = parts.pop();
+            const parentFolder = parts.length > 0 ? parts[parts.length - 1] : '';
+            const displayName = parentFolder ? `${parentFolder} / ${fileName}` : fileName;
+            const normName = displayName.toLowerCase().trim();
+
+            if (existingNameSet.has(normName)) {
+              duplicateCount++;
+              return;
+            }
+            existingNameSet.add(normName);
+
             const reader = new FileReader();
             reader.onload = (e) => {
               const text = e.target.result;
               const parsed = parseSRT(text);
               if (parsed.length > 0) {
-                const parts = fullPath.split('/');
-                const fileName = parts.pop();
-                const parentFolder = parts.length > 0 ? parts[parts.length - 1] : '';
-                const displayName = parentFolder ? `${parentFolder} / ${fileName}` : fileName;
-
                 const fileObj = {
                   id: `file_${Date.now()}_${idx}_${Math.random().toString(36).substring(2, 6)}`,
                   name: displayName,
@@ -398,6 +464,9 @@ export default function App() {
                 };
 
                 setFiles(prev => {
+                  if (prev.some(f => f.name.toLowerCase().trim() === normName)) {
+                    return prev;
+                  }
                   const updated = [...prev, fileObj];
                   if (!activeFileId || prev.length === 0) {
                     setActiveFileId(fileObj.id);
@@ -408,6 +477,13 @@ export default function App() {
             };
             reader.readAsText(file);
           });
+
+          if (duplicateCount > 0) {
+            setTimeout(() => {
+              setBatchProgressText(`⚡ Đã tự động bỏ qua ${duplicateCount} file SRT trùng lặp đã có sẵn.`);
+              setTimeout(() => setBatchProgressText(''), 4000);
+            }, 500);
+          }
           return;
         }
       } catch (err) {
@@ -421,10 +497,10 @@ export default function App() {
     }
   };
 
-  // Handle ZIP file upload
+  // Handle ZIP file upload with de-duplication
   const handleAddZip = async (zipFile) => {
     if (!zipFile) return;
-    setBatchProgressText(`Đang giải nén và quét file SRT từ "${zipFile.name}"...`);
+    setBatchProgressText(`Đang giải nén và lọc file .SRT từ "${zipFile.name}"...`);
 
     try {
       const extractedSrtItems = await processZipFile(zipFile);
@@ -434,27 +510,48 @@ export default function App() {
         return;
       }
 
-      const newFileObjs = extractedSrtItems.map((item, idx) => ({
-        id: `file_zip_${Date.now()}_${idx}`,
-        name: item.name,
-        subtitles: item.parsed.map(s => ({ ...s, previousText: s.originalText }))
-      }));
+      const existingNameSet = new Set(files.map(f => f.name.toLowerCase().trim()));
+      const newFileObjs = [];
+      let duplicateCount = 0;
 
-      setFiles(prev => {
-        const updated = [...prev, ...newFileObjs];
-        if (!activeFileId || prev.length === 0) {
-          setActiveFileId(newFileObjs[0].id);
+      extractedSrtItems.forEach((item, idx) => {
+        const normName = item.name.toLowerCase().trim();
+        if (existingNameSet.has(normName)) {
+          duplicateCount++;
+          return;
         }
-        return updated;
+        existingNameSet.add(normName);
+
+        newFileObjs.push({
+          id: `file_zip_${Date.now()}_${idx}`,
+          name: item.name,
+          subtitles: item.parsed.map(s => ({ ...s, previousText: s.originalText }))
+        });
       });
 
-      setBatchProgressText(`Đã giải nén thành công ${extractedSrtItems.length} file SRT từ file ZIP!`);
-      setTimeout(() => setBatchProgressText(''), 3000);
+      if (newFileObjs.length > 0) {
+        setFiles(prev => {
+          const updated = [...prev, ...newFileObjs];
+          if (!activeFileId || prev.length === 0) {
+            setActiveFileId(newFileObjs[0].id);
+          }
+          return updated;
+        });
+
+        const msg = `✅ Đã giải nén và nạp ${newFileObjs.length} file SRT mới từ file ZIP!` +
+          (duplicateCount > 0 ? ` (Bỏ qua ${duplicateCount} file đã có sẵn)` : '');
+        setBatchProgressText(msg);
+        setTimeout(() => setBatchProgressText(''), 4000);
+      } else if (duplicateCount > 0) {
+        alert(`Tất cả ${duplicateCount} file .srt trong file ZIP đều ĐÃ TỒN TẠI trong danh sách rồi, không thêm trùng lặp!`);
+        setBatchProgressText('');
+      }
     } catch (err) {
       alert(`Lỗi khi đọc file ZIP: ${err.message}`);
       setBatchProgressText('');
     }
   };
+
 
   // Load demo series (3 SRT files)
   const handleLoadSampleSeries = () => {
