@@ -254,6 +254,15 @@ export async function scanVideoFramesWithVisionAI({
               const matchedFrame = (char.frameIndex && batch[char.frameIndex - 1]) ? batch[char.frameIndex - 1] : batch[0];
               const actualTimestamp = char.timestamp || matchedFrame.timestampFormatted;
 
+              const formattedTag = cleanAndFormatIntroTag({
+                name: char.name || 'Nhân vật',
+                originalName: char.originalName || '',
+                type: char.type || 'character',
+                role: char.role || '',
+                sect: char.sect || '',
+                realm: char.realm || ''
+              }, 'clean_compact');
+
               allDetectedCharacters.push({
                 id: `char_vision_${Date.now()}_${allDetectedCharacters.length}_${Math.random().toString(36).substring(2, 6)}`,
                 name: char.name || 'Nhân vật',
@@ -264,12 +273,13 @@ export async function scanVideoFramesWithVisionAI({
                 realm: char.realm || 'Chưa rõ',
                 firstFileName: videoFileName,
                 firstTimestamp: actualTimestamp,
-                firstEndTimestamp: msToSrtTime(srtTimeToMs(actualTimestamp) + 5000),
+                firstEndTimestamp: msToSrtTime(srtTimeToMs(actualTimestamp) + 2000),
                 thumbnail: matchedFrame.base64Full,
-                introTag: char.introTag || `【 ${char.type === 'weapon' ? 'THẦN BINH' : 'NHÂN VẬT'}: ${char.name.toUpperCase()} | ${char.sect || 'VÔ MÔN PHÁI'} | ${char.role || ''} 】`,
+                introTag: formattedTag,
                 source: 'vision_ocr',
                 enabled: true
               });
+
             }
           });
         }
@@ -574,8 +584,115 @@ export function computeFileOffsets(files = [], fileDurations = {}, gapSeconds = 
   return { fileOffsets, totalMovieDurationMs: cumulativeOffsetMs };
 }
 
+// Smart Clean & Format Character / Weapon Intro Tag (Deduplicates repetitive words and avoids text wrapping on CapCut)
+export function cleanAndFormatIntroTag(char, templateMode = 'clean_compact', customPattern = '') {
+  if (!char) return '';
+  const name = (char.name || '').trim();
+  if (!name) return '';
+
+  const rawType = (char.type || '').toLowerCase();
+  let type = 'NHÂN VẬT';
+  if (rawType === 'weapon' || name.toLowerCase().includes('kiếm') || name.toLowerCase().includes('bảo') || name.toLowerCase().includes('đao') || name.toLowerCase().includes('chuỳ') || name.toLowerCase().includes('tháp') || name.toLowerCase().includes('kính') || name.toLowerCase().includes('kích') || name.toLowerCase().includes('thương') || name.toLowerCase().includes('trượng') || name.toLowerCase().includes('phiên')) {
+    type = 'THẦN BINH';
+  } else if (rawType === 'location') {
+    type = 'ĐỊA DANH';
+  } else if (rawType === 'skill') {
+    type = 'TUYỆT KỸ';
+  }
+
+  // Clean Sect/Role/Realm
+  let sect = (char.sect || '').trim();
+  if (['chưa rõ', 'vô môn phái', 'không rõ', 'none', 'null', 'unknown', ''].includes(sect.toLowerCase())) sect = '';
+  
+  let role = (char.role || '').trim();
+  if (['chưa rõ', 'nhân vật phụ', 'none', 'null', 'unknown', ''].includes(role.toLowerCase())) role = '';
+  
+  let realm = (char.realm || '').trim();
+  if (['chưa rõ', 'không rõ', 'none', 'null', 'unknown', ''].includes(realm.toLowerCase())) realm = '';
+
+  // Smart De-duplication: Remove repetitive words between Name and Realm / Sect
+  // (e.g. Name: "HUYỀN THIỆN LINH BẢO", Realm: "CỰC PHẨM LINH BẢO" -> Realm becomes "CỰC PHẨM")
+  if (realm) {
+    const nameLower = name.toLowerCase();
+    const realmLower = realm.toLowerCase();
+    if (nameLower.includes('linh bảo') && realmLower.includes('linh bảo')) {
+      realm = realm.replace(/linh\s*bảo/gi, '').trim();
+    }
+    if (nameLower.includes('thần kiếm') && realmLower.includes('thần kiếm')) {
+      realm = realm.replace(/thần\s*kiếm/gi, '').trim();
+    }
+    if (nameLower.includes('pháp bảo') && realmLower.includes('pháp bảo')) {
+      realm = realm.replace(/pháp\s*bảo/gi, '').trim();
+    }
+    if (nameLower.includes('thần binh') && realmLower.includes('thần binh')) {
+      realm = realm.replace(/thần\s*binh/gi, '').trim();
+    }
+    if (nameLower.includes('tiên kiếm') && realmLower.includes('tiên kiếm')) {
+      realm = realm.replace(/tiên\s*kiếm/gi, '').trim();
+    }
+  }
+
+  if (sect && name.toLowerCase().includes(sect.toLowerCase())) {
+    sect = '';
+  }
+
+  if (templateMode === 'clean_compact') {
+    // 1-2 parts max: Guarantees single-line display on CapCut without line breaks
+    const secondPart = sect || realm || role;
+    if (secondPart) {
+      return `【 ${type}: ${name.toUpperCase()} | ${secondPart.toUpperCase()} 】`;
+    }
+    return `【 ${type}: ${name.toUpperCase()} 】`;
+  }
+
+  if (templateMode === 'full_3part') {
+    const parts = [name.toUpperCase()];
+    if (sect) parts.push(sect.toUpperCase());
+    if (realm) parts.push(realm.toUpperCase());
+    else if (role) parts.push(role.toUpperCase());
+    return `【 ${type}: ${parts.join(' | ')} 】`;
+  }
+
+  if (templateMode === 'modern_badge') {
+    const icon = type === 'THẦN BINH' ? '⚔️' : (type === 'ĐỊA DANH' ? '🏛️' : (type === 'TUYỆT KỸ' ? '⚡' : '⭐'));
+    const extra = [sect, realm || role].filter(Boolean).join(' • ');
+    return `${icon} [ ${name.toUpperCase()} ]${extra ? ` • ${extra}` : ''}`;
+  }
+
+  if (templateMode === 'name_only_bracket') {
+    const secondPart = sect || realm || role;
+    if (secondPart) {
+      return `【 ${name.toUpperCase()} • ${secondPart.toUpperCase()} 】`;
+    }
+    return `【 ${name.toUpperCase()} 】`;
+  }
+
+  if (templateMode === 'custom' && customPattern) {
+    let result = customPattern
+      .replace(/{TYPE}/g, type)
+      .replace(/{NAME}/g, name.toUpperCase())
+      .replace(/{name}/g, name)
+      .replace(/{SECT}/g, sect ? sect.toUpperCase() : '')
+      .replace(/{sect}/g, sect)
+      .replace(/{REALM}/g, realm ? realm.toUpperCase() : '')
+      .replace(/{realm}/g, realm)
+      .replace(/{ROLE}/g, role ? role.toUpperCase() : '')
+      .replace(/{role}/g, role);
+
+    result = result.replace(/\s*\|\s*\|\s*/g, ' | ')
+      .replace(/\s*\|\s*】/g, ' 】')
+      .replace(/【\s*\|\s*/g, '【 ')
+      .replace(/\s*•\s*•\s*/g, ' • ')
+      .replace(/\s*•\s*\]/g, ' ]')
+      .trim();
+    return result;
+  }
+
+  return `【 ${type}: ${name.toUpperCase()} 】`;
+}
+
 // Generate Separate SRT file for Character Intro Tags (Strictly Sorted Chronologically, 2s Display Duration)
-export function generateCharacterIntroSRT(characters, files, isFullMovie = false, fileDurations = {}, gapSeconds = 0, displayDurationSec = 2) {
+export function generateCharacterIntroSRT(characters, files, isFullMovie = false, fileDurations = {}, gapSeconds = 0, displayDurationSec = 2, templateMode = 'clean_compact', customPattern = '') {
   const activeChars = characters.filter(c => c.enabled !== false);
   if (activeChars.length === 0) return '';
 
@@ -601,7 +718,7 @@ export function generateCharacterIntroSRT(characters, files, isFullMovie = false
     }
 
     const endMs = startMs + durationMs; // 2s display duration
-    const text = char.introTag || `【 NHÂN VẬT: ${char.name.toUpperCase()} | ${char.sect} | ${char.realm} 】`;
+    const text = cleanAndFormatIntroTag(char, templateMode, customPattern) || char.introTag || `【 NHÂN VẬT: ${char.name.toUpperCase()} 】`;
 
     return {
       char,
@@ -625,7 +742,7 @@ export function generateCharacterIntroSRT(characters, files, isFullMovie = false
 }
 
 // Generate Beautiful Advanced ASS Subtitle file (Top-Center Glowing Yellow Ancient Calligraphy Style, Strictly Sorted, 2s Duration)
-export function generateCharacterIntroASS(characters, files, isFullMovie = false, fileDurations = {}, gapSeconds = 0, displayDurationSec = 2) {
+export function generateCharacterIntroASS(characters, files, isFullMovie = false, fileDurations = {}, gapSeconds = 0, displayDurationSec = 2, templateMode = 'clean_compact', customPattern = '') {
   const activeChars = characters.filter(c => c.enabled !== false);
   if (activeChars.length === 0) return '';
 
@@ -676,7 +793,7 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
     }
 
     const endMs = startMs + durationMs;
-    const text = char.introTag || `【 NHÂN VẬT: ${char.name.toUpperCase()} | ${char.sect} | ${char.realm} 】`;
+    const text = cleanAndFormatIntroTag(char, templateMode, customPattern) || char.introTag || `【 NHÂN VẬT: ${char.name.toUpperCase()} 】`;
 
     return {
       char,
@@ -696,6 +813,7 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
 
   return assHeader + dialogueLines.join('\n');
 }
+
 
 
 

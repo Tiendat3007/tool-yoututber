@@ -2,7 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { 
   Users, Sparkles, Plus, Download, Copy, Check, Trash2, Edit3, Film, 
   Layers, Clock, Shield, Search, ChevronRight, Video, ArrowRight, BookOpen, AlertCircle, UploadCloud,
-  Eye, Camera, Play, CheckCircle2, Zap, History, RotateCcw, FileText, Calendar
+  Eye, Camera, Play, CheckCircle2, Zap, History, RotateCcw, FileText, Calendar, Palette, Type
 } from 'lucide-react';
 
 import { 
@@ -10,6 +10,7 @@ import {
   generateCharacterIntroSRT, 
   generateCharacterIntroASS, 
   stitchAllFilesToFullMovieSRT,
+  cleanAndFormatIntroTag,
   msToSrtTime,
   srtTimeToMs,
   readMediaDuration,
@@ -18,6 +19,7 @@ import {
   extractFramesFromVideo,
   scanVideoFramesWithVisionAI
 } from '../utils/characterExtractor';
+
 
 
 
@@ -562,10 +564,26 @@ export default function CharacterLoreStudio({
   };
 
   const [tagDurationSec, setTagDurationSec] = useState(2); // 2s display duration by default
+  const [tagFormatTemplate, setTagFormatTemplate] = useState('clean_compact'); // 'clean_compact' | 'full_3part' | 'modern_badge' | 'name_only_bracket' | 'custom'
+  const [customTagPattern, setCustomTagPattern] = useState('【 {TYPE}: {NAME} | {SECT} | {REALM} 】');
+
+  // Apply chosen format template to all existing characters
+  const handleApplyFormatToAll = () => {
+    if (characters.length === 0) {
+      alert('Chưa có nhân vật nào trong danh sách!');
+      return;
+    }
+    setCharacters(prev => prev.map(c => ({
+      ...c,
+      introTag: cleanAndFormatIntroTag(c, tagFormatTemplate, customTagPattern)
+    })));
+    setScanProgress(`✨ Đã chuẩn hóa định dạng mẫu cho toàn bộ ${characters.length} thẻ nhân vật / thần binh!`);
+    setTimeout(() => setScanProgress(''), 4000);
+  };
 
   // Export SRT Intro Tags (defaults to Full Movie MP4 continuous timeline)
   const handleExportIntroSRT = (isFullMovie = true) => {
-    const srtContent = generateCharacterIntroSRT(characters, effectiveTargetFiles, isFullMovie, fileDurations, gapSeconds, tagDurationSec);
+    const srtContent = generateCharacterIntroSRT(characters, effectiveTargetFiles, isFullMovie, fileDurations, gapSeconds, tagDurationSec, tagFormatTemplate, customTagPattern);
     if (!srtContent) {
       alert('Chưa có nhân vật nào được bật để xuất file chú thích!');
       return;
@@ -575,13 +593,14 @@ export default function CharacterLoreStudio({
 
   // Export ASS Intro Tags (defaults to Full Movie MP4 continuous timeline)
   const handleExportIntroASS = (isFullMovie = true) => {
-    const assContent = generateCharacterIntroASS(characters, effectiveTargetFiles, isFullMovie, fileDurations, gapSeconds, tagDurationSec);
+    const assContent = generateCharacterIntroASS(characters, effectiveTargetFiles, isFullMovie, fileDurations, gapSeconds, tagDurationSec, tagFormatTemplate, customTagPattern);
     if (!assContent) {
       alert('Chưa có nhân vật nào được bật để xuất file chú thích!');
       return;
     }
     downloadTextFile(assContent, isFullMovie ? `Full_Movie_${effectiveTargetFiles.length}Tap_Character_Tags.ass` : 'Character_Intro_Tags.ass');
   };
+
 
 
   // Export Full Stitched Movie SRT (Continuous Timeline)
@@ -792,6 +811,54 @@ export default function CharacterLoreStudio({
       {/* TAB 1: CHARACTER CARDS GRID */}
       {activeTabSub === 'characters' && (
         <div className="character-tab-content">
+          {/* Format Template Selector Bar */}
+          <div className="format-template-bar card-panel p-3 mb-3 flex-between" style={{ background: 'rgba(6, 182, 212, 0.05)', border: '1px solid rgba(6, 182, 212, 0.25)', flexWrap: 'wrap', gap: '12px' }}>
+            <div className="flex-center gap-2" style={{ flexWrap: 'wrap' }}>
+              <div className="flex-center gap-1 text-sm font-bold text-cyan">
+                <Palette size={16} />
+                <span>Mẫu Định Dạng Thẻ:</span>
+              </div>
+
+              <select
+                value={tagFormatTemplate}
+                onChange={(e) => setTagFormatTemplate(e.target.value)}
+                className="input-field select-field input-sm font-bold"
+                style={{ minWidth: '280px' }}
+              >
+                <option value="clean_compact">【 THẦN BINH: TÊN | CẤP BẬC 】 (Gọn Đẹp - Khuyên Dùng ⭐ Không Rớt Dòng)</option>
+                <option value="full_3part">【 THẦN BINH: TÊN | MÔN PHÁI | CẢNH GIỚI 】 (Đầy Đủ 3 Phần)</option>
+                <option value="modern_badge">⚔️ [ TÊN ] • Môn Phái • Cấp Bậc (Hiện Đại)</option>
+                <option value="name_only_bracket">【 TÊN • MÔN PHÁI 】 (Tối Giản)</option>
+                <option value="custom">⚙️ Tùy Chỉnh Mẫu Của Bạn...</option>
+              </select>
+
+              {tagFormatTemplate === 'custom' && (
+                <input
+                  type="text"
+                  value={customTagPattern}
+                  onChange={(e) => setCustomTagPattern(e.target.value)}
+                  className="input-field input-sm font-mono text-cyan"
+                  style={{ width: '260px' }}
+                  placeholder="【 {TYPE}: {NAME} | {SECT} 】"
+                />
+              )}
+
+              {/* Sample Live Preview Chip */}
+              <div className="sample-preview-badge text-xs font-bold px-2 py-1 rounded flex-center gap-1" style={{ background: 'rgba(0,0,0,0.4)', border: '1px solid #06b6d4', color: '#67e8f9' }}>
+                <span className="text-muted">Xem trước:</span>
+                <span>{cleanAndFormatIntroTag({ name: 'Huyền Thiện Linh Bảo', type: 'weapon', realm: 'Cực Phẩm Linh Bảo', sect: 'Bát Hoang Kiếm Các' }, tagFormatTemplate, customTagPattern)}</span>
+              </div>
+            </div>
+
+            <button
+              className="btn btn-cyan btn-sm font-bold flex-center gap-1"
+              onClick={handleApplyFormatToAll}
+              title="Chuẩn hóa lại định dạng thẻ chú thích cho toàn bộ danh sách nhân vật và loại bỏ lặp từ"
+            >
+              <Sparkles size={14} /> ✨ Áp Dụng Mẫu Này Cho Tất Cả ({characters.length} Thẻ)
+            </button>
+          </div>
+
           {/* Filter Bar */}
           <div className="filter-controls-group mb-3 flex-between">
             <div className="search-box" style={{ maxWidth: '350px' }}>
@@ -804,6 +871,7 @@ export default function CharacterLoreStudio({
                 className="input-field"
               />
             </div>
+
 
             <div className="flex-center gap-2">
               <select
