@@ -1,9 +1,10 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { 
   Users, Sparkles, Plus, Download, Copy, Check, Trash2, Edit3, Film, 
   Layers, Clock, Shield, Search, ChevronRight, Video, ArrowRight, BookOpen, AlertCircle, UploadCloud,
-  Eye, Camera, Play, CheckCircle2, Zap
+  Eye, Camera, Play, CheckCircle2, Zap, History, RotateCcw, FileText, Calendar
 } from 'lucide-react';
+
 import { 
   extractCharactersWithAI, 
   generateCharacterIntroSRT, 
@@ -76,7 +77,33 @@ export default function CharacterLoreStudio({
   const [searchQuery, setSearchQuery] = useState('');
   const [filterRole, setFilterRole] = useState('all');
   const [copiedText, setCopiedText] = useState(false);
-  const [activeTabSub, setActiveTabSub] = useState('characters'); // 'characters' | 'stitching'
+  const [activeTabSub, setActiveTabSub] = useState('characters'); // 'characters' | 'vision_scan' | 'stitching' | 'history'
+
+  // Scan History State with LocalStorage Persistence
+  const [scanHistory, setScanHistory] = useState(() => {
+    try {
+      const saved = localStorage.getItem('tutien_scan_history_sessions');
+      return saved ? JSON.parse(saved) : [];
+    } catch (e) {
+      return [];
+    }
+  });
+
+  // Sync scanHistory to localStorage with safety quota handling
+  useEffect(() => {
+    try {
+      localStorage.setItem('tutien_scan_history_sessions', JSON.stringify(scanHistory));
+    } catch (e) {
+      console.warn('Storage quota limit: saving compact history');
+      const compact = scanHistory.slice(0, 10).map(s => ({
+        ...s,
+        characters: s.characters.map(c => ({ ...c, thumbnail: '' }))
+      }));
+      try {
+        localStorage.setItem('tutien_scan_history_sessions', JSON.stringify(compact));
+      } catch (err) {}
+    }
+  }, [scanHistory]);
 
   // File filtering and selection for timeline stitching & selective AI scan
   const [fileSearchQuery, setFileSearchQuery] = useState('');
@@ -157,7 +184,20 @@ export default function CharacterLoreStudio({
           const newUnique = extracted.filter(c => !existingNames.has(c.name.toLowerCase().trim()));
           return [...prev, ...newUnique];
         });
-        setScanProgress(`✅ Đã tìm thấy ${extracted.length} nhân vật và mốc thời gian xuất hiện đầu tiên!`);
+
+        // 💾 Save Scan Session to History
+        const session = {
+          id: `scan_srt_${Date.now()}`,
+          timeFormatted: new Date().toLocaleString('vi-VN'),
+          videoName: `${effectiveTargetFiles.length} Tập Phụ Đề SRT (${effectiveTargetFiles.map(f => f.name).slice(0, 2).join(', ')}${effectiveTargetFiles.length > 2 ? '...' : ''})`,
+          type: 'srt',
+          count: extracted.length,
+          characters: extracted,
+          tagDurationSec: tagDurationSec || 2
+        };
+        setScanHistory(prev => [session, ...prev.slice(0, 29)]);
+
+        setScanProgress(`✅ Đã tìm thấy ${extracted.length} nhân vật và tự động lưu vào lịch sử quét!`);
         setTimeout(() => setScanProgress(''), 4000);
       }
     } catch (err) {
@@ -166,6 +206,7 @@ export default function CharacterLoreStudio({
       setIsScanning(false);
     }
   };
+
 
   // Total Movie Duration manual input state
   const [manualTotalDurationSec, setManualTotalDurationSec] = useState('');
@@ -385,7 +426,26 @@ export default function CharacterLoreStudio({
           const newChars = detected.filter(c => !existingNames.has(c.name.toLowerCase().trim()));
           return [...newChars, ...prev];
         });
-        setScanProgress(`🎉 AI Vision đã tìm thấy ${detected.length} bảng tên nhân vật chính xác từng khung hình trên video!`);
+
+        // 💾 Save Vision Scan Session to History
+        const session = {
+          id: `scan_vision_${Date.now()}`,
+          timeFormatted: new Date().toLocaleString('vi-VN'),
+          videoName: visionVideoFile.name,
+          videoSize: `${(visionVideoFile.size / (1024 * 1024)).toFixed(1)} MB`,
+          type: 'vision',
+          count: detected.length,
+          characters: detected,
+          tagDurationSec: tagDurationSec || 2,
+          settings: {
+            intervalSec: visionIntervalSec,
+            concurrency: visionConcurrency,
+            flipHorizontal: visionFlipHorizontal
+          }
+        };
+        setScanHistory(prev => [session, ...prev.slice(0, 29)]);
+
+        setScanProgress(`🎉 AI Vision đã tìm thấy ${detected.length} bảng tên nhân vật chính xác từng khung hình và tự động lưu vào lịch sử quét!`);
         setTimeout(() => setScanProgress(''), 5000);
       }
     } catch (err) {
@@ -394,6 +454,60 @@ export default function CharacterLoreStudio({
       setIsVisionScanning(false);
       setVisionProgress(null);
       setLiveCurrentFrame(null);
+    }
+  };
+
+  // Restore characters from a history session
+  const handleRestoreSession = (session) => {
+    if (!session || !session.characters || session.characters.length === 0) return;
+    setCharacters(prev => {
+      const existingNames = new Set(prev.map(c => c.name.toLowerCase().trim()));
+      const newChars = session.characters.filter(c => !existingNames.has(c.name.toLowerCase().trim()));
+      return [...newChars, ...prev];
+    });
+    setActiveTabSub('characters');
+    setScanProgress(`🔄 Đã nạp lại ${session.characters.length} thẻ từ lần quét [${session.videoName}] vào danh sách chính!`);
+    setTimeout(() => setScanProgress(''), 4000);
+  };
+
+  // Export SRT directly from a history session
+  const handleExportSessionSRT = (session) => {
+    if (!session || !session.characters || session.characters.length === 0) return;
+    const durSec = session.tagDurationSec || tagDurationSec || 2;
+    const srtContent = generateCharacterIntroSRT(session.characters, effectiveTargetFiles, true, fileDurations, gapSeconds, durSec);
+    if (!srtContent) {
+      alert('Không thể tạo file SRT từ lịch sử này.');
+      return;
+    }
+    const safeName = (session.videoName || 'Session').replace(/[^a-zA-Z0-9_-]/g, '_');
+    downloadTextFile(srtContent, `LichSu_${safeName}_Tags.srt`);
+  };
+
+  // Export ASS directly from a history session
+  const handleExportSessionASS = (session) => {
+    if (!session || !session.characters || session.characters.length === 0) return;
+    const durSec = session.tagDurationSec || tagDurationSec || 2;
+    const assContent = generateCharacterIntroASS(session.characters, effectiveTargetFiles, true, fileDurations, gapSeconds, durSec);
+    if (!assContent) {
+      alert('Không thể tạo file ASS từ lịch sử này.');
+      return;
+    }
+    const safeName = (session.videoName || 'Session').replace(/[^a-zA-Z0-9_-]/g, '_');
+    downloadTextFile(assContent, `LichSu_${safeName}_Tags.ass`);
+  };
+
+  // Delete a history session
+  const handleDeleteSession = (sessionId) => {
+    setScanHistory(prev => prev.filter(s => s.id !== sessionId));
+  };
+
+  // Clear all scan history
+  const handleClearAllHistory = () => {
+    if (window.confirm('Bạn có chắc chắn muốn xóa toàn bộ lịch sử quét không?')) {
+      setScanHistory([]);
+      try {
+        localStorage.removeItem('tutien_scan_history_sessions');
+      } catch (e) {}
     }
   };
 
@@ -406,6 +520,7 @@ export default function CharacterLoreStudio({
   const deleteCharacter = (id) => {
     setCharacters(prev => prev.filter(c => c.id !== id));
   };
+
 
   // Save Character (Add/Edit)
   const saveCharacter = (charData) => {
@@ -614,7 +729,16 @@ export default function CharacterLoreStudio({
           >
             <Clock size={16} /> ⚡ Ghép Nối Dòng Thời Gian Video Dài ({effectiveTargetFiles.length}/{files.length} Tập)
           </button>
+
+          <button
+            className={`tab-pill-btn ${activeTabSub === 'history' ? 'active' : ''}`}
+            onClick={() => setActiveTabSub('history')}
+            style={{ borderColor: activeTabSub === 'history' ? '#06b6d4' : undefined }}
+          >
+            <History size={16} className="text-cyan" /> 📜 Lịch Sử Quét ({scanHistory.length})
+          </button>
         </div>
+
 
         {/* Global Export Buttons */}
         <div className="flex-center gap-2" style={{ flexWrap: 'wrap' }}>
@@ -1341,8 +1465,150 @@ export default function CharacterLoreStudio({
         </div>
       )}
 
+      {/* TAB 4: SCAN HISTORY */}
+      {activeTabSub === 'history' && (
+        <div className="history-tab-content fade-in">
+          <div className="card-panel p-4 mb-3" style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.08)' }}>
+            <div className="flex-between mb-3" style={{ flexWrap: 'wrap', gap: '12px' }}>
+              <div>
+                <h3 className="font-bold flex-center gap-2 text-cyan" style={{ justifyContent: 'flex-start' }}>
+                  <History size={20} /> Lịch Sử Các Lần Quét AI ({scanHistory.length} Phiên Đã Lưu)
+                </h3>
+                <p className="text-xs text-muted mt-1">
+                  Mỗi lần AI soi video MP4 hoặc phân tích SRT đều được tự động lưu trữ vĩnh viễn trên trình duyệt. Bạn có thể xuất lại file hoặc nạp lại danh sách bất kỳ lúc nào.
+                </p>
+              </div>
+
+              {scanHistory.length > 0 && (
+                <button
+                  className="btn btn-danger btn-sm flex-center gap-1 font-bold"
+                  onClick={handleClearAllHistory}
+                >
+                  <Trash2 size={14} /> Xóa Sạch Toàn Bộ Lịch Sử
+                </button>
+              )}
+            </div>
+
+            {scanHistory.length === 0 ? (
+              <div className="text-center p-5 text-muted flex-center flex-column gap-3" style={{ background: 'rgba(0,0,0,0.2)', borderRadius: '12px', border: '1px dashed rgba(255,255,255,0.1)' }}>
+                <History size={48} style={{ opacity: 0.3 }} />
+                <p className="font-bold text-base">Chưa có lịch sử quét nào được ghi nhận</p>
+                <p className="text-xs text-muted">Hãy thực hiện một lượt quét thị giác video hoặc quét phụ đề SRT để lưu phiên làm việc tại đây.</p>
+                <button
+                  className="btn btn-green-glow btn-sm font-bold mt-2 flex-center gap-1"
+                  onClick={() => setActiveTabSub('vision_scan')}
+                >
+                  <Eye size={15} /> Đi Tới Tab Quét Thị Giác Video MP4
+                </button>
+              </div>
+            ) : (
+              <div className="history-sessions-list flex-column gap-3">
+                {scanHistory.map((session, sIdx) => (
+                  <div 
+                    key={session.id || sIdx}
+                    className="history-session-card p-3 rounded-lg border mb-3"
+                    style={{
+                      background: 'rgba(0,0,0,0.4)',
+                      borderColor: session.type === 'vision' ? 'rgba(16, 185, 129, 0.4)' : 'rgba(168, 85, 247, 0.4)',
+                      boxShadow: '0 4px 12px rgba(0,0,0,0.2)'
+                    }}
+                  >
+                    <div className="flex-between mb-2" style={{ flexWrap: 'wrap', gap: '8px' }}>
+                      <div className="flex-center gap-2">
+                        {session.type === 'vision' ? (
+                          <span className="badge badge-green flex-center gap-1" style={{ fontSize: '11px', padding: '3px 8px' }}>
+                            <Eye size={13} /> Quét Thị Giác Video
+                          </span>
+                        ) : (
+                          <span className="badge badge-purple flex-center gap-1" style={{ fontSize: '11px', padding: '3px 8px' }}>
+                            <Sparkles size={13} /> Quét Phụ Đề SRT
+                          </span>
+                        )}
+                        <strong className="text-sm font-bold text-white">{session.videoName}</strong>
+                        {session.videoSize && <span className="text-xs text-muted">({session.videoSize})</span>}
+                      </div>
+
+                      <div className="flex-center gap-3 text-xs text-muted">
+                        <span className="flex-center gap-1">
+                          <Calendar size={13} className="text-cyan" /> {session.timeFormatted}
+                        </span>
+                        <span className="badge badge-cyan font-bold" style={{ fontSize: '11px' }}>
+                          🎯 {session.count || session.characters?.length || 0} Thẻ Đã Tìm Thấy
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Preview Cards/Badges Row */}
+                    {session.characters && session.characters.length > 0 && (
+                      <div className="session-preview-row flex-center gap-2 my-2 overflow-x-auto p-2 rounded" style={{ justifyContent: 'flex-start', background: 'rgba(255,255,255,0.03)', maxWidth: '100%', border: '1px solid rgba(255,255,255,0.05)' }}>
+                        {session.characters.slice(0, 6).map((c, cIdx) => (
+                          <div 
+                            key={cIdx} 
+                            className="preview-item-chip flex-center gap-2 p-1 px-2 rounded text-xs"
+                            style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)', whiteSpace: 'nowrap' }}
+                          >
+                            {c.thumbnail && (
+                              <img src={c.thumbnail} alt={c.name} style={{ width: '28px', height: '28px', borderRadius: '4px', objectFit: 'cover' }} />
+                            )}
+                            <div>
+                              <strong className="text-cyan">{c.name}</strong>
+                              <span className="text-muted ml-1">({c.firstTimestamp})</span>
+                            </div>
+                          </div>
+                        ))}
+                        {session.characters.length > 6 && (
+                          <span className="text-xs text-muted font-bold px-2">
+                            +{session.characters.length - 6} thẻ khác...
+                          </span>
+                        )}
+                      </div>
+                    )}
+
+                    {/* Session Action Buttons */}
+                    <div className="session-actions-row flex-between mt-3 pt-2 border-top" style={{ flexWrap: 'wrap', gap: '8px' }}>
+                      <div className="flex-center gap-2" style={{ flexWrap: 'wrap' }}>
+                        <button
+                          className="btn btn-cyan btn-xs font-bold flex-center gap-1"
+                          onClick={() => handleExportSessionSRT(session)}
+                          title="Tải trực tiếp file SRT chú thích từ phiên quét này"
+                        >
+                          <Download size={13} /> Tải Lại .SRT ({session.tagDurationSec || 2}s)
+                        </button>
+                        <button
+                          className="btn btn-green-glow btn-xs font-bold flex-center gap-1"
+                          onClick={() => handleExportSessionASS(session)}
+                          title="Tải trực tiếp file ASS chú thích từ phiên quét này"
+                        >
+                          <Download size={13} /> Tải Lại .ASS
+                        </button>
+                        <button
+                          className="btn btn-secondary btn-xs font-bold flex-center gap-1"
+                          onClick={() => handleRestoreSession(session)}
+                          title="Nạp lại toàn bộ nhân vật của phiên này vào danh sách làm việc chính"
+                        >
+                          <RotateCcw size={13} className="text-cyan" /> Nạp Lại Danh Sách Này
+                        </button>
+                      </div>
+
+                      <button
+                        className="btn btn-icon btn-danger btn-xs"
+                        onClick={() => handleDeleteSession(session.id)}
+                        title="Xóa phiên quét này khỏi lịch sử"
+                      >
+                        <Trash2 size={13} />
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
       {/* EDIT / ADD CHARACTER MODAL */}
       {isModalOpen && editingChar && (
+
         <div className="modal-backdrop modal-overlay flex-center">
           <div className="modal-content card-panel" style={{ maxWidth: '550px', width: '95%' }}>
             <div className="modal-header flex-between mb-3">
