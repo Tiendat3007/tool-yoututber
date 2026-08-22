@@ -75,7 +75,7 @@ export default function CharacterLoreStudio({
   setCharacters,
   onScanningStateChange
 }) {
-
+  // 1. General & Navigation States
   const [isScanning, setIsScanning] = useState(false);
   const [scanProgress, setScanProgress] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
@@ -83,13 +83,19 @@ export default function CharacterLoreStudio({
   const [copiedText, setCopiedText] = useState(false);
   const [activeTabSub, setActiveTabSub] = useState('characters'); // 'characters' | 'vision_scan' | 'stitching' | 'history'
 
-  // Notify parent of active background scanning so user can switch tabs freely
-  useEffect(() => {
-    onScanningStateChange?.(isScanning || isVisionScanning);
-  }, [isScanning, isVisionScanning, onScanningStateChange]);
+  // 2. Vision Scanner States
+  const [visionVideoFile, setVisionVideoFile] = useState(null);
+  const [visionIntervalSec, setVisionIntervalSec] = useState(3);
+  const [visionConcurrency, setVisionConcurrency] = useState(6); // 6 parallel threads by default
+  const [visionModel, setVisionModel] = useState(() => localStorage.getItem('tutien_vision_model') || 'gemini-2.5-flash-lite');
+  const [visionFlipHorizontal, setVisionFlipHorizontal] = useState(true);
+  const [isVisionScanning, setIsVisionScanning] = useState(false);
+  const [visionProgress, setVisionProgress] = useState(null);
+  const [liveCurrentFrame, setLiveCurrentFrame] = useState(null);
+  const [visionDetectedChars, setVisionDetectedChars] = useState([]);
+  const visionInputRef = useRef(null);
 
-
-  // Scan History State with LocalStorage Persistence
+  // 3. Scan History State
   const [scanHistory, setScanHistory] = useState(() => {
     try {
       const saved = localStorage.getItem('tutien_scan_history_sessions');
@@ -98,6 +104,30 @@ export default function CharacterLoreStudio({
       return [];
     }
   });
+
+  // 4. File filtering and timeline stitching states
+  const [fileSearchQuery, setFileSearchQuery] = useState('');
+  const [selectedFileIds, setSelectedFileIds] = useState([]);
+  const [fileDurations, setFileDurations] = useState({});
+  const [gapSeconds, setGapSeconds] = useState(0);
+  const [isDraggingVideo, setIsDraggingVideo] = useState(false);
+  const [manualTotalDurationSec, setManualTotalDurationSec] = useState('');
+  const videoInputRef = useRef(null);
+
+  // 5. Tag Format & Template states
+  const [tagDurationSec, setTagDurationSec] = useState(2);
+  const [tagFormatTemplate, setTagFormatTemplate] = useState('clean_compact');
+  const [customTagPattern, setCustomTagPattern] = useState('【 {TYPE}: {NAME} | {SECT} | {REALM} 】');
+  const [activeMovieFilter, setActiveMovieFilter] = useState('all');
+
+  // 6. Modal state
+  const [editingChar, setEditingChar] = useState(null);
+  const [isModalOpen, setIsModalOpen] = useState(false);
+
+  // Notify parent of active background scanning so user can switch tabs freely
+  useEffect(() => {
+    onScanningStateChange?.(isScanning || isVisionScanning);
+  }, [isScanning, isVisionScanning, onScanningStateChange]);
 
   // Sync scanHistory to localStorage with safety quota handling
   useEffect(() => {
@@ -115,21 +145,6 @@ export default function CharacterLoreStudio({
     }
   }, [scanHistory]);
 
-  // File filtering and selection for timeline stitching & selective AI scan
-  const [fileSearchQuery, setFileSearchQuery] = useState('');
-  const [selectedFileIds, setSelectedFileIds] = useState([]);
-
-  // Video Duration Table for Timeline Stitching: { [fileId]: durationInSeconds }
-  const [fileDurations, setFileDurations] = useState({});
-  const [gapSeconds, setGapSeconds] = useState(0);
-  const [isDraggingVideo, setIsDraggingVideo] = useState(false);
-
-  // Edit / Add Character Modal State
-  const [editingChar, setEditingChar] = useState(null);
-  const [isModalOpen, setIsModalOpen] = useState(false);
-
-  const videoInputRef = useRef(null);
-
   // Filtered files for timeline stitching
   const filteredFiles = files.filter(f => f.name.toLowerCase().includes(fileSearchQuery.toLowerCase()));
 
@@ -137,6 +152,7 @@ export default function CharacterLoreStudio({
   const effectiveTargetFiles = selectedFileIds.length > 0 
     ? files.filter(f => selectedFileIds.includes(f.id)) 
     : (fileSearchQuery ? filteredFiles : files);
+
 
   const isAllFilteredSelected = filteredFiles.length > 0 && filteredFiles.every(f => selectedFileIds.includes(f.id));
   const someFilteredSelected = filteredFiles.some(f => selectedFileIds.includes(f.id));
@@ -226,12 +242,9 @@ export default function CharacterLoreStudio({
     }
   };
 
-
-  // Total Movie Duration manual input state
-  const [manualTotalDurationSec, setManualTotalDurationSec] = useState('');
-
   // Handle Video Upload or Drop to auto-detect clip durations
   const handleVideoUpload = async (e) => {
+
     const rawFiles = Array.from(e.target?.files || e.dataTransfer?.files || []);
     const uploadedVideos = rawFiles.filter(
       f => f.type.startsWith('video/') || /\.(mp4|mkv|avi|mov|webm|flv|ts|m4v)$/i.test(f.name)
@@ -362,20 +375,9 @@ export default function CharacterLoreStudio({
     setTimeout(() => setScanProgress(''), 3000);
   };
 
-  // Vision Scanner States
-  const [visionVideoFile, setVisionVideoFile] = useState(null);
-  const [visionIntervalSec, setVisionIntervalSec] = useState(3);
-  const [visionConcurrency, setVisionConcurrency] = useState(6); // 6 parallel threads by default
-  const [visionModel, setVisionModel] = useState(() => localStorage.getItem('tutien_vision_model') || 'gemini-2.5-flash-lite'); // Default to Gemini 2.5 Flash Lite for ultra token efficiency
-  const [visionFlipHorizontal, setVisionFlipHorizontal] = useState(true); // Default true for mirrored/flipped re-up videos
-  const [isVisionScanning, setIsVisionScanning] = useState(false);
-  const [visionProgress, setVisionProgress] = useState(null);
-  const [liveCurrentFrame, setLiveCurrentFrame] = useState(null);
-  const [visionDetectedChars, setVisionDetectedChars] = useState([]);
-  const visionInputRef = useRef(null);
-
   // Handle Start Vision Scan on Video Frames
   const handleStartVisionScan = async () => {
+
     if (!visionVideoFile) {
       alert('Vui lòng chọn hoặc kéo thả file video MP4 cần quét thị giác!');
       return;
@@ -590,10 +592,6 @@ export default function CharacterLoreStudio({
     return offset + localMs;
   };
 
-  const [tagDurationSec, setTagDurationSec] = useState(2); // 2s display duration by default
-  const [tagFormatTemplate, setTagFormatTemplate] = useState('clean_compact'); // 'clean_compact' | 'full_3part' | 'modern_badge' | 'name_only_bracket' | 'custom'
-  const [customTagPattern, setCustomTagPattern] = useState('【 {TYPE}: {NAME} | {SECT} | {REALM} 】');
-
   // Apply chosen format template to all existing characters
   const handleApplyFormatToAll = () => {
     if (characters.length === 0) {
@@ -608,11 +606,9 @@ export default function CharacterLoreStudio({
     setTimeout(() => setScanProgress(''), 4000);
   };
 
-  // Movie Profile / File Separation State (Each movie has its own isolated character list)
-  const [activeMovieFilter, setActiveMovieFilter] = useState('all');
-
   // List of all unique movies in characters
   const availableMovies = Array.from(
+
     new Set(characters.map(c => c.movieName || c.firstFileName || 'Mặc định').filter(Boolean))
   );
 
