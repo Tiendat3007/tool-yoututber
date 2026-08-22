@@ -32,8 +32,11 @@ export default function SubtitleEditor({
   setCustomPrompt,
   activePresetId,
   showDiffLog,
-  setShowDiffLog
+  setShowDiffLog,
+  onExtractGlossary,
+  isExtractingGlossary
 }) {
+
 
 
   const [searchTerm, setSearchTerm] = useState('');
@@ -476,6 +479,17 @@ export default function SubtitleEditor({
             </div>
 
             <div className="toolbar-group">
+              {onExtractGlossary && (
+                <button
+                  className="btn btn-secondary btn-sm text-cyan font-bold"
+                  onClick={onExtractGlossary}
+                  disabled={isTranslating || isExtractingGlossary}
+                  title="AI tự động quét file này để phát hiện nhân vật, môn phái, thuật ngữ mới chưa có trong Từ Điển"
+                >
+                  <Sparkles size={15} className={isExtractingGlossary ? 'spinner' : 'text-cyan'} />
+                  <span>{isExtractingGlossary ? 'Đang Quét...' : '🧠 AI Quét Từ Mới'}</span>
+                </button>
+              )}
 
               <button
                 className="btn btn-cyan btn-sm"
@@ -484,6 +498,7 @@ export default function SubtitleEditor({
               >
                 <BookOpen size={16} /> Dịch Từ Điển File Hiện Tại ({selectedIds.length > 0 ? selectedIds.length : 'Tất cả'})
               </button>
+
 
               {setConcurrency && (
                 <div className="select-with-icon select-concurrency" title="Chọn số luồng AI dịch song song cùng lúc">

@@ -865,3 +865,185 @@ HÃY TẠO PROMPT VẼ ẢNH TIẾNG ANH VÀ Ý TƯỞNG TIẾNG VIỆT THEO Đ�
     imagePromptVi: parsed.imagePromptVi || ''
   };
 }
+
+// 🚀 5. Batch Studio Generator for ALL Episodes in the Series
+export async function generateBatchStudioForFiles({
+  files = [],
+  genre = 'Tu Tiên / Tiên Hiệp',
+  contentType = 'Review Phim / Tóm Tắt Phim',
+  aiProvider = 'orimise',
+  apiKey,
+  baseUrl = 'https://api.orimise.com/v1',
+  model = 'claude-sonnet-5',
+  concurrency = 3,
+  onProgress // (completedCount, totalCount, currentFileName) => void
+}) {
+  if (!files || files.length === 0) return [];
+  const results = [];
+  let completed = 0;
+  const queue = [...files];
+
+  async function worker() {
+    while (queue.length > 0) {
+      const fileObj = queue.shift();
+      if (!fileObj) break;
+
+      if (onProgress) {
+        onProgress(completed, files.length, fileObj.name);
+      }
+
+      try {
+        const fileData = await generateYoutubeContent({
+          subtitles: fileObj.subtitles || [],
+          genre,
+          contentType,
+          aiProvider,
+          apiKey,
+          baseUrl,
+          model
+        });
+
+        results.push({
+          fileId: fileObj.id,
+          fileName: fileObj.name,
+          episodeName: fileObj.name.replace(/\.srt$/i, '').replace(/^.*[\\/]/, ''),
+          data: fileData
+        });
+      } catch (err) {
+        console.error(`Error generating content for ${fileObj.name}:`, err);
+        results.push({
+          fileId: fileObj.id,
+          fileName: fileObj.name,
+          episodeName: fileObj.name.replace(/\.srt$/i, '').replace(/^.*[\\/]/, ''),
+          error: err.message
+        });
+      } finally {
+        completed++;
+        if (onProgress) {
+          onProgress(completed, files.length, fileObj.name);
+        }
+      }
+    }
+  }
+
+  const numWorkers = Math.min(Math.max(1, concurrency), files.length);
+  await Promise.all(Array.from({ length: numWorkers }, worker));
+
+  // Sort results to match original file order
+  const fileIdOrder = files.map(f => f.id);
+  return results.sort((a, b) => fileIdOrder.indexOf(a.fileId) - fileIdOrder.indexOf(b.fileId));
+}
+
+// Helper to escape CSV fields
+function escapeCSV(field) {
+  if (field === null || field === undefined) return '""';
+  const str = String(field).replace(/"/g, '""');
+  return `"${str}"`;
+}
+
+// 📊 Export Batch Studio Results to CSV (Excel compatible with UTF-8 BOM)
+export function exportStudioResultsToCSV(resultsList = [], seriesTitle = 'Bo_Phim_YouTube_Studio') {
+  if (!resultsList || resultsList.length === 0) {
+    alert('Chưa có dữ liệu phân tích tập nào để xuất CSV!');
+    return;
+  }
+
+  const headers = [
+    'STT',
+    'Tập Phim',
+    'Tiêu Đề 1 (Tối Ưu)',
+    'Tiêu Đề 2',
+    'Tiêu Đề 3',
+    'Chữ Thumbnail Dòng 1',
+    'Chữ Thumbnail Dòng 2',
+    'Tóm Tắt Cốt Truyện',
+    'Mô Tả Video (SEO)',
+    'Thẻ Tags YouTube',
+    'Prompt Tạo Ảnh AI'
+  ];
+
+  const rows = resultsList.map((item, idx) => {
+    const d = item.data || {};
+    const titles = Array.isArray(d.titles) ? d.titles : [];
+    const thumbTexts = Array.isArray(d.thumbnailTexts) ? d.thumbnailTexts : [];
+    const thumb1 = thumbTexts[0] || {};
+
+    return [
+      idx + 1,
+      item.episodeName || item.fileName || `Tập ${idx + 1}`,
+      titles[0] || '',
+      titles[1] || '',
+      titles[2] || '',
+      thumb1.line1 || '',
+      thumb1.line2 || '',
+      d.storySummary || '',
+      d.description || '',
+      d.tags || '',
+      d.imagePromptEn || ''
+    ].map(escapeCSV).join(',');
+  });
+
+  const csvContent = '\uFEFF' + [headers.map(escapeCSV).join(','), ...rows].join('\r\n');
+  const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `${seriesTitle.replace(/[\s/\\:]+/g, '_')}_YouTube_Studio_Batch.csv`;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+// 📄 Export Batch Studio Results to TXT
+export function exportStudioResultsToTXT(resultsList = [], seriesTitle = 'Bo_Phim_YouTube_Studio') {
+  if (!resultsList || resultsList.length === 0) {
+    alert('Chưa có dữ liệu phân tích tập nào để xuất TXT!');
+    return;
+  }
+
+  let txtContent = `=======================================================\n`;
+  txtContent += `🎬 BẢNG TỔNG HỢP METADATA YOUTUBE STUDIO CHO BỘ PHIM\n`;
+  txtContent += `Tổng số tập: ${resultsList.length} tập\n`;
+  txtContent += `Thời gian xuất: ${new Date().toLocaleString('vi-VN')}\n`;
+  txtContent += `=======================================================\n\n`;
+
+  resultsList.forEach((item, idx) => {
+    const d = item.data || {};
+    txtContent += `-------------------------------------------------------\n`;
+    txtContent += `📺 TẬP #${idx + 1}: ${item.episodeName || item.fileName}\n`;
+    txtContent += `-------------------------------------------------------\n`;
+
+    if (item.error) {
+      txtContent += `❌ Lỗi phân tích: ${item.error}\n\n`;
+      return;
+    }
+
+    txtContent += `📌 5 TIÊU ĐỀ YOUTUBE:\n`;
+    (d.titles || []).forEach((t, tIdx) => {
+      txtContent += `  ${tIdx + 1}. ${t}\n`;
+    });
+    txtContent += `\n`;
+
+    txtContent += `🖼️ 5 MẪU CHỮ THUMBNAIL 2 DÒNG:\n`;
+    (d.thumbnailTexts || []).forEach((th, thIdx) => {
+      txtContent += `  Mẫu #${thIdx + 1}: [Dòng 1]: ${th.line1}  |  [Dòng 2]: ${th.line2}\n`;
+    });
+    txtContent += `\n`;
+
+    txtContent += `📖 TÓM TẮT CỐT TRUYỆN:\n${d.storySummary || ''}\n\n`;
+
+    txtContent += `🎨 PROMPT VẼ ẢNH AI:\n${d.imagePromptEn || ''}\n\n`;
+
+    txtContent += `🏷️ THẺ TAGS YOUTUBE:\n${d.tags || ''}\n\n`;
+
+    txtContent += `📝 MÔ TẢ VIDEO SEO:\n${d.description || ''}\n\n\n`;
+  });
+
+  const blob = new Blob([txtContent], { type: 'text/plain;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `${seriesTitle.replace(/[\s/\\:]+/g, '_')}_Metadata_Full.txt`;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+

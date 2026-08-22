@@ -1,8 +1,14 @@
 import React, { useState } from 'react';
-import { Plus, Trash2, Edit3, Check, X, Search, Download, Upload, RefreshCw, BookOpen, ShieldCheck, HelpCircle } from 'lucide-react';
+import { Plus, Trash2, Edit3, Check, X, Search, Download, Upload, RefreshCw, BookOpen, ShieldCheck, HelpCircle, Sparkles } from 'lucide-react';
 import { DEFAULT_GLOSSARY } from '../data/defaultGlossary';
 
-export default function GlossaryManager({ glossary, setGlossary }) {
+export default function GlossaryManager({
+  glossary,
+  setGlossary,
+  onExtractGlossary,
+  isExtractingGlossary
+}) {
+
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('all');
   const [editingId, setEditingId] = useState(null);
@@ -153,7 +159,19 @@ export default function GlossaryManager({ glossary, setGlossary }) {
           <BookOpen className="text-cyan" />
           <h2>Từ Điển Hán-Việt Tu Tiên Master ({glossary.length} thuật ngữ)</h2>
         </div>
-        <div className="action-row">
+        <div className="action-row flex-center flex-wrap gap-2">
+          {onExtractGlossary && (
+            <button
+              className="btn btn-cyan btn-sm font-bold btn-glow flex-center gap-1"
+              onClick={onExtractGlossary}
+              disabled={isExtractingGlossary}
+              title="AI tự động quét toàn bộ phụ đề các tập phim đang nạp để tìm ra nhân vật, môn phái, đan dược mới chưa có trong từ điển"
+            >
+              <Sparkles size={15} className={isExtractingGlossary ? 'spinner' : ''} />
+              <span>{isExtractingGlossary ? 'Đang Quét Phim...' : '🧠 AI Quét Phim Tìm Thuật Ngữ Mới'}</span>
+            </button>
+          )}
+
           <button className="btn btn-secondary btn-sm" onClick={resetToDefault}>
             <RefreshCw size={15} /> Khôi Phục Mặc Định ({DEFAULT_GLOSSARY.length} Từ)
           </button>
@@ -165,6 +183,7 @@ export default function GlossaryManager({ glossary, setGlossary }) {
             <input type="file" accept=".json" onChange={importJSON} hidden />
           </label>
         </div>
+
       </div>
 
       {/* Add New Term Form */}

@@ -7,13 +7,16 @@ import GlossaryManager from './components/GlossaryManager';
 import PronounPresetSelector from './components/PronounPresetSelector';
 import YoutuberStudio from './components/YoutuberStudio';
 import AISettingsModal from './components/AISettingsModal';
+import AutoGlossaryModal from './components/AutoGlossaryModal';
 
 import { DEFAULT_GLOSSARY, PRONOUN_PRESETS, SAMPLE_SRT } from './data/defaultGlossary';
 import { parseSRT, generateSRT } from './utils/srtParser';
 import { localTranslateLine, translateBatchWithGemini, translateBatchWithOrimise, translateSubtitlesWithThreadPool } from './utils/translator';
+import { extractNewGlossaryTermsWithAI } from './utils/glossaryExtractor';
 import { getFilesFromDataTransfer, processZipFile, getSmartFileName } from './utils/fileScanner';
 import { loadProjectStateFromDB, saveProjectStateToDB } from './utils/dbStorage';
 import './App.css';
+
 
 export default function App() {
   const [activeTab, setActiveTab] = useState(() => {
@@ -93,6 +96,11 @@ export default function App() {
   const [customPrompt, setCustomPrompt] = useState(() => localStorage.getItem('tutien_custom_prompt') || '');
   const [isAISettingsOpen, setIsAISettingsOpen] = useState(false);
 
+  // Auto-Glossary Extraction State (Feature 1)
+  const [isExtractingGlossary, setIsExtractingGlossary] = useState(false);
+  const [isGlossaryModalOpen, setIsGlossaryModalOpen] = useState(false);
+  const [extractedGlossaryTerms, setExtractedGlossaryTerms] = useState([]);
+
   // Batch progress state
   const [isBatchProcessing, setIsBatchProcessing] = useState(false);
   const [batchProgressText, setBatchProgressText] = useState('');
@@ -111,6 +119,68 @@ export default function App() {
     localStorage.setItem('tutien_concurrency', concurrency);
     localStorage.setItem('tutien_custom_prompt', customPrompt);
   }, [aiProvider, orimiseKey, orimiseBaseUrl, geminiKey, aiModel, concurrency, customPrompt]);
+
+  // 🧠 Auto-Glossary Extraction Handler
+  const handleExtractGlossary = async (specificSubtitles = null) => {
+    const isOrimise = aiProvider === 'orimise';
+    const activeKey = isOrimise ? orimiseKey : geminiKey;
+
+    if (!activeKey) {
+      alert(`Vui lòng nhập ${isOrimise ? 'Orimise' : 'Google Gemini'} API Key trong menu Cấu hình AI!`);
+      setIsAISettingsOpen(true);
+      return;
+    }
+
+    let targetSubs = [];
+    if (specificSubtitles && specificSubtitles.length > 0) {
+      targetSubs = specificSubtitles;
+    } else {
+      const activeF = files.find(f => f.id === activeFileId);
+      if (activeF && activeF.subtitles.length > 0) {
+        targetSubs = activeF.subtitles;
+      } else if (files.length > 0) {
+        targetSubs = files.flatMap(f => f.subtitles);
+      }
+    }
+
+    if (targetSubs.length === 0) {
+      alert('Chưa có dữ liệu phụ đề để quét thuật ngữ. Vui lòng nạp file SRT trước!');
+      return;
+    }
+
+    setIsExtractingGlossary(true);
+    setBatchProgressText(`🧠 Đang quét thuật ngữ, tên nhân vật, môn phái mới bằng AI ${aiModel}...`);
+
+    try {
+      const terms = await extractNewGlossaryTermsWithAI({
+        subtitles: targetSubs,
+        existingGlossary: glossary,
+        aiProvider,
+        apiKey: activeKey,
+        baseUrl: orimiseBaseUrl,
+        model: aiModel
+      });
+
+      if (terms.length === 0) {
+        alert('Tất cả các thuật ngữ quan trọng trong phim đã có sẵn trong Từ Điển Tu Tiên!');
+      } else {
+        setExtractedGlossaryTerms(terms);
+        setIsGlossaryModalOpen(true);
+      }
+      setBatchProgressText('');
+    } catch (err) {
+      alert(`Lỗi khi quét thuật ngữ: ${err.message}`);
+      setBatchProgressText('');
+    } finally {
+      setIsExtractingGlossary(false);
+    }
+  };
+
+  const handleAddTermsToGlossary = (newTerms) => {
+    if (!newTerms || newTerms.length === 0) return;
+    setGlossary(prev => [...newTerms, ...prev]);
+  };
+
 
 
   // Native File System Access API: Pick SRT files with persistent fileHandle
@@ -684,6 +754,8 @@ export default function App() {
               setConcurrency={setConcurrency}
               customPrompt={customPrompt}
               setCustomPrompt={setCustomPrompt}
+              onExtractGlossary={() => handleExtractGlossary()}
+              isExtractingGlossary={isExtractingGlossary}
             />
 
             {/* Subtitle Line Editor for Active File */}
@@ -713,6 +785,8 @@ export default function App() {
               activePresetId={activePresetId}
               showDiffLog={showDiffLog}
               setShowDiffLog={setShowDiffLog}
+              onExtractGlossary={() => handleExtractGlossary(activeFile?.subtitles)}
+              isExtractingGlossary={isExtractingGlossary}
             />
 
           </>
@@ -724,6 +798,8 @@ export default function App() {
           <GlossaryManager
             glossary={glossary}
             setGlossary={setGlossary}
+            onExtractGlossary={() => handleExtractGlossary()}
+            isExtractingGlossary={isExtractingGlossary}
           />
         )}
 
@@ -771,9 +847,18 @@ export default function App() {
         setCustomPrompt={setCustomPrompt}
       />
 
+      {/* 🧠 Auto-Glossary Modal (Feature 1) */}
+      <AutoGlossaryModal
+        isOpen={isGlossaryModalOpen}
+        onClose={() => setIsGlossaryModalOpen(false)}
+        extractedTerms={extractedGlossaryTerms}
+        onAddTermsToGlossary={handleAddTermsToGlossary}
+      />
+
       <footer className="app-footer">
         <p>Tu Tiên SRT Subtitle Pro &bull; Quản Lý & Dịch Hàng Loạt Bộ Phim SRT &bull; Orimise API ({aiModel})</p>
       </footer>
     </div>
   );
 }
+

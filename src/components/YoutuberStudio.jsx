@@ -10,8 +10,12 @@ import {
   regenerateTitlesAndThumbnailTexts,
   regenerateDescriptionOnly,
   regenerateStorySummaryOnly,
-  regenerateImagePromptOnly
+  regenerateImagePromptOnly,
+  generateBatchStudioForFiles,
+  exportStudioResultsToCSV,
+  exportStudioResultsToTXT
 } from '../utils/youtuberGenerator';
+
 import { exportThumbnailHD, generateAIThumbnailImage, THUMBNAIL_COLOR_THEMES } from '../utils/thumbnailExporter';
 import { uploadReferenceImageToOrimise, generateOrimiseImage } from '../utils/orimiseImageApi';
 import { generateFreeAIImage, FREE_IMAGE_MODELS } from '../utils/freeImageApi';
@@ -105,11 +109,40 @@ export default function YoutuberStudio({
   // Copy status indicators
   const [copiedField, setCopiedField] = useState(null);
 
+  // Batch Series Processing State (Feature 6)
+  const [isBatchGenerating, setIsBatchGenerating] = useState(false);
+  const [batchProgress, setBatchProgress] = useState({ current: 0, total: 0, currentFile: '' });
+  const [batchResults, setBatchResults] = useState(null);
+  const [showBatchModal, setShowBatchModal] = useState(false);
+
   // Theme & Model states
   const [selectedThemeId, setSelectedThemeId] = useState('gold-cyan');
   const [selectedFreeModel, setSelectedFreeModel] = useState('flux');
   const [selectedAnalysisModel, setSelectedAnalysisModel] = useState(() => aiModel || 'claude-sonnet-5');
   const [isRestoring, setIsRestoring] = useState(true);
+
+  // Helper to convert tags string into comma-separated list
+  const formatCommaTags = (tagsString = '') => {
+    if (!tagsString) return '';
+    return tagsString
+      .replace(/#/g, '')
+      .split(/[\n,]+/)
+      .map(t => t.trim())
+      .filter(Boolean)
+      .join(', ');
+  };
+
+  // Helper to convert tags string into hashtags
+  const formatHashTags = (tagsString = '') => {
+    if (!tagsString) return '';
+    return tagsString
+      .split(/[\n,]+/)
+      .map(t => t.trim())
+      .filter(Boolean)
+      .map(t => t.startsWith('#') ? t : `#${t.replace(/\s+/g, '')}`)
+      .join(' ');
+  };
+
 
   // Restore history sessions & active session from IndexedDB across page reloads (F5)
   useEffect(() => {
@@ -559,6 +592,50 @@ ${fullImagePromptEn || generatedData.imagePromptEn}
       setIsGenerating(false);
     }
   };
+
+  // 🚀 Batch Generator for ALL Episodes in the Series (Feature 6)
+  const handleBatchGenerateSeries = async () => {
+    if (files.length === 0) {
+      alert('Chưa có file SRT nào trong danh sách. Hãy nạp file ở tab Trình Dịch!');
+      return;
+    }
+    const apiKey = aiProvider === 'orimise' ? orimiseKey : geminiKey;
+    if (!apiKey) {
+      alert(`Vui lòng nhập ${aiProvider === 'orimise' ? 'Orimise' : 'Google Gemini'} API Key trong Cấu Hình AI!`);
+      return;
+    }
+
+    if (!window.confirm(`Khởi chạy phân tích trọn bộ ${files.length} tập phim bằng AI ${selectedAnalysisModel}?\n\nQuá trình chạy song song đa luồng và tự động tổng hợp thành bảng Excel / CSV để đăng video hàng loạt.`)) {
+      return;
+    }
+
+    setIsBatchGenerating(true);
+    setBatchProgress({ current: 0, total: files.length, currentFile: files[0]?.name || '' });
+
+    try {
+      const results = await generateBatchStudioForFiles({
+        files,
+        genre,
+        contentType,
+        aiProvider,
+        apiKey,
+        baseUrl: orimiseBaseUrl,
+        model: selectedAnalysisModel,
+        concurrency: 3,
+        onProgress: (current, total, currentFile) => {
+          setBatchProgress({ current, total, currentFile });
+        }
+      });
+
+      setBatchResults(results);
+      setShowBatchModal(true);
+    } catch (err) {
+      alert(`Lỗi khi phân tích hàng loạt: ${err.message}`);
+    } finally {
+      setIsBatchGenerating(false);
+    }
+  };
+
 
   // 🪄 1. Re-render Story Summary according to prompt
   const handleRegenerateSummary = async () => {
@@ -1171,27 +1248,50 @@ ${fullImagePromptEn || generatedData.imagePromptEn}
             </select>
           </div>
 
-          <div className="control-action">
+          <div className="control-action flex-center flex-wrap gap-2">
             <button
               className="btn btn-cyan btn-lg font-bold btn-glow"
               onClick={handleGenerate}
-              disabled={isGenerating || files.length === 0}
+              disabled={isGenerating || isBatchGenerating || files.length === 0}
+              title="Phân tích các tập đang chọn và tạo giao diện Studio trực tiếp"
             >
               {isGenerating ? (
                 <>
                   <RefreshCw size={20} className="spinner" />
-                  <span>Đang Phân Tích Kịch Bản AI...</span>
+                  <span>Đang Phân Tích...</span>
                 </>
               ) : (
                 <>
                   <Wand2 size={20} />
-                  <span>⚡ PHÂN TÍCH {selectedFileIds.length} TẬP & TẠO CONTENT</span>
+                  <span>⚡ PHÂN TÍCH {selectedFileIds.length} TẬP ĐANG CHỌN</span>
                 </>
               )}
             </button>
+
+            {files.length > 1 && (
+              <button
+                className="btn btn-purple-glow btn-lg font-bold flex-center gap-2"
+                onClick={handleBatchGenerateSeries}
+                disabled={isGenerating || isBatchGenerating || files.length === 0}
+                title="Phân tích đồng loạt tất cả các tập của bộ phim bằng AI và tự động xuất ra bảng tổng hợp Excel / CSV"
+              >
+                {isBatchGenerating ? (
+                  <>
+                    <RefreshCw size={20} className="spinner" />
+                    <span>Đang Xử Lý {batchProgress.current}/{batchProgress.total} Tập...</span>
+                  </>
+                ) : (
+                  <>
+                    <Sparkles size={20} />
+                    <span>🚀 PHÂN TÍCH TẤT CẢ {files.length} TẬP (XUẤT EXCEL)</span>
+                  </>
+                )}
+              </button>
+            )}
           </div>
         </div>
       </div>
+
 
 
       {/* Main Results Grid */}
@@ -1286,7 +1386,18 @@ ${fullImagePromptEn || generatedData.imagePromptEn}
               {generatedData.titles.map((title, idx) => {
                 const isSelected = selectedTitleIndex === idx;
                 const charCount = title.length;
-                const isOptimal = charCount >= 60 && charCount <= 95;
+                let badgeClass = 'char-badge-optimal'; // <= 70 (Emerald)
+                let badgeLabel = `${charCount}/70 kt`;
+                let badgeTooltip = `${charCount} ký tự (Chuẩn SEO Mobile & Desktop < 70 ký tự)`;
+                if (charCount > 70 && charCount <= 100) {
+                  badgeClass = 'char-badge-warning'; // Gold
+                  badgeLabel = `${charCount}/100 kt`;
+                  badgeTooltip = `${charCount} ký tự (Khá tốt, có thể bị rút gọn trên Mobile)`;
+                } else if (charCount > 100) {
+                  badgeClass = 'char-badge-danger'; // Red
+                  badgeLabel = `${charCount} kt ⚠️`;
+                  badgeTooltip = `${charCount} ký tự (Quá dài > 100 ký tự, sẽ bị YouTube cắt bớt!)`;
+                }
 
                 return (
                   <div
@@ -1304,8 +1415,8 @@ ${fullImagePromptEn || generatedData.imagePromptEn}
                   >
                     <div className="title-number">#{idx + 1}</div>
                     <div className="title-text" style={{ flex: 1 }}>{title}</div>
-                    <span className={`char-count-badge ${isOptimal ? 'optimal' : ''}`} title={`${charCount} ký tự (Độ dài lý tưởng: 60-90 ký tự)`}>
-                      {charCount} ký tự
+                    <span className={`char-count-badge ${badgeClass}`} title={badgeTooltip} style={{ fontSize: '0.75rem', padding: '2px 8px', fontWeight: 600 }}>
+                      {badgeLabel}
                     </span>
                     <button
                       className="btn-icon text-cyan"
@@ -1321,6 +1432,7 @@ ${fullImagePromptEn || generatedData.imagePromptEn}
                 );
               })}
             </div>
+
 
             {/* 5 Paired 2-Line Thumbnail Text Overlay Suggestions */}
             <div className="column-header mt-4">
@@ -1697,22 +1809,48 @@ ${fullImagePromptEn || generatedData.imagePromptEn}
               </div>
             )}
 
-            <div className="column-header mt-4">
-              <Tag size={20} className="text-purple" />
-              <h3>🏷️ Thẻ Tags & Từ Khóa SEO YouTube</h3>
-              <button
-                className="btn btn-secondary btn-sm ml-auto"
-                onClick={() => handleCopy(generatedData.tags, 'tags')}
-              >
-                {copiedField === 'tags' ? <Check size={14} className="text-emerald" /> : <Copy size={14} />}
-                <span>Sao Chép Tags</span>
-              </button>
+            <div className="column-header mt-4 flex-between flex-wrap gap-2">
+              <div className="flex-center gap-2">
+                <Tag size={20} className="text-purple" />
+                <h3 className="mb-0">🏷️ Thẻ Tags & Từ Khóa SEO YouTube</h3>
+                {(() => {
+                  const commaStr = formatCommaTags(generatedData.tags);
+                  const isUnder500 = commaStr.length <= 500;
+                  return (
+                    <span
+                      className={`char-count-badge ${isUnder500 ? 'char-badge-optimal' : 'char-badge-danger'}`}
+                      title={`${commaStr.length}/500 ký tự (Giới hạn tối đa của YouTube Studio là 500 ký tự)`}
+                      style={{ fontSize: '0.75rem', padding: '2px 8px', fontWeight: 600 }}
+                    >
+                      {commaStr.length}/500 kt {isUnder500 ? '✓' : '⚠️ Quá'}
+                    </span>
+                  );
+                })()}
+              </div>
+              <div className="flex-center gap-1">
+                <button
+                  className="btn btn-green-glow btn-sm font-bold"
+                  onClick={() => handleCopy(formatCommaTags(generatedData.tags), 'tags_comma')}
+                  title="Sao chép toàn bộ tags dưới dạng phân tách bằng dấu phẩy để dán trực tiếp vào ô Thẻ Tags của YouTube Studio"
+                >
+                  {copiedField === 'tags_comma' ? <Check size={14} className="text-emerald" /> : <Copy size={14} />}
+                  <span>📋 Copy Tags (Dạng Phẩy ,)</span>
+                </button>
+                <button
+                  className="btn btn-secondary btn-sm"
+                  onClick={() => handleCopy(formatHashTags(generatedData.tags), 'tags_hash')}
+                  title="Sao chép dạng #Hashtag để dán vào cuối phần Mô Tả Video"
+                >
+                  {copiedField === 'tags_hash' ? <Check size={14} className="text-emerald" /> : <Copy size={14} />}
+                  <span># Hashtags</span>
+                </button>
+              </div>
             </div>
 
             <textarea
               className="input-field textarea-field tags-box font-mono"
               rows={4}
-              value={generatedData.tags}
+              value={formatCommaTags(generatedData.tags) || generatedData.tags}
               readOnly
             />
           </div>
@@ -1728,10 +1866,119 @@ ${fullImagePromptEn || generatedData.imagePromptEn}
           <Video size={64} className="text-muted pulse" />
           <h3>Chưa Tạo Nội Dung YouTube</h3>
           <p className="text-muted">
-            Hãy chọn các tập SRT ở phía trên và bấm nút <strong className="highlight-cyan">"⚡ PHÂN TÍCH TẬP & TẠO CONTENT"</strong> để AI tự động phân tích và tạo trọn bộ metadata!
+            Hãy chọn các tập SRT ở phía trên và bấm nút <strong className="highlight-cyan">"⚡ PHÂN TÍCH TẬP ĐANG CHỌN"</strong> hoặc <strong className="highlight-cyan">"🚀 PHÂN TÍCH TẤT CẢ TẬP (XUẤT EXCEL)"</strong>!
           </p>
+        </div>
+      )}
+
+      {/* 🚀 Batch Studio Results Modal (Feature 6) */}
+      {showBatchModal && batchResults && (
+        <div className="modal-overlay" onClick={() => setShowBatchModal(false)}>
+          <div
+            className="modal-content card-panel"
+            style={{ maxWidth: '1050px', width: '95vw', maxHeight: '90vh', display: 'flex', flexDirection: 'column' }}
+            onClick={e => e.stopPropagation()}
+          >
+            {/* Header */}
+            <div className="modal-header flex-between mb-3 pb-2" style={{ borderBottom: '1px solid var(--border-color)' }}>
+              <div className="flex-center gap-2">
+                <Sparkles size={22} className="text-purple pulse" />
+                <h3 className="text-purple font-bold mb-0">
+                  🚀 Bảng Tổng Hợp YouTube Studio Toàn Bộ {batchResults.length} Tập Phim
+                </h3>
+              </div>
+              <div className="flex-center gap-2">
+                <button
+                  className="btn btn-green-glow btn-sm font-bold flex-center gap-1"
+                  onClick={() => exportStudioResultsToCSV(batchResults, 'Bo_Phim_YouTube_Studio')}
+                  title="Tải về file Excel / CSV đầy đủ cột để quản lý và đăng video hàng loạt"
+                >
+                  <Download size={15} /> Xuất Bảng Excel / CSV
+                </button>
+                <button
+                  className="btn btn-cyan btn-sm font-bold flex-center gap-1"
+                  onClick={() => exportStudioResultsToTXT(batchResults, 'Bo_Phim_YouTube_Studio')}
+                  title="Tải về file văn bản TXT tổng hợp"
+                >
+                  <Download size={15} /> Xuất File TXT
+                </button>
+                <button className="btn-icon text-muted ml-2" onClick={() => setShowBatchModal(false)}>
+                  ✕
+                </button>
+              </div>
+            </div>
+
+            {/* Table */}
+            <div style={{ flex: 1, overflowY: 'auto', border: '1px solid var(--border-color)', borderRadius: '8px', background: 'rgba(0,0,0,0.2)' }}>
+              <table className="glossary-table" style={{ width: '100%', fontSize: '0.85rem' }}>
+                <thead>
+                  <tr style={{ background: 'rgba(255,255,255,0.05)', position: 'sticky', top: 0, zIndex: 2 }}>
+                    <th style={{ width: '45px', textAlign: 'center', padding: '8px 4px' }}>#</th>
+                    <th style={{ width: '140px', padding: '8px' }}>Tập Phim</th>
+                    <th style={{ minWidth: '240px', padding: '8px' }}>Tiêu Đề Clickbait Tối Ưu</th>
+                    <th style={{ width: '220px', padding: '8px' }}>Chữ Thumbnail 2 Dòng</th>
+                    <th style={{ width: '90px', textAlign: 'center', padding: '8px' }}>Thao Tác</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {batchResults.map((item, idx) => {
+                    const d = item.data || {};
+                    const topTitle = d.titles?.[0] || '---';
+                    const thumb = d.thumbnailTexts?.[0] || {};
+
+                    return (
+                      <tr key={item.fileId || idx} style={{ borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
+                        <td style={{ textAlign: 'center', color: 'var(--text-muted)' }}>{idx + 1}</td>
+                        <td className="font-bold text-cyan">{item.episodeName || item.fileName}</td>
+                        <td>
+                          <div className="font-bold text-amber mb-1">{topTitle}</div>
+                          <span className="text-xs text-muted">({topTitle.length}/70 kt)</span>
+                        </td>
+                        <td>
+                          <div className="text-xs text-amber font-bold">{thumb.line1}</div>
+                          <div className="text-xs text-cyan font-bold">{thumb.line2}</div>
+                        </td>
+                        <td style={{ textAlign: 'center' }}>
+                          <button
+                            className="btn btn-secondary btn-xs"
+                            onClick={() => {
+                              if (item.data) {
+                                setGeneratedData(item.data);
+                                setSelectedFileIds([item.fileId]);
+                                setSelectedTitleIndex(0);
+                                setSelectedTextIndex(0);
+                                if (item.data.thumbnailTexts?.[0]) {
+                                  setCustomLine1(item.data.thumbnailTexts[0].line1);
+                                  setCustomLine2(item.data.thumbnailTexts[0].line2);
+                                }
+                                setShowBatchModal(false);
+                              }
+                            }}
+                            title="Nạp dữ liệu tập này vào màn hình Studio chính để xem chi tiết & render ảnh"
+                          >
+                            Xem Studio
+                          </button>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+
+            {/* Footer */}
+            <div className="modal-footer flex-between mt-3 pt-2" style={{ borderTop: '1px solid var(--border-color)' }}>
+              <span className="text-sm text-muted">
+                Đã hoàn tất phân tích <strong className="highlight-cyan">{batchResults.length} tập</strong> bằng AI.
+              </span>
+              <button className="btn btn-secondary btn-sm" onClick={() => setShowBatchModal(false)}>
+                Đóng Bảng
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>
   );
 }
+

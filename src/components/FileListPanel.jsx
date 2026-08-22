@@ -25,8 +25,11 @@ export default function FileListPanel({
   concurrency = 4,
   setConcurrency,
   customPrompt,
-  setCustomPrompt
+  setCustomPrompt,
+  onExtractGlossary,
+  isExtractingGlossary
 }) {
+
 
 
   const fileInputRef = useRef(null);
@@ -359,20 +362,33 @@ export default function FileListPanel({
             <button
               className="btn btn-purple btn-sm font-bold"
               onClick={onBatchTranslateAI}
-              disabled={isBatchProcessing}
+              disabled={isBatchProcessing || isExtractingGlossary}
               title="Dịch toàn bộ tất cả file SRT trong danh sách bằng AI"
             >
               <Sparkles size={16} /> Dịch AI Tất Cả {files.length} File ({concurrency} Luồng)
             </button>
 
+            {onExtractGlossary && (
+              <button
+                className="btn btn-secondary btn-sm text-cyan font-bold"
+                onClick={onExtractGlossary}
+                disabled={isBatchProcessing || isExtractingGlossary}
+                title="AI tự động quét toàn bộ các file trong bộ phim để phát hiện nhân vật, môn phái, thuật ngữ mới chưa có trong Từ Điển"
+              >
+                <Sparkles size={15} className={isExtractingGlossary ? 'spinner' : 'text-cyan'} />
+                <span>{isExtractingGlossary ? 'Đang Quét Thuật Ngữ...' : '🧠 AI Quét Thuật Ngữ Mới'}</span>
+              </button>
+            )}
+
             <button
               className="btn btn-cyan btn-sm"
               onClick={onBatchApplyGlossary}
-              disabled={isBatchProcessing}
+              disabled={isBatchProcessing || isExtractingGlossary}
               title="Áp dụng từ điển Tu Tiên Hán Việt cho tất cả file"
             >
               <BookOpen size={16} /> Dịch Từ Điển Tất Cả File
             </button>
+
 
             <button
               className="btn btn-secondary btn-sm"
