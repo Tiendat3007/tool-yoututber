@@ -162,6 +162,9 @@ export default function CharacterLoreStudio({
     }
   };
 
+  // Total Movie Duration manual input state
+  const [manualTotalDurationSec, setManualTotalDurationSec] = useState('');
+
   // Handle Video Upload or Drop to auto-detect clip durations
   const handleVideoUpload = async (e) => {
     const rawFiles = Array.from(e.target?.files || e.dataTransfer?.files || []);
@@ -175,30 +178,62 @@ export default function CharacterLoreStudio({
     }
 
     setIsScanning(true);
-    setScanProgress(`🎬 Đang đọc thời lượng từ ${uploadedVideos.length} video clip...`);
+    setScanProgress(`🎬 Đang phân tích thời lượng từ ${uploadedVideos.length} video...`);
 
+    const targetPool = effectiveTargetFiles.length > 0 ? effectiveTargetFiles : files;
+
+    // CASE 1: Single Joined Video uploaded for multiple episode files (e.g. 1 video of 3h35m for 34 episodes)
+    if (uploadedVideos.length === 1 && targetPool.length > 1) {
+      const singleVideo = uploadedVideos[0];
+      const totalVideoDuration = await readMediaDuration(singleVideo);
+
+      if (totalVideoDuration !== null && totalVideoDuration > 0) {
+        // Calculate total subtitle duration sum of all episodes
+        let totalSubSec = 0;
+        const episodeSubDurations = targetPool.map(f => {
+          const subs = f.subtitles || [];
+          const lastSub = subs[subs.length - 1];
+          const durSec = lastSub ? srtTimeToMs(lastSub.endTime) / 1000 : 900;
+          totalSubSec += durSec;
+          return { id: f.id, durSec };
+        });
+
+        // Scale factor so sum matches exactly totalVideoDuration
+        const scale = totalSubSec > 0 ? (totalVideoDuration / totalSubSec) : 1;
+
+        const newDurations = {};
+        episodeSubDurations.forEach(ep => {
+          newDurations[ep.id] = Math.round(ep.durSec * scale * 100) / 100;
+        });
+
+        setFileDurations(prev => ({ ...prev, ...newDurations }));
+        setManualTotalDurationSec(Math.round(totalVideoDuration));
+        setIsScanning(false);
+        setScanProgress(`✅ Đã nhận diện Video Gộp Toàn Bộ (${Math.round(totalVideoDuration)}s = ${msToSrtTime(totalVideoDuration * 1000)}) và tự động phân bổ chính xác cho ${targetPool.length} tập!`);
+        setTimeout(() => setScanProgress(''), 5000);
+
+        if (videoInputRef.current) videoInputRef.current.value = '';
+        return;
+      }
+    }
+
+    // CASE 2: Multiple Video Clips (e.g. each clip matches 1 episode)
     const newDurations = {};
     let matchedCount = 0;
 
-    // Sort uploaded videos alphabetically/numerically
     uploadedVideos.sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true }));
-
-    const targetPool = effectiveTargetFiles.length > 0 ? effectiveTargetFiles : files;
 
     for (let i = 0; i < uploadedVideos.length; i++) {
       const videoFile = uploadedVideos[i];
       const duration = await readMediaDuration(videoFile);
 
       if (duration !== null && duration > 0) {
-        // Try smart match against effectiveTargetFiles
         let matchedFile = matchVideoToFile(videoFile.name, targetPool);
 
-        // If not matched, try all files
         if (!matchedFile && targetPool !== files) {
           matchedFile = matchVideoToFile(videoFile.name, files);
         }
 
-        // Sequential fallback match if name matching fails
         if (!matchedFile && i < targetPool.length) {
           matchedFile = targetPool[i];
         }
@@ -224,6 +259,44 @@ export default function CharacterLoreStudio({
       videoInputRef.current.value = '';
     }
   };
+
+  // Handle Manual Total Duration Distribution
+  const handleDistributeTotalDuration = () => {
+    const totalSec = parseFloat(manualTotalDurationSec);
+    if (!totalSec || isNaN(totalSec) || totalSec <= 0) {
+      alert('Vui lòng nhập tổng thời lượng hợp lệ (tính bằng số giây, ví dụ: 12918)!');
+      return;
+    }
+
+    const targetPool = effectiveTargetFiles.length > 0 ? effectiveTargetFiles : files;
+    let totalSubSec = 0;
+    const episodeSubDurations = targetPool.map(f => {
+      const subs = f.subtitles || [];
+      const lastSub = subs[subs.length - 1];
+      const durSec = lastSub ? srtTimeToMs(lastSub.endTime) / 1000 : 900;
+      totalSubSec += durSec;
+      return { id: f.id, durSec };
+    });
+
+    const scale = totalSubSec > 0 ? (totalSec / totalSubSec) : 1;
+    const newDurations = {};
+    episodeSubDurations.forEach(ep => {
+      newDurations[ep.id] = Math.round(ep.durSec * scale * 100) / 100;
+    });
+
+    setFileDurations(prev => ({ ...prev, ...newDurations }));
+    setScanProgress(`✅ Đã phân bổ tổng thời lượng ${totalSec}s (${msToSrtTime(totalSec * 1000)}) cho ${targetPool.length} tập!`);
+    setTimeout(() => setScanProgress(''), 4000);
+  };
+
+  // Reset file durations to default from subtitles
+  const handleResetDurationsToSubtitles = () => {
+    setFileDurations({});
+    setManualTotalDurationSec('');
+    setScanProgress('🔄 Đã đặt lại thời lượng các tập phim theo mốc dòng sub cuối cùng!');
+    setTimeout(() => setScanProgress(''), 3000);
+  };
+
 
 
   // Toggle Character Enabled
@@ -699,7 +772,40 @@ export default function CharacterLoreStudio({
                 <span>giây</span>
               </div>
             </div>
+
+            {/* Quick Manual Total Duration Toolbar */}
+            <div className="video-duration-quick-toolbar flex-between p-2 mt-1" style={{ background: 'rgba(0,0,0,0.3)', borderRadius: '8px', width: '100%', flexWrap: 'wrap', gap: '10px' }}>
+              <div className="flex-center gap-2" style={{ flexWrap: 'wrap' }}>
+                <Clock size={16} className="text-yellow" />
+                <span className="text-sm font-bold">Hoặc Nhập Tổng Thời Lượng Video Gộp:</span>
+                <input
+                  type="number"
+                  placeholder="VD: 12918"
+                  value={manualTotalDurationSec}
+                  onChange={e => setManualTotalDurationSec(e.target.value)}
+                  className="input-field input-xs font-mono font-bold text-center"
+                  style={{ width: '95px' }}
+                />
+                <span className="text-xs text-muted">giây {manualTotalDurationSec ? `(${msToSrtTime(Number(manualTotalDurationSec) * 1000)})` : ''}</span>
+                <button
+                  className="btn btn-purple btn-xs font-bold flex-center gap-1"
+                  onClick={handleDistributeTotalDuration}
+                  title="Phân bổ tổng thời lượng này chuẩn xác theo tỷ lệ các tập phụ đề"
+                >
+                  <Sparkles size={13} /> Phân Bổ Cho {effectiveTargetFiles.length} Tập
+                </button>
+              </div>
+
+              <button
+                className="btn btn-secondary btn-xs text-muted"
+                onClick={handleResetDurationsToSubtitles}
+                title="Khôi phục thời lượng các tập về mốc dòng sub cuối cùng"
+              >
+                🔄 Đặt Lại Theo Sub
+              </button>
+            </div>
           </div>
+
 
           {/* Episode Sequence Timeline Table */}
           <div className="stitching-table-wrapper card-panel mb-3">
