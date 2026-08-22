@@ -1,8 +1,9 @@
 import React, { useState, useRef } from 'react';
 import {
   Upload, Sparkles, Download, Clock, Search, Replace, Trash2, Plus,
-  CheckCircle, Play, FileText, Zap, BookOpen, Layers, Eye, RefreshCw, ArrowRight, EyeOff, FolderPlus, Archive, Save
+  CheckCircle, Check, Play, FileText, Zap, BookOpen, Layers, Eye, RefreshCw, ArrowRight, EyeOff, FolderPlus, Archive, Save
 } from 'lucide-react';
+
 import { parseSRT, generateSRT, generateVTT, shiftSubtitlesTime } from '../utils/srtParser';
 import { localTranslateLine, translateBatchWithGemini, translateBatchWithOrimise, translateSubtitlesWithThreadPool } from '../utils/translator';
 import { PRONOUN_PRESETS } from '../data/defaultGlossary';
