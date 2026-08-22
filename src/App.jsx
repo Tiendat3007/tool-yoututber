@@ -138,7 +138,7 @@ export default function App() {
 
 
   // 🧠 Auto-Glossary Extraction Handler
-  const handleExtractGlossary = async (specificSubtitles = null) => {
+  const handleExtractGlossary = async (targetParam = null) => {
     const isOrimise = aiProvider === 'orimise';
     const activeKey = isOrimise ? orimiseKey : geminiKey;
 
@@ -149,8 +149,15 @@ export default function App() {
     }
 
     let targetSubs = [];
-    if (specificSubtitles && specificSubtitles.length > 0) {
-      targetSubs = specificSubtitles;
+    if (Array.isArray(targetParam) && targetParam.length > 0) {
+      if (typeof targetParam[0] === 'string') {
+        // Array of file IDs
+        const matchedFiles = files.filter(f => targetParam.includes(f.id));
+        targetSubs = matchedFiles.flatMap(f => f.subtitles);
+      } else {
+        // Array of subtitle objects
+        targetSubs = targetParam;
+      }
     } else {
       const activeF = files.find(f => f.id === activeFileId);
       if (activeF && activeF.subtitles.length > 0) {
@@ -159,6 +166,7 @@ export default function App() {
         targetSubs = files.flatMap(f => f.subtitles);
       }
     }
+
 
     if (targetSubs.length === 0) {
       alert('Chưa có dữ liệu phụ đề để quét thuật ngữ. Vui lòng nạp file SRT trước!');
@@ -534,8 +542,8 @@ export default function App() {
     ));
   };
 
-  // Batch AI Translate All Files in the series using Turbo Multi-Threading Pool
-  const handleBatchTranslateAI = async () => {
+  // Batch AI Translate Files in the series (supports selective file IDs or all)
+  const handleBatchTranslateAI = async (targetFileIds = null) => {
     if (files.length === 0) return;
     const isOrimise = aiProvider === 'orimise';
     const activeKey = isOrimise ? orimiseKey : geminiKey;
@@ -546,15 +554,21 @@ export default function App() {
       return;
     }
 
+    const filesToProcess = targetFileIds && targetFileIds.length > 0
+      ? files.filter(f => targetFileIds.includes(f.id))
+      : files;
+
+    if (filesToProcess.length === 0) return;
+
     setIsBatchProcessing(true);
 
     try {
       const updatedFiles = [...files];
 
-      for (let fIdx = 0; fIdx < updatedFiles.length; fIdx++) {
-        const fileObj = updatedFiles[fIdx];
+      for (let fIdx = 0; fIdx < filesToProcess.length; fIdx++) {
+        const fileObj = filesToProcess[fIdx];
         const totalLines = fileObj.subtitles.length;
-        setBatchProgressText(`⚡ [File ${fIdx + 1}/${updatedFiles.length}] Đang khởi chạy ${concurrency} luồng Turbo: "${fileObj.name}" (${totalLines} dòng)...`);
+        setBatchProgressText(`⚡ [File ${fIdx + 1}/${filesToProcess.length}] Đang khởi chạy ${concurrency} luồng Turbo: "${fileObj.name}" (${totalLines} dòng)...`);
 
         const resultMap = await translateSubtitlesWithThreadPool({
           subtitles: fileObj.subtitles,
@@ -568,29 +582,33 @@ export default function App() {
           concurrency: concurrency,
           onProgress: (doneChunks, totalChunks, doneLines, total) => {
             setBatchProgressText(
-              `⚡ [File ${fIdx + 1}/${updatedFiles.length}] Turbo ${concurrency} Luồng: "${fileObj.name}" — Xong ${doneChunks}/${totalChunks} khối (${Math.round((doneChunks / totalChunks) * 100)}%)`
+              `⚡ [File ${fIdx + 1}/${filesToProcess.length}] Turbo ${concurrency} Luồng: "${fileObj.name}" — Xong ${doneChunks}/${totalChunks} khối (${Math.round((doneChunks / totalChunks) * 100)}%)`
             );
           }
         });
 
-        // Apply translated map to file
-        fileObj.subtitles = fileObj.subtitles.map(sub => {
-          if (resultMap.has(sub.index)) {
-            return {
-              ...sub,
-              previousText: sub.translatedText,
-              translatedText: resultMap.get(sub.index),
-              status: 'translated'
-            };
-          }
-          return sub;
-        });
-
-        // Update state in real-time after each file finishes
-        setFiles([...updatedFiles]);
+        // Apply translated map to file in main list
+        const targetIndex = updatedFiles.findIndex(f => f.id === fileObj.id);
+        if (targetIndex !== -1) {
+          updatedFiles[targetIndex] = {
+            ...updatedFiles[targetIndex],
+            subtitles: updatedFiles[targetIndex].subtitles.map(sub => {
+              if (resultMap.has(sub.index)) {
+                return {
+                  ...sub,
+                  previousText: sub.translatedText,
+                  translatedText: resultMap.get(sub.index),
+                  status: 'translated'
+                };
+              }
+              return sub;
+            })
+          };
+          setFiles([...updatedFiles]);
+        }
       }
 
-      setBatchProgressText(`🎉 ĐÃ DỊCH HOÀN TẤT SIÊU TỐC TẤT CẢ ${files.length} FILE SRT TRONG BỘ PHIM!`);
+      setBatchProgressText(`🎉 ĐÃ DỊCH HOÀN TẤT SIÊU TỐC ${filesToProcess.length} FILE SRT!`);
       setTimeout(() => setBatchProgressText(''), 4000);
     } catch (err) {
       alert(`Lỗi khi dịch hàng loạt: ${err.message}`);
@@ -599,12 +617,14 @@ export default function App() {
     }
   };
 
-  // Batch Apply Glossary across all files
-  const handleBatchApplyGlossary = () => {
+  // Batch Apply Glossary across all or selected files
+  const handleBatchApplyGlossary = (targetFileIds = null) => {
     if (files.length === 0) return;
     const activeRules = PRONOUN_PRESETS.find(p => p.id === activePresetId)?.rules || [];
+    const targetSet = targetFileIds && targetFileIds.length > 0 ? new Set(targetFileIds) : null;
 
     const updatedFiles = files.map(fileObj => {
+      if (targetSet && !targetSet.has(fileObj.id)) return fileObj;
       const newSubs = fileObj.subtitles.map(sub => {
         const newTranslated = localTranslateLine(sub.originalText, glossary, activeRules);
         return {
@@ -618,15 +638,18 @@ export default function App() {
     });
 
     setFiles(updatedFiles);
-    alert(`Đã áp dụng Từ Điển Tu Tiên cho toàn bộ ${files.length} file SRT!`);
+    const affectedCount = targetSet ? targetSet.size : files.length;
+    alert(`Đã áp dụng Từ Điển Tu Tiên cho ${affectedCount} file SRT!`);
   };
 
-  // Batch Apply Pronouns across all files
-  const handleBatchApplyPronouns = () => {
+  // Batch Apply Pronouns across all or selected files
+  const handleBatchApplyPronouns = (targetFileIds = null) => {
     if (files.length === 0) return;
     const preset = PRONOUN_PRESETS.find(p => p.id === activePresetId) || PRONOUN_PRESETS[0];
+    const targetSet = targetFileIds && targetFileIds.length > 0 ? new Set(targetFileIds) : null;
 
     const updatedFiles = files.map(fileObj => {
+      if (targetSet && !targetSet.has(fileObj.id)) return fileObj;
       const newSubs = fileObj.subtitles.map(sub => {
         let text = sub.translatedText || sub.originalText;
         preset.rules.forEach(rule => {
@@ -643,16 +666,21 @@ export default function App() {
     });
 
     setFiles(updatedFiles);
-    alert(`Đã áp dụng quy tắc xưng hô "${preset.name}" cho toàn bộ ${files.length} file SRT!`);
+    const affectedCount = targetSet ? targetSet.size : files.length;
+    alert(`Đã áp dụng quy tắc xưng hô "${preset.name}" cho ${affectedCount} file SRT!`);
   };
 
-  // Export ALL files as a single ZIP archive
-  const handleExportZip = async () => {
-    if (files.length === 0) return;
+  // Export files as a single ZIP archive (supports selective file IDs or all)
+  const handleExportZip = async (targetFileIds = null) => {
+    const filesToExport = targetFileIds && targetFileIds.length > 0
+      ? files.filter(f => targetFileIds.includes(f.id))
+      : files;
+
+    if (filesToExport.length === 0) return;
 
     const zip = new JSZip();
 
-    files.forEach(fileObj => {
+    filesToExport.forEach(fileObj => {
       const srtContent = generateSRT(fileObj.subtitles, true);
       // Clean filename for Zip structure
       const cleanName = fileObj.name.replace(/ \/ /g, '_').replace(/[/\\?%*:|"<>]/g, '_');
@@ -664,7 +692,7 @@ export default function App() {
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `bo_phim_srt_tu_tien_${Date.now()}.zip`;
+    a.download = `bo_phim_srt_${filesToExport.length}tap_${Date.now()}.zip`;
     a.click();
     URL.revokeObjectURL(url);
   };
@@ -674,12 +702,16 @@ export default function App() {
     setFiles(prev => prev.map(f => f.id === fileId ? { ...f, fileHandle } : f));
   };
 
-  // Batch Save All Files Directly back to Disk
-  const handleBatchSaveDirectAll = async () => {
-    if (files.length === 0) return;
+  // Batch Save Files Directly back to Disk (supports selective file IDs or all)
+  const handleBatchSaveDirectAll = async (targetFileIds = null) => {
+    const filesToSave = targetFileIds && targetFileIds.length > 0
+      ? files.filter(f => targetFileIds.includes(f.id))
+      : files;
+
+    if (filesToSave.length === 0) return;
 
     let savedCount = 0;
-    for (let fileObj of files) {
+    for (let fileObj of filesToSave) {
       const srtContent = generateSRT(fileObj.subtitles, true);
 
       if (fileObj.fileHandle && fileObj.fileHandle.createWritable) {
@@ -722,9 +754,10 @@ export default function App() {
     }
 
     if (savedCount > 0) {
-      alert(`✅ ĐÃ LƯU TRỰC TIẾP THÀNH CÔNG HÀNG LOẠT ${savedCount} / ${files.length} FILE SRT VỀ ĐÚNG ĐƯỜNG DẪN GỐC TRÊN Ổ ĐĨA MÁY TÍNH!`);
+      alert(`✅ ĐÃ LƯU TRỰC TIẾP THÀNH CÔNG HÀNG LOẠT ${savedCount} / ${filesToSave.length} FILE SRT VỀ ĐÚNG ĐƯỜNG DẪN GỐC TRÊN Ổ ĐĨA MÁY TÍNH!`);
     }
   };
+
 
 
   const activeFile = files.find(f => f.id === activeFileId);

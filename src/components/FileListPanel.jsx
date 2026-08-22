@@ -1,5 +1,5 @@
 import React, { useRef, useState } from 'react';
-import { Files, FileText, FolderPlus, Archive, Trash2, Plus, Download, Sparkles, BookOpen, Zap, Search, ArrowUpDown, Filter, Eraser, CheckCircle2 } from 'lucide-react';
+import { Files, FileText, FolderPlus, Archive, Trash2, Plus, Download, Sparkles, BookOpen, Zap, Search, ArrowUpDown, Filter, Eraser, CheckCircle2, Check, CheckSquare, Square } from 'lucide-react';
 
 export default function FileListPanel({
   files,
@@ -31,10 +31,6 @@ export default function FileListPanel({
   extractedGlossaryTerms = [],
   onOpenScannedGlossary
 }) {
-
-
-
-
   const fileInputRef = useRef(null);
   const folderInputRef = useRef(null);
   const zipInputRef = useRef(null);
@@ -43,6 +39,9 @@ export default function FileListPanel({
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [sortOption, setSortOption] = useState('natural');
+
+  // File multi-selection state
+  const [selectedFileIds, setSelectedFileIds] = useState([]);
 
   // Count how many SubGoc files exist
   const subGocCount = files.filter(f => f.name.toLowerCase().includes('subgoc')).length;
@@ -76,6 +75,29 @@ export default function FileListPanel({
     return 0;
   });
 
+  // Selection handlers
+  const isAllFilteredFilesSelected = sortedFiles.length > 0 && sortedFiles.every(f => selectedFileIds.includes(f.id));
+  const someFilteredFilesSelected = sortedFiles.some(f => selectedFileIds.includes(f.id));
+
+  const handleSelectOnlyFilteredFiles = () => {
+    const sortedIdSet = new Set(sortedFiles.map(f => f.id));
+    setSelectedFileIds(prev => Array.from(new Set([...prev, ...sortedIdSet])));
+  };
+
+  const handleDeselectFilteredFiles = () => {
+    const sortedIdSet = new Set(sortedFiles.map(f => f.id));
+    setSelectedFileIds(prev => prev.filter(id => !sortedIdSet.has(id)));
+  };
+
+  const toggleSelectFile = (fileId, e) => {
+    e?.stopPropagation();
+    if (selectedFileIds.includes(fileId)) {
+      setSelectedFileIds(prev => prev.filter(id => id !== fileId));
+    } else {
+      setSelectedFileIds(prev => [...prev, fileId]);
+    }
+  };
+
   const handleBatchDeleteFiltered = () => {
     if (sortedFiles.length === 0) return;
     onRemoveFilteredFiles(sortedFiles.map(f => f.id));
@@ -85,6 +107,7 @@ export default function FileListPanel({
     if (sortedFiles.length === 0) return;
     onKeepOnlyFilteredFiles(sortedFiles.map(f => f.id));
   };
+
 
   return (
     <div className="file-list-panel card-panel">
@@ -187,7 +210,7 @@ export default function FileListPanel({
             <Search size={16} className="search-icon" />
             <input
               type="text"
-              placeholder="🔍 Gõ mã muốn giữ/xóa (VD: c9, c2, b2, SubGoc...)..."
+              placeholder="🔍 Gõ mã muốn giữ/xóa/chọn (VD: d1, c9, c2, SubGoc...)..."
               value={searchQuery}
               onChange={e => setSearchQuery(e.target.value)}
               className="input-field"
@@ -203,6 +226,28 @@ export default function FileListPanel({
           </div>
 
           <div className="filter-controls-group">
+            {/* 🎯 SELECT ALL Filtered Files Button */}
+            {sortedFiles.length > 0 && (
+              <button
+                className="btn btn-cyan btn-sm font-bold flex-center gap-1"
+                onClick={handleSelectOnlyFilteredFiles}
+                title={`Chọn toàn bộ ${sortedFiles.length} file đang hiển thị${searchQuery ? ` ("${searchQuery}")` : ''} để dịch hoặc thao tác hàng loạt`}
+              >
+                <Check size={14} />
+                <span>CHỌN TẤT CẢ {sortedFiles.length} FILE{searchQuery ? ` ("${searchQuery}")` : ''}</span>
+              </button>
+            )}
+
+            {someFilteredFilesSelected && (
+              <button
+                className="btn btn-secondary btn-sm text-muted"
+                onClick={handleDeselectFilteredFiles}
+                title="Bỏ chọn các file đang lọc"
+              >
+                Bỏ Chọn
+              </button>
+            )}
+
             {/* KEEP ONLY Filtered Files Button */}
             {searchQuery && sortedFiles.length > 0 && (
               <button
@@ -252,8 +297,22 @@ export default function FileListPanel({
               </select>
             </div>
 
-            <div className="filter-counter text-muted">
-              Đang hiện: <strong className="highlight-cyan">{sortedFiles.length}</strong> / {files.length} file
+            <div className="filter-counter text-muted flex-center gap-2">
+              <span>Đang hiện: <strong className="highlight-cyan">{sortedFiles.length}</strong> / {files.length} file</span>
+              {selectedFileIds.length > 0 && (
+                <span className="badge badge-done" style={{ padding: '3px 8px', fontSize: '0.8rem' }}>
+                  Đã chọn: <strong className="highlight-cyan font-bold">{selectedFileIds.length}</strong> file
+                </span>
+              )}
+              {selectedFileIds.length > 0 && (
+                <button
+                  className="btn btn-secondary btn-xs text-muted"
+                  onClick={() => setSelectedFileIds([])}
+                  title="Bỏ chọn toàn bộ file"
+                >
+                  Bỏ chọn hết
+                </button>
+              )}
             </div>
           </div>
         </div>
@@ -263,18 +322,29 @@ export default function FileListPanel({
       <div className="file-tabs-grid">
         {sortedFiles.map(file => {
           const isActive = file.id === activeFileId;
+          const isSelected = selectedFileIds.includes(file.id);
           const translatedCount = file.subtitles.filter(s => s.status === 'translated' || s.status === 'edited').length;
           const isDone = translatedCount === file.subtitles.length && file.subtitles.length > 0;
 
           return (
             <div
               key={file.id}
-              className={`file-tab-card ${isActive ? 'active' : ''} ${isDone ? 'done' : ''}`}
+              className={`file-tab-card ${isActive ? 'active' : ''} ${isDone ? 'done' : ''} ${isSelected ? 'selected-card' : ''}`}
               onClick={() => setActiveFileId(file.id)}
             >
               <div className="file-tab-header">
-                <FileText className={isActive ? 'text-cyan' : 'text-muted'} size={18} />
-                <span className="file-tab-name" title={file.name}>{file.name}</span>
+                <div className="flex-center gap-2" style={{ overflow: 'hidden', flex: 1 }}>
+                  <input
+                    type="checkbox"
+                    checked={isSelected}
+                    onChange={(e) => toggleSelectFile(file.id, e)}
+                    onClick={(e) => e.stopPropagation()}
+                    className="custom-checkbox file-tab-checkbox"
+                    title="Tích chọn file này để dịch / lưu / xuất hàng loạt"
+                  />
+                  <FileText className={isActive ? 'text-cyan' : 'text-muted'} size={18} style={{ flexShrink: 0 }} />
+                  <span className="file-tab-name" title={file.name}>{file.name}</span>
+                </div>
                 <button
                   className="btn-icon btn-close-file text-muted"
                   onClick={(e) => {
@@ -310,131 +380,140 @@ export default function FileListPanel({
       </div>
 
       {/* Batch Processing Controls Bar */}
-      {files.length > 0 && (
-        <div className="batch-actions-bar">
-          <div className="batch-title">
-            <Zap className="text-cyan" size={18} />
-            <span>Thao Tác Hàng Loạt Cho Bộ Phim ({files.length} file):</span>
-          </div>
+      {files.length > 0 && (() => {
+        const effectiveTargetIds = selectedFileIds.length > 0
+          ? selectedFileIds
+          : (searchQuery || statusFilter !== 'all' ? sortedFiles.map(f => f.id) : null);
+        const effectiveCount = effectiveTargetIds ? effectiveTargetIds.length : files.length;
+        const isSubset = Boolean(effectiveTargetIds && effectiveTargetIds.length < files.length);
+        const targetLabel = selectedFileIds.length > 0
+          ? `${selectedFileIds.length} File Đang Chọn`
+          : (searchQuery || statusFilter !== 'all' ? `${sortedFiles.length} File Đang Lọc ("${searchQuery}")` : `Tất Cả ${files.length} File`);
 
-          {/* 💡 Inline Custom AI Translation Prompt for Entire Series */}
-          <div className="prompt-inline-action-bar cyan mt-2 mb-2" style={{ width: '100%' }}>
-            <Sparkles size={15} className="text-cyan" />
-            <input
-              type="text"
-              className="prompt-inline-input"
-              placeholder="💡 Nhập prompt yêu cầu dịch AI cho cả bộ phim (VD: Dịch phong cách Ma Tu hắc ám, Main xưng Ta - gọi Ngươi, dịch hài hước bắt trend, dịch ngắn gọn...)..."
-              value={customPrompt || ''}
-              onChange={e => setCustomPrompt && setCustomPrompt(e.target.value)}
-              onKeyDown={e => e.key === 'Enter' && onBatchTranslateAI()}
-            />
-            {customPrompt && (
-              <button
-                type="button"
-                className="btn-icon text-muted"
-                onClick={() => setCustomPrompt && setCustomPrompt('')}
-                title="Xóa prompt dịch"
-                style={{ padding: '0 4px', fontSize: '0.8rem' }}
-              >
-                ✕
-              </button>
-            )}
-          </div>
+        return (
+          <div className="batch-actions-bar">
+            <div className="batch-title">
+              <Zap className="text-cyan" size={18} />
+              <span>Thao Tác Hàng Loạt Cho <strong className="highlight-cyan font-bold">{targetLabel}</strong>:</span>
+            </div>
 
-          <div className="batch-btn-group">
-
-            {setConcurrency && (
-              <div className="select-with-icon select-concurrency" title="Chọn số luồng AI dịch song song cùng lúc">
-                <Zap size={14} className="text-cyan" />
-                <select
-                  value={concurrency}
-                  onChange={e => setConcurrency(Number(e.target.value))}
-                  className="input-field select-field input-sm font-bold text-cyan"
-                  style={{ background: 'rgba(6, 182, 212, 0.12)', borderColor: 'rgba(6, 182, 212, 0.35)', minWidth: '130px' }}
+            {/* 💡 Inline Custom AI Translation Prompt for Entire Series */}
+            <div className="prompt-inline-action-bar cyan mt-2 mb-2" style={{ width: '100%' }}>
+              <Sparkles size={15} className="text-cyan" />
+              <input
+                type="text"
+                className="prompt-inline-input"
+                placeholder="💡 Nhập prompt yêu cầu dịch AI cho cả bộ phim (VD: Dịch phong cách Ma Tu hắc ám, Main xưng Ta - gọi Ngươi, dịch hài hước bắt trend, dịch ngắn gọn...)..."
+                value={customPrompt || ''}
+                onChange={e => setCustomPrompt && setCustomPrompt(e.target.value)}
+                onKeyDown={e => e.key === 'Enter' && onBatchTranslateAI(effectiveTargetIds)}
+              />
+              {customPrompt && (
+                <button
+                  type="button"
+                  className="btn-icon text-muted"
+                  onClick={() => setCustomPrompt && setCustomPrompt('')}
+                  title="Xóa prompt dịch"
+                  style={{ padding: '0 4px', fontSize: '0.8rem' }}
                 >
-                  <option value={1}>1 Luồng (Đơn luồng)</option>
-                  <option value={2}>2 Luồng (Song song 2x)</option>
-                  <option value={3}>3 Luồng (Song song 3x)</option>
-                  <option value={4}>⚡ 4 Luồng (Turbo 4x)</option>
-                  <option value={5}>5 Luồng (Song song 5x)</option>
-                  <option value={6}>🚀 6 Luồng (Ultra 6x)</option>
-                </select>
-              </div>
-            )}
+                  ✕
+                </button>
+              )}
+            </div>
 
-            <button
-              className="btn btn-purple btn-sm font-bold"
-              onClick={onBatchTranslateAI}
-              disabled={isBatchProcessing || isExtractingGlossary}
-              title="Dịch toàn bộ tất cả file SRT trong danh sách bằng AI"
-            >
-              <Sparkles size={16} /> Dịch AI Tất Cả {files.length} File ({concurrency} Luồng)
-            </button>
+            <div className="batch-btn-group">
 
-            {onExtractGlossary && (
+              {setConcurrency && (
+                <div className="select-with-icon select-concurrency" title="Chọn số luồng AI dịch song song cùng lúc">
+                  <Zap size={14} className="text-cyan" />
+                  <select
+                    value={concurrency}
+                    onChange={e => setConcurrency(Number(e.target.value))}
+                    className="input-field select-field input-sm font-bold text-cyan"
+                    style={{ background: 'rgba(6, 182, 212, 0.12)', borderColor: 'rgba(6, 182, 212, 0.35)', minWidth: '130px' }}
+                  >
+                    <option value={1}>1 Luồng (Đơn luồng)</option>
+                    <option value={2}>2 Luồng (Song song 2x)</option>
+                    <option value={3}>3 Luồng (Song song 3x)</option>
+                    <option value={4}>⚡ 4 Luồng (Turbo 4x)</option>
+                    <option value={5}>5 Luồng (Song song 5x)</option>
+                    <option value={6}>🚀 6 Luồng (Ultra 6x)</option>
+                  </select>
+                </div>
+              )}
+
               <button
-                className="btn btn-secondary btn-sm text-cyan font-bold"
-                onClick={onExtractGlossary}
+                className="btn btn-purple btn-sm font-bold"
+                onClick={() => onBatchTranslateAI(effectiveTargetIds)}
                 disabled={isBatchProcessing || isExtractingGlossary}
-                title="AI tự động quét toàn bộ các file trong bộ phim để phát hiện nhân vật, môn phái, thuật ngữ mới chưa có trong Từ Điển"
+                title={`Dịch ${targetLabel} bằng AI`}
               >
-                <Sparkles size={15} className={isExtractingGlossary ? 'spinner' : 'text-cyan'} />
-                <span>{isExtractingGlossary ? 'Đang Quét Thuật Ngữ...' : '🧠 AI Quét Thuật Ngữ Mới'}</span>
+                <Sparkles size={16} /> Dịch AI {targetLabel} ({concurrency} Luồng)
               </button>
-            )}
 
-            {onOpenScannedGlossary && (
+              {onExtractGlossary && (
+                <button
+                  className="btn btn-secondary btn-sm text-cyan font-bold"
+                  onClick={() => onExtractGlossary(effectiveTargetIds)}
+                  disabled={isBatchProcessing || isExtractingGlossary}
+                  title="AI tự động quét các file này để phát hiện nhân vật, môn phái, thuật ngữ mới chưa có trong Từ Điển"
+                >
+                  <Sparkles size={15} className={isExtractingGlossary ? 'spinner' : 'text-cyan'} />
+                  <span>{isExtractingGlossary ? 'Đang Quét Thuật Ngữ...' : `🧠 AI Quét Thuật Ngữ Mới (${effectiveCount} File)`}</span>
+                </button>
+              )}
+
+              {onOpenScannedGlossary && (
+                <button
+                  className={`btn btn-sm font-bold ${extractedGlossaryTerms && extractedGlossaryTerms.length > 0 ? 'btn-cyan btn-glow' : 'btn-secondary text-cyan'}`}
+                  onClick={onOpenScannedGlossary}
+                  title={`Mở danh sách ${extractedGlossaryTerms ? extractedGlossaryTerms.length : 0} thuật ngữ đã được AI quét từ bộ phim`}
+                >
+                  <BookOpen size={15} />
+                  <span>📖 Xem Thuật Ngữ Đã Quét ({extractedGlossaryTerms ? extractedGlossaryTerms.length : 0})</span>
+                </button>
+              )}
+
               <button
-                className={`btn btn-sm font-bold ${extractedGlossaryTerms && extractedGlossaryTerms.length > 0 ? 'btn-cyan btn-glow' : 'btn-secondary text-cyan'}`}
-                onClick={onOpenScannedGlossary}
-                title={`Mở danh sách ${extractedGlossaryTerms ? extractedGlossaryTerms.length : 0} thuật ngữ đã được AI quét từ bộ phim`}
+                className="btn btn-cyan btn-sm"
+                onClick={() => onBatchApplyGlossary(effectiveTargetIds)}
+                disabled={isBatchProcessing || isExtractingGlossary}
+                title={`Áp dụng từ điển Tu Tiên Hán Việt cho ${targetLabel}`}
               >
-                <BookOpen size={15} />
-                <span>📖 Xem Thuật Ngữ Đã Quét ({extractedGlossaryTerms ? extractedGlossaryTerms.length : 0})</span>
+                <BookOpen size={16} /> Dịch Từ Điển {isSubset ? `${effectiveCount} File` : 'Tất Cả File'}
               </button>
-            )}
 
+              <button
+                className="btn btn-secondary btn-sm"
+                onClick={() => onBatchApplyPronouns(effectiveTargetIds)}
+                disabled={isBatchProcessing}
+                title={`Áp dụng quy tắc xưng hô cho ${targetLabel}`}
+              >
+                <Zap size={16} /> Đổi Xưng Hô {isSubset ? `${effectiveCount} File` : 'Tất Cả File'}
+              </button>
 
+              <button
+                className="btn btn-green-glow btn-sm font-bold"
+                onClick={() => onBatchSaveDirectAll(effectiveTargetIds)}
+                disabled={isBatchProcessing}
+                title={`Ghi trực tiếp nội dung đã dịch đè thẳng lên ${targetLabel} trong thư mục gốc trên ổ đĩa máy tính`}
+              >
+                <CheckCircle2 size={16} /> 💾 Lưu Trực Tiếp {isSubset ? `${effectiveCount} File` : `Tất Cả ${files.length} File`} Về Ổ Đĩa
+              </button>
 
-            <button
-              className="btn btn-cyan btn-sm"
-              onClick={onBatchApplyGlossary}
-              disabled={isBatchProcessing || isExtractingGlossary}
-              title="Áp dụng từ điển Tu Tiên Hán Việt cho tất cả file"
-            >
-              <BookOpen size={16} /> Dịch Từ Điển Tất Cả File
-            </button>
+              <button
+                className="btn btn-green btn-sm"
+                onClick={() => onExportZip(effectiveTargetIds)}
+                title={`Đóng gói ${targetLabel} thành file ZIP để tải về`}
+              >
+                <Download size={16} /> Xuất {isSubset ? `${effectiveCount} File` : `Tất Cả File`} (.ZIP)
+              </button>
+            </div>
 
-
-            <button
-              className="btn btn-secondary btn-sm"
-              onClick={onBatchApplyPronouns}
-              disabled={isBatchProcessing}
-              title="Áp dụng quy tắc xưng hô cho tất cả file"
-            >
-              <Zap size={16} /> Đổi Xưng Hô Tất Cả File
-            </button>
-
-            <button
-              className="btn btn-green-glow btn-sm font-bold"
-              onClick={onBatchSaveDirectAll}
-              disabled={isBatchProcessing}
-              title="Ghi trực tiếp nội dung đã dịch đè thẳng lên tất cả file SRT nguyên bản trong các thư mục gốc trên ổ đĩa máy tính (Hế hẳn bảng hỏi Save As)"
-            >
-              <CheckCircle2 size={16} /> 💾 Lưu Trực Tiếp Tất Cả {files.length} File Về Ổ Đĩa
-            </button>
-
-            <button
-              className="btn btn-green btn-sm"
-              onClick={onExportZip}
-              title="Đóng gói tất cả file SRT đã dịch thành 1 file ZIP duy nhất để tải về"
-            >
-              <Download size={16} /> Xuất Tất Cả File (.ZIP)
-            </button>
           </div>
+        );
+      })()}
 
-        </div>
-      )}
 
       {batchProgressText && (
         <div className="progress-banner mt-3">
