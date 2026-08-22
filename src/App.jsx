@@ -99,7 +99,14 @@ export default function App() {
   // Auto-Glossary Extraction State (Feature 1)
   const [isExtractingGlossary, setIsExtractingGlossary] = useState(false);
   const [isGlossaryModalOpen, setIsGlossaryModalOpen] = useState(false);
-  const [extractedGlossaryTerms, setExtractedGlossaryTerms] = useState([]);
+  const [extractedGlossaryTerms, setExtractedGlossaryTerms] = useState(() => {
+    try {
+      const saved = localStorage.getItem('tutien_extracted_glossary');
+      return saved ? JSON.parse(saved) : [];
+    } catch (e) {
+      return [];
+    }
+  });
 
   // Batch progress state
   const [isBatchProcessing, setIsBatchProcessing] = useState(false);
@@ -111,6 +118,10 @@ export default function App() {
   }, [glossary]);
 
   useEffect(() => {
+    localStorage.setItem('tutien_extracted_glossary', JSON.stringify(extractedGlossaryTerms));
+  }, [extractedGlossaryTerms]);
+
+  useEffect(() => {
     localStorage.setItem('tutien_ai_provider', aiProvider);
     localStorage.setItem('tutien_orimise_key', orimiseKey);
     localStorage.setItem('tutien_orimise_url', orimiseBaseUrl);
@@ -119,6 +130,12 @@ export default function App() {
     localStorage.setItem('tutien_concurrency', concurrency);
     localStorage.setItem('tutien_custom_prompt', customPrompt);
   }, [aiProvider, orimiseKey, orimiseBaseUrl, geminiKey, aiModel, concurrency, customPrompt]);
+
+  const handleClearScannedTerms = () => {
+    setExtractedGlossaryTerms([]);
+    localStorage.removeItem('tutien_extracted_glossary');
+  };
+
 
   // 🧠 Auto-Glossary Extraction Handler
   const handleExtractGlossary = async (specificSubtitles = null) => {
@@ -756,6 +773,8 @@ export default function App() {
               setCustomPrompt={setCustomPrompt}
               onExtractGlossary={() => handleExtractGlossary()}
               isExtractingGlossary={isExtractingGlossary}
+              extractedGlossaryTerms={extractedGlossaryTerms}
+              onOpenScannedGlossary={() => setIsGlossaryModalOpen(true)}
             />
 
             {/* Subtitle Line Editor for Active File */}
@@ -787,6 +806,8 @@ export default function App() {
               setShowDiffLog={setShowDiffLog}
               onExtractGlossary={() => handleExtractGlossary(activeFile?.subtitles)}
               isExtractingGlossary={isExtractingGlossary}
+              extractedGlossaryTerms={extractedGlossaryTerms}
+              onOpenScannedGlossary={() => setIsGlossaryModalOpen(true)}
             />
 
           </>
@@ -800,6 +821,8 @@ export default function App() {
             setGlossary={setGlossary}
             onExtractGlossary={() => handleExtractGlossary()}
             isExtractingGlossary={isExtractingGlossary}
+            extractedGlossaryTerms={extractedGlossaryTerms}
+            onOpenScannedGlossary={() => setIsGlossaryModalOpen(true)}
           />
         )}
 
@@ -852,8 +875,11 @@ export default function App() {
         isOpen={isGlossaryModalOpen}
         onClose={() => setIsGlossaryModalOpen(false)}
         extractedTerms={extractedGlossaryTerms}
+        existingGlossary={glossary}
         onAddTermsToGlossary={handleAddTermsToGlossary}
+        onClearScannedTerms={handleClearScannedTerms}
       />
+
 
       <footer className="app-footer">
         <p>Tu Tiên SRT Subtitle Pro &bull; Quản Lý & Dịch Hàng Loạt Bộ Phim SRT &bull; Orimise API ({aiModel})</p>

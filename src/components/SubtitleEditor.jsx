@@ -34,8 +34,11 @@ export default function SubtitleEditor({
   showDiffLog,
   setShowDiffLog,
   onExtractGlossary,
-  isExtractingGlossary
+  isExtractingGlossary,
+  extractedGlossaryTerms = [],
+  onOpenScannedGlossary
 }) {
+
 
 
 
@@ -491,6 +494,17 @@ export default function SubtitleEditor({
                 </button>
               )}
 
+              {extractedGlossaryTerms && extractedGlossaryTerms.length > 0 && onOpenScannedGlossary && (
+                <button
+                  className="btn btn-cyan btn-sm font-bold btn-glow"
+                  onClick={onOpenScannedGlossary}
+                  title={`Xem danh sách ${extractedGlossaryTerms.length} thuật ngữ đã quét`}
+                >
+                  <BookOpen size={15} />
+                  <span>📖 Xem Từ Đã Quét ({extractedGlossaryTerms.length})</span>
+                </button>
+              )}
+
               <button
                 className="btn btn-cyan btn-sm"
                 onClick={handleApplyGlossaryBatch}
@@ -498,6 +512,7 @@ export default function SubtitleEditor({
               >
                 <BookOpen size={16} /> Dịch Từ Điển File Hiện Tại ({selectedIds.length > 0 ? selectedIds.length : 'Tất cả'})
               </button>
+
 
 
               {setConcurrency && (

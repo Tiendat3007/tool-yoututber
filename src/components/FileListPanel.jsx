@@ -27,8 +27,11 @@ export default function FileListPanel({
   customPrompt,
   setCustomPrompt,
   onExtractGlossary,
-  isExtractingGlossary
+  isExtractingGlossary,
+  extractedGlossaryTerms = [],
+  onOpenScannedGlossary
 }) {
+
 
 
 
@@ -379,6 +382,18 @@ export default function FileListPanel({
                 <span>{isExtractingGlossary ? 'Đang Quét Thuật Ngữ...' : '🧠 AI Quét Thuật Ngữ Mới'}</span>
               </button>
             )}
+
+            {extractedGlossaryTerms && extractedGlossaryTerms.length > 0 && onOpenScannedGlossary && (
+              <button
+                className="btn btn-cyan btn-sm font-bold btn-glow"
+                onClick={onOpenScannedGlossary}
+                title={`Mở danh sách ${extractedGlossaryTerms.length} thuật ngữ đã được AI quét từ bộ phim`}
+              >
+                <BookOpen size={15} />
+                <span>📖 Xem Thuật Ngữ Đã Quét ({extractedGlossaryTerms.length})</span>
+              </button>
+            )}
+
 
             <button
               className="btn btn-cyan btn-sm"

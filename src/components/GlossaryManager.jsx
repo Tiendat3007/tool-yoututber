@@ -6,8 +6,11 @@ export default function GlossaryManager({
   glossary,
   setGlossary,
   onExtractGlossary,
-  isExtractingGlossary
+  isExtractingGlossary,
+  extractedGlossaryTerms = [],
+  onOpenScannedGlossary
 }) {
+
 
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('all');
@@ -172,6 +175,17 @@ export default function GlossaryManager({
             </button>
           )}
 
+          {extractedGlossaryTerms && extractedGlossaryTerms.length > 0 && onOpenScannedGlossary && (
+            <button
+              className="btn btn-purple-glow btn-sm font-bold flex-center gap-1"
+              onClick={onOpenScannedGlossary}
+              title={`Mở danh sách ${extractedGlossaryTerms.length} thuật ngữ đã quét từ bộ phim`}
+            >
+              <BookOpen size={15} />
+              <span>📖 Xem Thuật Ngữ Đã Quét ({extractedGlossaryTerms.length})</span>
+            </button>
+          )}
+
           <button className="btn btn-secondary btn-sm" onClick={resetToDefault}>
             <RefreshCw size={15} /> Khôi Phục Mặc Định ({DEFAULT_GLOSSARY.length} Từ)
           </button>
@@ -185,6 +199,29 @@ export default function GlossaryManager({
         </div>
 
       </div>
+
+      {/* 🧠 Scanned Terms Persistent Banner */}
+      {extractedGlossaryTerms && extractedGlossaryTerms.length > 0 && onOpenScannedGlossary && (
+        <div
+          className="scanned-terms-banner card-panel flex-between flex-wrap gap-2 mb-3"
+          style={{ background: 'rgba(6, 182, 212, 0.08)', borderColor: 'rgba(6, 182, 212, 0.35)', padding: '10px 14px' }}
+        >
+          <div className="flex-center gap-2">
+            <Sparkles size={18} className="text-cyan pulse" />
+            <div>
+              <span className="font-bold text-cyan">Đang lưu giữ {extractedGlossaryTerms.length} thuật ngữ đã quét từ phim: </span>
+              <span className="text-xs text-muted">Bạn có thể xem lại, chỉnh sửa hoặc nạp bổ sung vào từ điển bất cứ lúc nào.</span>
+            </div>
+          </div>
+          <button
+            className="btn btn-cyan btn-sm font-bold flex-center gap-1"
+            onClick={onOpenScannedGlossary}
+          >
+            <BookOpen size={14} /> Mở Bảng Thuật Ngữ Đã Quét
+          </button>
+        </div>
+      )}
+
 
       {/* Add New Term Form */}
       <form onSubmit={handleAddTerm} className="add-term-form">
