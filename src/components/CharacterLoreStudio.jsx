@@ -2,7 +2,7 @@ import React, { useState, useRef } from 'react';
 import { 
   Users, Sparkles, Plus, Download, Copy, Check, Trash2, Edit3, Film, 
   Layers, Clock, Shield, Search, ChevronRight, Video, ArrowRight, BookOpen, AlertCircle, UploadCloud,
-  Eye, Camera, Play, CheckCircle2
+  Eye, Camera, Play, CheckCircle2, Zap
 } from 'lucide-react';
 import { 
   extractCharactersWithAI, 
@@ -17,6 +17,7 @@ import {
   extractFramesFromVideo,
   scanVideoFramesWithVisionAI
 } from '../utils/characterExtractor';
+
 
 
 
@@ -301,11 +302,10 @@ export default function CharacterLoreStudio({
     setTimeout(() => setScanProgress(''), 3000);
   };
 
-
-
   // Vision Scanner States
   const [visionVideoFile, setVisionVideoFile] = useState(null);
   const [visionIntervalSec, setVisionIntervalSec] = useState(3);
+  const [visionConcurrency, setVisionConcurrency] = useState(6); // 6 parallel threads by default
   const [visionFlipHorizontal, setVisionFlipHorizontal] = useState(true); // Default true for mirrored/flipped re-up videos
   const [isVisionScanning, setIsVisionScanning] = useState(false);
   const [visionProgress, setVisionProgress] = useState(null);
@@ -347,14 +347,12 @@ export default function CharacterLoreStudio({
         }
       });
 
-
       if (frames.length === 0) {
         throw new Error('Không trích xuất được khung hình nào từ video.');
       }
 
-
-      // 2. Scan with Vision AI (Gemini Vision / Orimise Vision)
-      setVisionProgress({ phase: 'ai_scanning', percent: 0, message: `Bắt đầu gửi ${frames.length} khung hình sang AI Vision soi bảng tên chữ Hán...` });
+      // 2. Scan with Multi-threaded Vision AI (Runs 6-10 parallel streams)
+      setVisionProgress({ phase: 'ai_scanning', percent: 0, message: `Bắt đầu khởi chạy ${visionConcurrency} luồng AI Vision song song...` });
 
       const detected = await scanVideoFramesWithVisionAI({
         frames,
@@ -364,17 +362,19 @@ export default function CharacterLoreStudio({
         baseUrl: orimiseBaseUrl,
         model: aiModel || 'gemini-2.5-flash',
         batchSize: 4,
+        concurrency: Number(visionConcurrency) || 6,
         onProgress: (p) => {
           setVisionProgress({
             phase: 'ai_scanning',
             percent: p.percent,
             message: p.message
           });
-          if (frames[p.current - 1]) {
-            setLiveCurrentFrame(frames[p.current - 1].base64Full);
+          if (p.currentFrame) {
+            setLiveCurrentFrame(p.currentFrame);
           }
         }
       });
+
 
       if (detected.length === 0) {
         alert('AI đã quét các khung hình nhưng không phát hiện bảng tên nhân vật nào. Bạn có thể chọn khoảng cách quét dày hơn (VD: 5 giây) để quét chi tiết hơn.');
@@ -865,8 +865,25 @@ export default function CharacterLoreStudio({
 
                   <div className="flex-center gap-1 text-sm text-green font-bold" style={{ background: 'rgba(16, 185, 129, 0.1)', padding: '6px 12px', borderRadius: '6px', border: '1px solid rgba(16, 185, 129, 0.2)' }}>
                     <Layers size={15} />
-                    <span>Quét Toàn Bộ 100% Video (Không Giới Hạn)</span>
+                    <span>Quét Toàn Bộ 100% Video</span>
                   </div>
+
+                  <div className="flex-center gap-1 text-sm font-bold" style={{ background: 'rgba(234, 179, 8, 0.1)', padding: '6px 12px', borderRadius: '6px', border: '1px solid rgba(234, 179, 8, 0.3)' }}>
+                    <Zap size={15} className="text-yellow" />
+                    <span>Đa Luồng AI:</span>
+                    <select
+                      value={visionConcurrency}
+                      onChange={(e) => setVisionConcurrency(Number(e.target.value))}
+                      className="input-field select-field input-xs font-bold"
+                      style={{ color: '#eab308', background: 'rgba(0,0,0,0.5)', width: 'auto' }}
+                    >
+                      <option value={3}>3 Luồng (Tiêu chuẩn)</option>
+                      <option value={6}>6 Luồng (Khuyên Dùng - Siêu Nhanh ⚡)</option>
+                      <option value={10}>10 Luồng (Cực Nhanh 🚀)</option>
+                      <option value={15}>15 Luồng (Tối Đa)</option>
+                    </select>
+                  </div>
+
 
 
                   <label 

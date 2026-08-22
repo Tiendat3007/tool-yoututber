@@ -131,7 +131,7 @@ export async function extractFramesFromVideo(videoFile, {
 }
 
 
-// Scan video frames using Gemini Vision or Orimise Vision in small batches
+// Scan video frames using Gemini Vision or Orimise Vision with Multi-threaded Concurrency
 export async function scanVideoFramesWithVisionAI({
   frames = [],
   videoFileName = 'video.mp4',
@@ -140,6 +140,7 @@ export async function scanVideoFramesWithVisionAI({
   baseUrl = 'https://api.orimise.com/v1',
   model = 'gemini-2.5-flash',
   batchSize = 4,
+  concurrency = 5,
   onProgress = () => {}
 }) {
   if (!frames || frames.length === 0) return [];
@@ -147,23 +148,23 @@ export async function scanVideoFramesWithVisionAI({
     throw new Error(`Vui lòng nhập ${aiProvider === 'orimise' ? 'Orimise' : 'Google Gemini'} API Key trong Cấu Hình AI!`);
   }
 
+  // Split frames into batches of 4
+  const batches = [];
+  for (let i = 0; i < frames.length; i += batchSize) {
+    batches.push({
+      index: batches.length + 1,
+      frames: frames.slice(i, i + batchSize)
+    });
+  }
+
   const allDetectedCharacters = [];
   const seenNames = new Set();
+  let completedBatches = 0;
 
-  for (let i = 0; i < frames.length; i += batchSize) {
-    const batch = frames.slice(i, i + batchSize);
+  // Worker task to process 1 batch
+  const processBatch = async (batchItem) => {
+    const batch = batchItem.frames;
     const batchInfo = batch.map((f, idx) => `[Ảnh ${idx + 1} lúc ${f.timestampFormatted}]`).join(', ');
-
-    if (onProgress) {
-      onProgress({
-        phase: 'ai_scanning',
-        current: Math.min(i + batchSize, frames.length),
-        total: frames.length,
-        percent: Math.round((Math.min(i + batchSize, frames.length) / frames.length) * 100),
-        message: `AI Vision đang soi bảng tên chữ Hán tại các mốc ${batchInfo}...`
-      });
-    }
-
     const userPromptText = `${VISION_CHARACTER_PROMPT}\n\nDưới đây là ${batch.length} khung hình chụp từ video: ${batchInfo}. Hãy kiểm tra xem có bảng tên nhân vật nào xuất hiện không!`;
 
     let rawResult = '';
@@ -254,9 +255,10 @@ export async function scanVideoFramesWithVisionAI({
               const actualTimestamp = char.timestamp || matchedFrame.timestampFormatted;
 
               allDetectedCharacters.push({
-                id: `char_vision_${Date.now()}_${allDetectedCharacters.length}`,
+                id: `char_vision_${Date.now()}_${allDetectedCharacters.length}_${Math.random().toString(36).substring(2, 6)}`,
                 name: char.name || 'Nhân vật',
                 originalName: char.originalName || '',
+                type: char.type || 'character',
                 role: char.role || 'Chưa rõ',
                 sect: char.sect || 'Vô Môn Phái',
                 realm: char.realm || 'Chưa rõ',
@@ -264,7 +266,7 @@ export async function scanVideoFramesWithVisionAI({
                 firstTimestamp: actualTimestamp,
                 firstEndTimestamp: msToSrtTime(srtTimeToMs(actualTimestamp) + 5000),
                 thumbnail: matchedFrame.base64Full,
-                introTag: char.introTag || `【 NHÂN VẬT: ${char.name.toUpperCase()} | ${char.sect || 'VÔ MÔN PHÁI'} | ${char.role || ''} 】`,
+                introTag: char.introTag || `【 ${char.type === 'weapon' ? 'THẦN BINH' : 'NHÂN VẬT'}: ${char.name.toUpperCase()} | ${char.sect || 'VÔ MÔN PHÁI'} | ${char.role || ''} 】`,
                 source: 'vision_ocr',
                 enabled: true
               });
@@ -273,12 +275,46 @@ export async function scanVideoFramesWithVisionAI({
         }
       }
     } catch (err) {
-      console.warn("Lỗi khi phân tích batch frame vision:", err);
+      console.warn(`Lỗi khi phân tích batch ${batchItem.index}:`, err);
+    } finally {
+      completedBatches++;
+      if (onProgress) {
+        const processedFrames = Math.min(completedBatches * batchSize, frames.length);
+        const percent = Math.round((completedBatches / batches.length) * 100);
+        onProgress({
+          phase: 'ai_scanning',
+          current: processedFrames,
+          total: frames.length,
+          completedBatches,
+          totalBatches: batches.length,
+          percent,
+          currentFrame: batch[0]?.base64Full,
+          message: `⚡ Đang chạy song song ${concurrency} luồng AI Vision: Đã xong ${completedBatches}/${batches.length} nhóm (${processedFrames}/${frames.length} frames)...`
+        });
+      }
     }
-  }
+  };
+
+  // Multi-threaded worker pool execution
+  const effectiveConcurrency = Math.min(concurrency || 5, batches.length);
+  const queue = [...batches];
+  const workers = Array.from({ length: effectiveConcurrency }, async () => {
+    while (queue.length > 0) {
+      const nextBatch = queue.shift();
+      if (nextBatch) {
+        await processBatch(nextBatch);
+      }
+    }
+  });
+
+  await Promise.all(workers);
+
+  // Sort characters chronologically by timestamp
+  allDetectedCharacters.sort((a, b) => srtTimeToMs(a.firstTimestamp) - srtTimeToMs(b.firstTimestamp));
 
   return allDetectedCharacters;
 }
+
 
 // Default Character Lore System Prompt for Xianxia/Anime (SRT Text Fallback)
 export const CHARACTER_EXTRACTION_PROMPT = `
