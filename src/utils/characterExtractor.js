@@ -184,59 +184,97 @@ export function srtTimeToMs(srtTime) {
   return (hours * 3600 + minutes * 60 + seconds) * 1000 + milliseconds;
 }
 
-// Generate Separate SRT file for Character Intro Tags
+// Find accurate cumulative offset for a character across episodes
+export function findFileOffset(char, files = [], fileOffsets = {}) {
+  // 1. Direct File ID match
+  if (char.firstFileId && fileOffsets[char.firstFileId] !== undefined) {
+    return fileOffsets[char.firstFileId];
+  }
+
+  // 2. By File Name match
+  if (char.firstFileName) {
+    const cleanCharFile = char.firstFileName.split(/[/\\]/).pop().replace(/\.[^/.]+$/, '').trim().toLowerCase();
+    for (const file of files) {
+      const cleanFile = file.name.split(/[/\\]/).pop().replace(/\.[^/.]+$/, '').trim().toLowerCase();
+      if (cleanFile === cleanCharFile || cleanFile.includes(cleanCharFile) || cleanCharFile.includes(cleanFile)) {
+        return fileOffsets[file.id] || 0;
+      }
+    }
+
+    // 3. Numeric Episode matching (e.g., 'd7_02' or '02' or 'ep02')
+    const charNums = cleanCharFile.match(/\d+/g);
+    if (charNums && charNums.length > 0) {
+      const charKey = charNums.join('_');
+      for (const file of files) {
+        const cleanFile = file.name.split(/[/\\]/).pop().replace(/\.[^/.]+$/, '').trim().toLowerCase();
+        const fileNums = cleanFile.match(/\d+/g);
+        if (fileNums && fileNums.join('_') === charKey) {
+          return fileOffsets[file.id] || 0;
+        }
+      }
+    }
+  }
+
+  return 0;
+}
+
+// Compute File Offsets Map
+export function computeFileOffsets(files = [], fileDurations = {}, gapSeconds = 0) {
+  let cumulativeOffsetMs = 0;
+  const fileOffsets = {};
+
+  files.forEach(file => {
+    fileOffsets[file.id] = cumulativeOffsetMs;
+    let durationMs = 0;
+    if (fileDurations[file.id]) {
+      durationMs = fileDurations[file.id] * 1000;
+    } else if (file.subtitles && file.subtitles.length > 0) {
+      const lastSub = file.subtitles[file.subtitles.length - 1];
+      durationMs = srtTimeToMs(lastSub.endTime);
+    }
+    cumulativeOffsetMs += durationMs + (gapSeconds * 1000);
+  });
+
+  return fileOffsets;
+}
+
+// Generate Separate SRT file for Character Intro Tags (Strictly Sorted Chronologically from Start to End)
 export function generateCharacterIntroSRT(characters, files, isFullMovie = false, fileDurations = {}, gapSeconds = 0) {
   const activeChars = characters.filter(c => c.enabled !== false);
   if (activeChars.length === 0) return '';
 
+  const fileOffsets = isFullMovie ? computeFileOffsets(files, fileDurations, gapSeconds) : {};
+
+  // Build tag items with exact start and end millisecond timestamps
+  const tagItems = activeChars.map(char => {
+    const fileOffset = isFullMovie ? findFileOffset(char, files, fileOffsets) : 0;
+    const charLocalStartMs = srtTimeToMs(char.firstTimestamp);
+    const startMs = fileOffset + charLocalStartMs;
+    const endMs = startMs + 5000; // 5s display duration
+    const text = char.introTag || `【 NHÂN VẬT: ${char.name.toUpperCase()} | ${char.sect} | ${char.realm} 】`;
+
+    return {
+      char,
+      startMs,
+      endMs,
+      text
+    };
+  });
+
+  // ⚡ CRITICAL: SORT STRICTLY CHRONOLOGICALLY BY START TIME (FROM BEGINNING TO END)
+  tagItems.sort((a, b) => a.startMs - b.startMs);
+
   let srtLines = [];
-  let counter = 1;
-
-  if (!isFullMovie) {
-    // Generate per file (Local Episode Timestamps)
-    activeChars.forEach(char => {
-      const startTime = char.firstTimestamp || '00:00:05,000';
-      const endTime = char.firstEndTimestamp || msToSrtTime(srtTimeToMs(startTime) + 5000); // 5s duration
-      const text = char.introTag || `【 NHÂN VẬT: ${char.name.toUpperCase()} | ${char.sect} | ${char.realm} 】`;
-
-      srtLines.push(`${counter++}\n${startTime} --> ${endTime}\n${text}\n`);
-    });
-  } else {
-    // Generate for Full Stitched Long Movie (Exact MP4 Video Timeline)
-    let cumulativeOffsetMs = 0;
-    const fileOffsets = {};
-
-    files.forEach(file => {
-      fileOffsets[file.id] = cumulativeOffsetMs;
-      // Get exact duration from MP4 video file, user input, or last sub endTime
-      let durationMs = 0;
-      if (fileDurations[file.id]) {
-        durationMs = fileDurations[file.id] * 1000;
-      } else if (file.subtitles.length > 0) {
-        const lastSub = file.subtitles[file.subtitles.length - 1];
-        durationMs = srtTimeToMs(lastSub.endTime);
-      }
-      cumulativeOffsetMs += durationMs + (gapSeconds * 1000);
-    });
-
-    activeChars.forEach(char => {
-      const fileOffset = fileOffsets[char.firstFileId] || 0;
-      const charLocalStartMs = srtTimeToMs(char.firstTimestamp);
-      const fullMovieStartMs = fileOffset + charLocalStartMs;
-      const fullMovieEndMs = fullMovieStartMs + 5000; // 5s display duration
-
-      const startTime = msToSrtTime(fullMovieStartMs);
-      const endTime = msToSrtTime(fullMovieEndMs);
-      const text = char.introTag || `【 NHÂN VẬT: ${char.name.toUpperCase()} | ${char.sect} | ${char.realm} 】`;
-
-      srtLines.push(`${counter++}\n${startTime} --> ${endTime}\n${text}\n`);
-    });
-  }
+  tagItems.forEach((item, index) => {
+    const startTime = msToSrtTime(item.startMs);
+    const endTime = msToSrtTime(item.endMs);
+    srtLines.push(`${index + 1}\n${startTime} --> ${endTime}\n${item.text}\n`);
+  });
 
   return srtLines.join('\n');
 }
 
-// Generate Beautiful Advanced ASS Subtitle file (Top-Center Glowing Yellow Ancient Calligraphy Style for CapCut/Premiere)
+// Generate Beautiful Advanced ASS Subtitle file (Top-Center Glowing Yellow Ancient Calligraphy Style, Strictly Sorted)
 export function generateCharacterIntroASS(characters, files, isFullMovie = false, fileDurations = {}, gapSeconds = 0) {
   const activeChars = characters.filter(c => c.enabled !== false);
   if (activeChars.length === 0) return '';
@@ -267,44 +305,35 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
     return `${main}.${centis}`;
   };
 
+  const fileOffsets = isFullMovie ? computeFileOffsets(files, fileDurations, gapSeconds) : {};
+
+  // Build tag items with exact start and end millisecond timestamps
+  const tagItems = activeChars.map(char => {
+    const fileOffset = isFullMovie ? findFileOffset(char, files, fileOffsets) : 0;
+    const charLocalStartMs = srtTimeToMs(char.firstTimestamp);
+    const startMs = fileOffset + charLocalStartMs;
+    const endMs = startMs + 5000;
+    const text = char.introTag || `【 NHÂN VẬT: ${char.name.toUpperCase()} | ${char.sect} | ${char.realm} 】`;
+
+    return {
+      char,
+      startMs,
+      endMs,
+      text
+    };
+  });
+
+  // ⚡ CRITICAL: SORT STRICTLY CHRONOLOGICALLY
+  tagItems.sort((a, b) => a.startMs - b.startMs);
+
   let dialogueLines = [];
-
-  if (!isFullMovie) {
-    activeChars.forEach(char => {
-      const startMs = srtTimeToMs(char.firstTimestamp);
-      const endMs = srtTimeToMs(char.firstEndTimestamp) || (startMs + 5000);
-      const tagText = char.introTag || `【 NHÂN VẬT: ${char.name.toUpperCase()} | ${char.sect} | ${char.realm} 】`;
-
-      dialogueLines.push(`Dialogue: 0,${toAssTime(startMs)},${toAssTime(endMs)},CharacterIntro,,0,0,0,,{\\fad(300,300)\\b1\\c&H00F2FE&\\3c&H000000&}${tagText}`);
-    });
-  } else {
-    let cumulativeOffsetMs = 0;
-    const fileOffsets = {};
-
-    files.forEach(file => {
-      fileOffsets[file.id] = cumulativeOffsetMs;
-      let durationMs = 0;
-      if (fileDurations[file.id]) {
-        durationMs = fileDurations[file.id] * 1000;
-      } else if (file.subtitles.length > 0) {
-        const lastSub = file.subtitles[file.subtitles.length - 1];
-        durationMs = srtTimeToMs(lastSub.endTime);
-      }
-      cumulativeOffsetMs += durationMs + (gapSeconds * 1000);
-    });
-
-    activeChars.forEach(char => {
-      const fileOffset = fileOffsets[char.firstFileId] || 0;
-      const startMs = fileOffset + srtTimeToMs(char.firstTimestamp);
-      const endMs = startMs + 5000;
-      const tagText = char.introTag || `【 NHÂN VẬT: ${char.name.toUpperCase()} | ${char.sect} | ${char.realm} 】`;
-
-      dialogueLines.push(`Dialogue: 0,${toAssTime(startMs)},${toAssTime(endMs)},CharacterIntro,,0,0,0,,{\\fad(300,300)\\b1\\c&H00F2FE&\\3c&H000000&}${tagText}`);
-    });
-  }
+  tagItems.forEach(item => {
+    dialogueLines.push(`Dialogue: 0,${toAssTime(item.startMs)},${toAssTime(item.endMs)},CharacterIntro,,0,0,0,,{\\fad(300,300)\\b1\\c&H00F2FE&\\3c&H000000&}${item.text}`);
+  });
 
   return assHeader + dialogueLines.join('\n');
 }
+
 
 
 // Stitch All File SRTs into 1 Seamless Full Movie SRT with Continuous Timeline

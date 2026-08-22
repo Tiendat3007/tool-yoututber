@@ -10,8 +10,11 @@ import {
   stitchAllFilesToFullMovieSRT,
   msToSrtTime,
   srtTimeToMs,
-  readMediaDuration
+  readMediaDuration,
+  findFileOffset,
+  computeFileOffsets
 } from '../utils/characterExtractor';
+
 
 // Extract clean file name without path, extension, symbols for fuzzy video matching
 function extractCleanName(filename) {
@@ -251,21 +254,19 @@ export default function CharacterLoreStudio({
     setEditingChar(null);
   };
 
+  const fileOffsets = computeFileOffsets(effectiveTargetFiles, fileDurations, gapSeconds);
+
   // Helper to compute cumulative full movie MP4 timestamp for each character
   const getFullMovieTimestamp = (char) => {
-    let cumulativeOffsetMs = 0;
-    for (const file of effectiveTargetFiles) {
-      if (file.id === char.firstFileId) {
-        const charLocalStartMs = srtTimeToMs(char.firstTimestamp);
-        return msToSrtTime(cumulativeOffsetMs + charLocalStartMs);
-      }
-      const fileSubs = file.subtitles || [];
-      const lastSub = fileSubs[fileSubs.length - 1];
-      const defaultSubDurationSec = lastSub ? Math.round(srtTimeToMs(lastSub.endTime) / 1000) : 0;
-      const actualDurationSec = fileDurations[file.id] || defaultSubDurationSec;
-      cumulativeOffsetMs += (actualDurationSec * 1000) + (gapSeconds * 1000);
-    }
-    return char.firstTimestamp;
+    const offset = findFileOffset(char, effectiveTargetFiles, fileOffsets);
+    const localMs = srtTimeToMs(char.firstTimestamp);
+    return msToSrtTime(offset + localMs);
+  };
+
+  const getFullMovieStartMs = (char) => {
+    const offset = findFileOffset(char, effectiveTargetFiles, fileOffsets);
+    const localMs = srtTimeToMs(char.firstTimestamp);
+    return offset + localMs;
   };
 
   // Export SRT Intro Tags (defaults to Full Movie MP4 continuous timeline)
@@ -298,16 +299,17 @@ export default function CharacterLoreStudio({
     downloadTextFile(fullSRT, `Full_Movie_${effectiveTargetFiles.length}Tap_TronBo_Continuous.srt`);
   };
 
-  // Copy Lore to Clipboard for YouTube Community/Description
+  // Copy Lore to Clipboard for YouTube Community/Description (Sorted chronologically)
   const handleCopyLoreForYouTube = () => {
     if (characters.length === 0) return;
-    let text = `📜 BẢNG HỒ SƠ NHÂN VẬT & CẢNH GIỚI TU TIÊN:\n\n`;
-    characters.forEach((c, idx) => {
+    const sortedActive = [...characters].filter(c => c.enabled !== false).sort((a, b) => getFullMovieStartMs(a) - getFullMovieStartMs(b));
+    let text = `📜 BẢNG HỒ SƠ NHÂN VẬT & CẢNH GIỚI TU TIÊN (THEO THỨ TỰ XUẤT HIỆN TRONG VIDEO):\n\n`;
+    sortedActive.forEach((c, idx) => {
       text += `${idx + 1}. 👤 ${c.name} ${c.originalName ? `(${c.originalName})` : ''}\n`;
       text += `   • Thân phận: ${c.role} | Môn phái: ${c.sect}\n`;
       text += `   • Cảnh giới: ${c.realm}\n`;
       if (c.quote) text += `   • Lời thoại: "${c.quote}"\n`;
-      text += `   • Xuất hiện tại: Tập ${c.firstFileName || '1'} (Mốc tập: ${c.firstTimestamp} | Mốc MP4: ${getFullMovieTimestamp(c)})\n\n`;
+      text += `   • Xuất hiện tại: Tập ${c.firstFileName || '1'} (Mốc MP4: ${getFullMovieTimestamp(c)})\n\n`;
     });
 
     navigator.clipboard.writeText(text);
@@ -327,17 +329,20 @@ export default function CharacterLoreStudio({
     URL.revokeObjectURL(url);
   };
 
-  // Filtered Characters
-  const filteredCharacters = characters.filter(c => {
-    const matchesSearch = c.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      (c.sect && c.sect.toLowerCase().includes(searchQuery.toLowerCase())) ||
-      (c.realm && c.realm.toLowerCase().includes(searchQuery.toLowerCase()));
-    
-    if (filterRole === 'all') return matchesSearch;
-    if (filterRole === 'main') return matchesSearch && (c.role.toLowerCase().includes('chính') || c.role.toLowerCase().includes('nữ chính'));
-    if (filterRole === 'antagonist') return matchesSearch && (c.role.toLowerCase().includes('phản') || c.role.toLowerCase().includes('ma'));
-    return matchesSearch;
-  });
+  // Filtered and Chronologically Sorted Characters
+  const filteredCharacters = characters
+    .filter(c => {
+      const matchesSearch = c.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        (c.sect && c.sect.toLowerCase().includes(searchQuery.toLowerCase())) ||
+        (c.realm && c.realm.toLowerCase().includes(searchQuery.toLowerCase()));
+      
+      if (filterRole === 'all') return matchesSearch;
+      if (filterRole === 'main') return matchesSearch && (c.role.toLowerCase().includes('chính') || c.role.toLowerCase().includes('nữ chính'));
+      if (filterRole === 'antagonist') return matchesSearch && (c.role.toLowerCase().includes('phản') || c.role.toLowerCase().includes('ma'));
+      return matchesSearch;
+    })
+    .sort((a, b) => getFullMovieStartMs(a) - getFullMovieStartMs(b));
+
 
   const targetLabel = selectedFileIds.length > 0
     ? `${selectedFileIds.length} Tập Đang Chọn`
