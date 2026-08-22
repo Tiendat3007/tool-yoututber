@@ -175,16 +175,17 @@ export default function GlossaryManager({
             </button>
           )}
 
-          {extractedGlossaryTerms && extractedGlossaryTerms.length > 0 && onOpenScannedGlossary && (
+          {onOpenScannedGlossary && (
             <button
-              className="btn btn-purple-glow btn-sm font-bold flex-center gap-1"
+              className={`btn btn-sm font-bold flex-center gap-1 ${extractedGlossaryTerms && extractedGlossaryTerms.length > 0 ? 'btn-purple-glow' : 'btn-secondary text-cyan'}`}
               onClick={onOpenScannedGlossary}
-              title={`Mở danh sách ${extractedGlossaryTerms.length} thuật ngữ đã quét từ bộ phim`}
+              title={`Mở danh sách ${extractedGlossaryTerms ? extractedGlossaryTerms.length : 0} thuật ngữ đã quét từ bộ phim`}
             >
               <BookOpen size={15} />
-              <span>📖 Xem Thuật Ngữ Đã Quét ({extractedGlossaryTerms.length})</span>
+              <span>📖 Xem Thuật Ngữ Đã Quét ({extractedGlossaryTerms ? extractedGlossaryTerms.length : 0})</span>
             </button>
           )}
+
 
           <button className="btn btn-secondary btn-sm" onClick={resetToDefault}>
             <RefreshCw size={15} /> Khôi Phục Mặc Định ({DEFAULT_GLOSSARY.length} Từ)

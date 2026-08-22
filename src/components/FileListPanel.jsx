@@ -383,16 +383,17 @@ export default function FileListPanel({
               </button>
             )}
 
-            {extractedGlossaryTerms && extractedGlossaryTerms.length > 0 && onOpenScannedGlossary && (
+            {onOpenScannedGlossary && (
               <button
-                className="btn btn-cyan btn-sm font-bold btn-glow"
+                className={`btn btn-sm font-bold ${extractedGlossaryTerms && extractedGlossaryTerms.length > 0 ? 'btn-cyan btn-glow' : 'btn-secondary text-cyan'}`}
                 onClick={onOpenScannedGlossary}
-                title={`Mở danh sách ${extractedGlossaryTerms.length} thuật ngữ đã được AI quét từ bộ phim`}
+                title={`Mở danh sách ${extractedGlossaryTerms ? extractedGlossaryTerms.length : 0} thuật ngữ đã được AI quét từ bộ phim`}
               >
                 <BookOpen size={15} />
-                <span>📖 Xem Thuật Ngữ Đã Quét ({extractedGlossaryTerms.length})</span>
+                <span>📖 Xem Thuật Ngữ Đã Quét ({extractedGlossaryTerms ? extractedGlossaryTerms.length : 0})</span>
               </button>
             )}
+
 
 
             <button

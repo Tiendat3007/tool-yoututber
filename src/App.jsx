@@ -178,12 +178,8 @@ export default function App() {
         model: aiModel
       });
 
-      if (terms.length === 0) {
-        alert('Tất cả các thuật ngữ quan trọng trong phim đã có sẵn trong Từ Điển Tu Tiên!');
-      } else {
-        setExtractedGlossaryTerms(terms);
-        setIsGlossaryModalOpen(true);
-      }
+      setExtractedGlossaryTerms(terms);
+      setIsGlossaryModalOpen(true);
       setBatchProgressText('');
     } catch (err) {
       alert(`Lỗi khi quét thuật ngữ: ${err.message}`);
@@ -192,6 +188,7 @@ export default function App() {
       setIsExtractingGlossary(false);
     }
   };
+
 
   const handleAddTermsToGlossary = (newTerms) => {
     if (!newTerms || newTerms.length === 0) return;
@@ -878,7 +875,10 @@ export default function App() {
         existingGlossary={glossary}
         onAddTermsToGlossary={handleAddTermsToGlossary}
         onClearScannedTerms={handleClearScannedTerms}
+        onTriggerExtractGlossary={() => handleExtractGlossary()}
+        isExtractingGlossary={isExtractingGlossary}
       />
+
 
 
       <footer className="app-footer">

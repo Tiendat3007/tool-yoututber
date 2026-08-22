@@ -139,22 +139,20 @@ ${textCorpus.substring(0, 8000)}`;
   }
 
   if (!Array.isArray(parsedList) || parsedList.length === 0) {
-    throw new Error('AI không tìm thấy thuật ngữ mới nào đặc biệt trong đoạn phụ đề này.');
+    throw new Error('AI không tìm thấy thuật ngữ mới nào đặc biệt trong đoạn phụ đề này. Hãy kiểm tra lại phụ đề gốc.');
   }
 
-  // Filter out terms that already exist in the glossary
-  const newTerms = parsedList.filter(item => {
-    if (!item.zh || !item.vi) return false;
-    const cleanZh = item.zh.trim().toLowerCase();
-    return !existingSet.has(cleanZh);
-  });
-
-  return newTerms.map((t, idx) => ({
-    id: `term_ai_${Date.now()}_${idx}`,
-    zh: t.zh.trim(),
-    vi: t.vi.trim(),
-    category: t.category || 'Danh xưng & Khác',
-    meaning: t.meaning || '',
-    enabled: true
-  }));
+  // Return all extracted terms (tagging whether they are in existing glossary)
+  return parsedList
+    .filter(item => item && item.zh && item.vi)
+    .map((t, idx) => ({
+      id: `term_ai_${Date.now()}_${idx}`,
+      zh: t.zh.trim(),
+      vi: t.vi.trim(),
+      category: t.category || 'Danh xưng & Khác',
+      meaning: t.meaning || '',
+      enabled: true,
+      isExisting: existingSet.has(t.zh.trim().toLowerCase())
+    }));
 }
+

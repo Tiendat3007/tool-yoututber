@@ -494,16 +494,17 @@ export default function SubtitleEditor({
                 </button>
               )}
 
-              {extractedGlossaryTerms && extractedGlossaryTerms.length > 0 && onOpenScannedGlossary && (
+              {onOpenScannedGlossary && (
                 <button
-                  className="btn btn-cyan btn-sm font-bold btn-glow"
+                  className={`btn btn-sm font-bold ${extractedGlossaryTerms && extractedGlossaryTerms.length > 0 ? 'btn-cyan btn-glow' : 'btn-secondary text-cyan'}`}
                   onClick={onOpenScannedGlossary}
-                  title={`Xem danh sách ${extractedGlossaryTerms.length} thuật ngữ đã quét`}
+                  title={`Xem danh sách ${extractedGlossaryTerms ? extractedGlossaryTerms.length : 0} thuật ngữ đã quét`}
                 >
                   <BookOpen size={15} />
-                  <span>📖 Xem Từ Đã Quét ({extractedGlossaryTerms.length})</span>
+                  <span>📖 Xem Từ Đã Quét ({extractedGlossaryTerms ? extractedGlossaryTerms.length : 0})</span>
                 </button>
               )}
+
 
               <button
                 className="btn btn-cyan btn-sm"
