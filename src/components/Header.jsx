@@ -1,5 +1,5 @@
 import React from 'react';
-import { Sparkles, BookOpen, Sliders, FileText, Key, Download, RefreshCw, Layers, Video } from 'lucide-react';
+import { Sparkles, BookOpen, Sliders, FileText, Key, Download, RefreshCw, Layers, Video, Users } from 'lucide-react';
 
 export default function Header({ activeTab, setActiveTab, subtitleCount, onOpenAISettings }) {
   return (
@@ -51,7 +51,13 @@ export default function Header({ activeTab, setActiveTab, subtitleCount, onOpenA
             <span>Youtuber Studio</span>
           </button>
 
-
+          <button
+            className={`nav-btn ${activeTab === 'lore' ? 'active' : ''}`}
+            onClick={() => setActiveTab('lore')}
+          >
+            <Users size={18} className="text-purple" />
+            <span>Hồ Sơ Nhân Vật & Chú Thích</span>
+          </button>
 
           <button
             className="nav-btn ai-settings-btn"
@@ -65,3 +71,4 @@ export default function Header({ activeTab, setActiveTab, subtitleCount, onOpenA
     </header>
   );
 }
+

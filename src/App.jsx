@@ -6,6 +6,7 @@ import SubtitleEditor from './components/SubtitleEditor';
 import GlossaryManager from './components/GlossaryManager';
 import PronounPresetSelector from './components/PronounPresetSelector';
 import YoutuberStudio from './components/YoutuberStudio';
+import CharacterLoreStudio from './components/CharacterLoreStudio';
 import AISettingsModal from './components/AISettingsModal';
 import AutoGlossaryModal from './components/AutoGlossaryModal';
 
@@ -109,6 +110,16 @@ export default function App() {
     }
   });
 
+  // Character Lore & Intro Tags state
+  const [characters, setCharacters] = useState(() => {
+    try {
+      const saved = localStorage.getItem('tutien_character_lore');
+      return saved ? JSON.parse(saved) : [];
+    } catch (e) {
+      return [];
+    }
+  });
+
   // Batch progress state
   const [isBatchProcessing, setIsBatchProcessing] = useState(false);
   const [batchProgressText, setBatchProgressText] = useState('');
@@ -121,6 +132,11 @@ export default function App() {
   useEffect(() => {
     localStorage.setItem('tutien_extracted_glossary', JSON.stringify(extractedGlossaryTerms));
   }, [extractedGlossaryTerms]);
+
+  useEffect(() => {
+    localStorage.setItem('tutien_character_lore', JSON.stringify(characters));
+  }, [characters]);
+
 
   useEffect(() => {
     localStorage.setItem('tutien_ai_provider', aiProvider);
@@ -1010,7 +1026,22 @@ export default function App() {
             aiModel={aiModel}
           />
         )}
+
+        {activeTab === 'lore' && (
+          <CharacterLoreStudio
+            files={files}
+            aiProvider={aiProvider}
+            orimiseKey={orimiseKey}
+            orimiseBaseUrl={orimiseBaseUrl}
+            geminiKey={geminiKey}
+            aiModel={aiModel}
+            characters={characters}
+            setCharacters={setCharacters}
+          />
+        )}
       </main>
+
+
 
 
       <AISettingsModal
