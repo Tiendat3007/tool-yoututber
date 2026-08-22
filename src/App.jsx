@@ -592,7 +592,6 @@ export default function App() {
 
   // Batch Save All Files Directly back to Disk
   const handleBatchSaveDirectAll = async () => {
-
     if (files.length === 0) return;
 
     let savedCount = 0;
@@ -601,6 +600,11 @@ export default function App() {
 
       if (fileObj.fileHandle && fileObj.fileHandle.createWritable) {
         try {
+          if (fileObj.fileHandle.queryPermission) {
+            const hasPerm = (await fileObj.fileHandle.queryPermission({ mode: 'readwrite' })) === 'granted' ||
+                            (fileObj.fileHandle.requestPermission && (await fileObj.fileHandle.requestPermission({ mode: 'readwrite' })) === 'granted');
+            if (!hasPerm) continue;
+          }
           const writable = await fileObj.fileHandle.createWritable();
           await writable.write(srtContent);
           await writable.close();
@@ -637,6 +641,7 @@ export default function App() {
       alert(`✅ ĐÃ LƯU TRỰC TIẾP THÀNH CÔNG HÀNG LOẠT ${savedCount} / ${files.length} FILE SRT VỀ ĐÚNG ĐƯỜNG DẪN GỐC TRÊN Ổ ĐĨA MÁY TÍNH!`);
     }
   };
+
 
   const activeFile = files.find(f => f.id === activeFileId);
   const totalSubtitlesCount = files.reduce((sum, f) => sum + f.subtitles.length, 0);

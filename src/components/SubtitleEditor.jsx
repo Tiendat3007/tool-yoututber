@@ -251,6 +251,14 @@ export default function SubtitleEditor({
     // 1. If fileHandle exists from Native File System API, write directly with ZERO Save As dialogs!
     if (activeFile.fileHandle && activeFile.fileHandle.createWritable) {
       try {
+        if (activeFile.fileHandle.queryPermission) {
+          const hasPerm = (await activeFile.fileHandle.queryPermission({ mode: 'readwrite' })) === 'granted' ||
+                          (activeFile.fileHandle.requestPermission && (await activeFile.fileHandle.requestPermission({ mode: 'readwrite' })) === 'granted');
+          if (!hasPerm) {
+            alert('Quyền ghi vào file bị từ chối.');
+            return;
+          }
+        }
         const writable = await activeFile.fileHandle.createWritable();
         await writable.write(srtContent);
         await writable.close();
@@ -260,6 +268,7 @@ export default function SubtitleEditor({
         console.warn("Direct file handle write failed/cancelled, fallback to Save Picker:", err);
       }
     }
+
 
     // 2. Fallback to Native Save File Picker & REMEMBER handle for subsequent 1-click silent saves
     if (window.showSaveFilePicker) {
