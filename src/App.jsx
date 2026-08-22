@@ -123,6 +123,8 @@ export default function App() {
   // Batch progress state
   const [isBatchProcessing, setIsBatchProcessing] = useState(false);
   const [batchProgressText, setBatchProgressText] = useState('');
+  const [isLoreScanning, setIsLoreScanning] = useState(false);
+
 
   // LocalStorage sync
   useEffect(() => {
@@ -918,82 +920,80 @@ export default function App() {
         setActiveTab={setActiveTab}
         subtitleCount={totalSubtitlesCount}
         onOpenAISettings={() => setIsAISettingsOpen(true)}
+        isBatchProcessing={isBatchProcessing}
+        isLoreScanning={isLoreScanning}
       />
 
       <main className="main-content">
-        {activeTab === 'editor' && (
-          <>
-            {/* Multi-file Project Manager Panel */}
-            <FileListPanel
-              files={files}
-              activeFileId={activeFileId}
-              setActiveFileId={setActiveFileId}
-              onOpenFilesNative={handleOpenFilesNative}
-              onOpenFolderNative={handleOpenFolderNative}
-              onAddFiles={handleAddFiles}
-              onAddFolder={handleAddFolder}
-              onAddZip={handleAddZip}
-              onRemoveFile={handleRemoveFile}
-              onRemoveFilteredFiles={handleRemoveFilteredFiles}
-              onKeepOnlyFilteredFiles={handleKeepOnlyFilteredFiles}
-              onRemoveSubGocFiles={handleRemoveSubGocFiles}
-              onRemoveAllFiles={handleRemoveAllFiles}
-              onBatchTranslateAI={handleBatchTranslateAI}
-              onBatchApplyGlossary={handleBatchApplyGlossary}
-              onBatchApplyPronouns={handleBatchApplyPronouns}
-              onBatchSaveDirectAll={handleBatchSaveDirectAll}
-              onExportZip={handleExportZip}
-              isBatchProcessing={isBatchProcessing}
-              batchProgressText={batchProgressText}
-              concurrency={concurrency}
-              setConcurrency={setConcurrency}
-              customPrompt={customPrompt}
-              setCustomPrompt={setCustomPrompt}
-              onExtractGlossary={() => handleExtractGlossary()}
-              isExtractingGlossary={isExtractingGlossary}
-              extractedGlossaryTerms={extractedGlossaryTerms}
-              onOpenScannedGlossary={() => setIsGlossaryModalOpen(true)}
-            />
+        {/* TAB 1: SUBTITLE EDITOR & PROJECT MANAGER */}
+        <div className="tab-pane-container" style={{ display: activeTab === 'editor' ? 'block' : 'none' }}>
+          <FileListPanel
+            files={files}
+            activeFileId={activeFileId}
+            setActiveFileId={setActiveFileId}
+            onOpenFilesNative={handleOpenFilesNative}
+            onOpenFolderNative={handleOpenFolderNative}
+            onAddFiles={handleAddFiles}
+            onAddFolder={handleAddFolder}
+            onAddZip={handleAddZip}
+            onRemoveFile={handleRemoveFile}
+            onRemoveFilteredFiles={handleRemoveFilteredFiles}
+            onKeepOnlyFilteredFiles={handleKeepOnlyFilteredFiles}
+            onRemoveSubGocFiles={handleRemoveSubGocFiles}
+            onRemoveAllFiles={handleRemoveAllFiles}
+            onBatchTranslateAI={handleBatchTranslateAI}
+            onBatchApplyGlossary={handleBatchApplyGlossary}
+            onBatchApplyPronouns={handleBatchApplyPronouns}
+            onBatchSaveDirectAll={handleBatchSaveDirectAll}
+            onExportZip={handleExportZip}
+            isBatchProcessing={isBatchProcessing}
+            batchProgressText={batchProgressText}
+            concurrency={concurrency}
+            setConcurrency={setConcurrency}
+            customPrompt={customPrompt}
+            setCustomPrompt={setCustomPrompt}
+            onExtractGlossary={() => handleExtractGlossary()}
+            isExtractingGlossary={isExtractingGlossary}
+            extractedGlossaryTerms={extractedGlossaryTerms}
+            onOpenScannedGlossary={() => setIsGlossaryModalOpen(true)}
+          />
 
-            {/* Subtitle Line Editor for Active File */}
-            <SubtitleEditor
-              files={files}
-              activeFile={activeFile}
-              subtitles={activeFile?.subtitles || []}
-              setSubtitles={handleUpdateActiveSubtitles}
-              onOpenFilesNative={handleOpenFilesNative}
-              onOpenFolderNative={handleOpenFolderNative}
-              onSetFileHandle={handleSetFileHandle}
-              onAddFiles={handleAddFiles}
-              onAddFolder={handleAddFolder}
-              onAddZip={handleAddZip}
-              onDropDataTransfer={handleDropDataTransfer}
-              onLoadSampleSeries={handleLoadSampleSeries}
-              glossary={glossary}
-              aiProvider={aiProvider}
-              orimiseKey={orimiseKey}
-              orimiseBaseUrl={orimiseBaseUrl}
-              geminiKey={geminiKey}
-              aiModel={aiModel}
-              concurrency={concurrency}
-              setConcurrency={setConcurrency}
-              customPrompt={customPrompt}
-              setCustomPrompt={setCustomPrompt}
-              activePresetId={activePresetId}
-              showDiffLog={showDiffLog}
-              setShowDiffLog={setShowDiffLog}
-              onExtractGlossary={() => handleExtractGlossary(activeFile?.subtitles)}
-              isExtractingGlossary={isExtractingGlossary}
-              extractedGlossaryTerms={extractedGlossaryTerms}
-              onOpenScannedGlossary={() => setIsGlossaryModalOpen(true)}
-            />
+          {/* Subtitle Line Editor for Active File */}
+          <SubtitleEditor
+            files={files}
+            activeFile={activeFile}
+            subtitles={activeFile?.subtitles || []}
+            setSubtitles={handleUpdateActiveSubtitles}
+            onOpenFilesNative={handleOpenFilesNative}
+            onOpenFolderNative={handleOpenFolderNative}
+            onSetFileHandle={handleSetFileHandle}
+            onAddFiles={handleAddFiles}
+            onAddFolder={handleAddFolder}
+            onAddZip={handleAddZip}
+            onDropDataTransfer={handleDropDataTransfer}
+            onLoadSampleSeries={handleLoadSampleSeries}
+            glossary={glossary}
+            aiProvider={aiProvider}
+            orimiseKey={orimiseKey}
+            orimiseBaseUrl={orimiseBaseUrl}
+            geminiKey={geminiKey}
+            aiModel={aiModel}
+            concurrency={concurrency}
+            setConcurrency={setConcurrency}
+            customPrompt={customPrompt}
+            setCustomPrompt={setCustomPrompt}
+            activePresetId={activePresetId}
+            showDiffLog={showDiffLog}
+            setShowDiffLog={setShowDiffLog}
+            onExtractGlossary={() => handleExtractGlossary(activeFile?.subtitles)}
+            isExtractingGlossary={isExtractingGlossary}
+            extractedGlossaryTerms={extractedGlossaryTerms}
+            onOpenScannedGlossary={() => setIsGlossaryModalOpen(true)}
+          />
+        </div>
 
-          </>
-        )}
-
-
-
-        {activeTab === 'glossary' && (
+        {/* TAB 2: GLOSSARY MANAGER */}
+        <div className="tab-pane-container" style={{ display: activeTab === 'glossary' ? 'block' : 'none' }}>
           <GlossaryManager
             glossary={glossary}
             setGlossary={setGlossary}
@@ -1002,9 +1002,10 @@ export default function App() {
             extractedGlossaryTerms={extractedGlossaryTerms}
             onOpenScannedGlossary={() => setIsGlossaryModalOpen(true)}
           />
-        )}
+        </div>
 
-        {activeTab === 'pronoun' && (
+        {/* TAB 3: PRONOUN PRESETS */}
+        <div className="tab-pane-container" style={{ display: activeTab === 'pronoun' ? 'block' : 'none' }}>
           <PronounPresetSelector
             activePresetId={activePresetId}
             setActivePresetId={setActivePresetId}
@@ -1013,9 +1014,10 @@ export default function App() {
               handleBatchApplyPronouns();
             }}
           />
-        )}
+        </div>
 
-        {activeTab === 'youtuber' && (
+        {/* TAB 4: YOUTUBER STUDIO */}
+        <div className="tab-pane-container" style={{ display: activeTab === 'youtuber' ? 'block' : 'none' }}>
           <YoutuberStudio
             files={files}
             activeFile={activeFile}
@@ -1025,9 +1027,10 @@ export default function App() {
             geminiKey={geminiKey}
             aiModel={aiModel}
           />
-        )}
+        </div>
 
-        {activeTab === 'lore' && (
+        {/* TAB 5: CHARACTER LORE & INTRO TAG STUDIO */}
+        <div className="tab-pane-container" style={{ display: activeTab === 'lore' ? 'block' : 'none' }}>
           <CharacterLoreStudio
             files={files}
             aiProvider={aiProvider}
@@ -1037,9 +1040,11 @@ export default function App() {
             aiModel={aiModel}
             characters={characters}
             setCharacters={setCharacters}
+            onScanningStateChange={setIsLoreScanning}
           />
-        )}
+        </div>
       </main>
+
 
 
 

@@ -72,7 +72,8 @@ export default function CharacterLoreStudio({
   geminiKey = '',
   aiModel = 'gemini-2.5-flash',
   characters = [], 
-  setCharacters 
+  setCharacters,
+  onScanningStateChange
 }) {
   const [isScanning, setIsScanning] = useState(false);
   const [scanProgress, setScanProgress] = useState('');
@@ -80,6 +81,12 @@ export default function CharacterLoreStudio({
   const [filterRole, setFilterRole] = useState('all');
   const [copiedText, setCopiedText] = useState(false);
   const [activeTabSub, setActiveTabSub] = useState('characters'); // 'characters' | 'vision_scan' | 'stitching' | 'history'
+
+  // Notify parent of active background scanning so user can switch tabs freely
+  useEffect(() => {
+    onScanningStateChange?.(isScanning || isVisionScanning);
+  }, [isScanning, isVisionScanning, onScanningStateChange]);
+
 
   // Scan History State with LocalStorage Persistence
   const [scanHistory, setScanHistory] = useState(() => {
@@ -865,7 +872,7 @@ export default function CharacterLoreStudio({
 
 
       {/* TAB 1: CHARACTER CARDS GRID */}
-      {activeTabSub === 'characters' && (
+      <div className="subtab-pane-characters" style={{ display: activeTabSub === 'characters' ? 'block' : 'none' }}>
         <div className="character-tab-content">
           {/* Format Template Selector Bar */}
           <div className="format-template-bar card-panel p-3 mb-3 flex-between" style={{ background: 'rgba(6, 182, 212, 0.05)', border: '1px solid rgba(6, 182, 212, 0.25)', flexWrap: 'wrap', gap: '12px' }}>
@@ -1105,11 +1112,12 @@ export default function CharacterLoreStudio({
             </div>
           )}
         </div>
-      )}
+      </div>
 
       {/* TAB 2: AI VIDEO VISION SCANNER (BẢNG TÊN & CHỮ HÁN TRÊN KHUNG HÌNH VIDEO) */}
-      {activeTabSub === 'vision_scan' && (
+      <div className="subtab-pane-vision" style={{ display: activeTabSub === 'vision_scan' ? 'block' : 'none' }}>
         <div className="vision-scan-tab-content fade-in">
+
           {/* Banner Introduction */}
           <div className="alert-box green mb-3">
             <Eye size={24} className="text-green flex-shrink-0" />
@@ -1336,11 +1344,10 @@ export default function CharacterLoreStudio({
             </div>
           )}
         </div>
-      )}
+      </div>
 
-
-      {/* TAB 2: TIMELINE STITCHING & CONTINUOUS FULL MOVIE */}
-      {activeTabSub === 'stitching' && (
+      {/* TAB 3: TIMELINE STITCHING & CONTINUOUS FULL MOVIE */}
+      <div className="subtab-pane-stitching" style={{ display: activeTabSub === 'stitching' ? 'block' : 'none' }}>
         <div className="stitching-tab-content">
           <div className="alert-box cyan mb-3">
             <Clock size={20} className="text-cyan flex-shrink-0" />
@@ -1470,41 +1477,18 @@ export default function CharacterLoreStudio({
                 />
                 <span>giây</span>
               </div>
-            </div>
 
-            {/* Quick Manual Total Duration Toolbar */}
-            <div className="video-duration-quick-toolbar flex-between p-2 mt-1" style={{ background: 'rgba(0,0,0,0.3)', borderRadius: '8px', width: '100%', flexWrap: 'wrap', gap: '10px' }}>
-              <div className="flex-center gap-2" style={{ flexWrap: 'wrap' }}>
-                <Clock size={16} className="text-yellow" />
-                <span className="text-sm font-bold">Hoặc Nhập Tổng Thời Lượng Video Gộp:</span>
-                <input
-                  type="number"
-                  placeholder="VD: 12918"
-                  value={manualTotalDurationSec}
-                  onChange={e => setManualTotalDurationSec(e.target.value)}
-                  className="input-field input-xs font-mono font-bold text-center"
-                  style={{ width: '95px' }}
-                />
-                <span className="text-xs text-muted">giây {manualTotalDurationSec ? `(${msToSrtTime(Number(manualTotalDurationSec) * 1000)})` : ''}</span>
+              {Object.keys(fileDurations).length > 0 && (
                 <button
-                  className="btn btn-purple btn-xs font-bold flex-center gap-1"
-                  onClick={handleDistributeTotalDuration}
-                  title="Phân bổ tổng thời lượng này chuẩn xác theo tỷ lệ các tập phụ đề"
+                  className="btn btn-secondary btn-sm flex-center gap-1"
+                  onClick={handleResetDurationsToSubtitles}
+                  title="Khôi phục thời lượng các tập về mốc dòng sub cuối cùng"
                 >
-                  <Sparkles size={13} /> Phân Bổ Cho {effectiveTargetFiles.length} Tập
+                  🔄 Đặt Lại Theo Sub
                 </button>
-              </div>
-
-              <button
-                className="btn btn-secondary btn-xs text-muted"
-                onClick={handleResetDurationsToSubtitles}
-                title="Khôi phục thời lượng các tập về mốc dòng sub cuối cùng"
-              >
-                🔄 Đặt Lại Theo Sub
-              </button>
+              )}
             </div>
           </div>
-
 
           {/* Episode Sequence Timeline Table */}
           <div className="stitching-table-wrapper card-panel mb-3">
@@ -1542,7 +1526,6 @@ export default function CharacterLoreStudio({
                     const startMs = cumulativeOffsetMs;
                     const endMs = startMs + (actualDurationSec * 1000);
                     
-                    // If selected or no filter, advance cumulative timeline
                     cumulativeOffsetMs = endMs + (gapSeconds * 1000);
 
                     return (
@@ -1573,25 +1556,21 @@ export default function CharacterLoreStudio({
                           </div>
                         </td>
                         <td className="font-mono text-cyan font-bold">{msToSrtTime(startMs)}</td>
-                        <td onClick={e => e.stopPropagation()}>
+                        <td>
                           <div className="flex-center gap-1" style={{ justifyContent: 'flex-start' }}>
                             <input
                               type="number"
-                              step="0.1"
-                              value={fileDurations[file.id] || actualDurationSec}
+                              min="1"
+                              value={actualDurationSec}
+                              onClick={e => e.stopPropagation()}
                               onChange={e => {
-                                const val = parseFloat(e.target.value) || 0;
-                                setFileDurations(prev => ({ ...prev, [file.id]: val }));
+                                const val = Math.max(1, parseInt(e.target.value, 10) || 0);
+                                handleUpdateFileDuration(file.id, val);
                               }}
                               className="input-field input-xs font-mono font-bold"
-                              style={{ width: '85px' }}
+                              style={{ width: '80px', color: isFromMp4 ? '#10b981' : '#f59e0b' }}
                             />
-                            <span className="text-xs text-muted">s</span>
-                            {!isFromMp4 && (
-                              <span className="text-xs text-muted" title="Thời lượng ước tính từ dòng sub cuối cùng">
-                                (từ sub)
-                              </span>
-                            )}
+                            <span className="text-xs text-muted">s ({msToSrtTime(actualDurationSec * 1000).substring(3, 8)})</span>
                           </div>
                         </td>
                         <td className="font-mono text-green font-bold">{msToSrtTime(endMs)}</td>
@@ -1611,7 +1590,6 @@ export default function CharacterLoreStudio({
               </tbody>
             </table>
           </div>
-
 
           {/* Full Movie Actions */}
           <div className="full-movie-actions-card card-panel flex-between p-3" style={{ flexWrap: 'wrap', gap: '12px' }}>
@@ -1649,10 +1627,10 @@ export default function CharacterLoreStudio({
             </div>
           </div>
         </div>
-      )}
+      </div>
 
       {/* TAB 4: SCAN HISTORY */}
-      {activeTabSub === 'history' && (
+      <div className="subtab-pane-history" style={{ display: activeTabSub === 'history' ? 'block' : 'none' }}>
         <div className="history-tab-content fade-in">
           <div className="card-panel p-4 mb-3" style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.08)' }}>
             <div className="flex-between mb-3" style={{ flexWrap: 'wrap', gap: '12px' }}>
@@ -1790,7 +1768,7 @@ export default function CharacterLoreStudio({
             )}
           </div>
         </div>
-      )}
+      </div>
 
       {/* EDIT / ADD CHARACTER MODAL */}
       {isModalOpen && editingChar && (

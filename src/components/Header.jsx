@@ -1,7 +1,14 @@
 import React from 'react';
 import { Sparkles, BookOpen, Sliders, FileText, Key, Download, RefreshCw, Layers, Video, Users } from 'lucide-react';
 
-export default function Header({ activeTab, setActiveTab, subtitleCount, onOpenAISettings }) {
+export default function Header({ 
+  activeTab, 
+  setActiveTab, 
+  subtitleCount, 
+  onOpenAISettings,
+  isBatchProcessing = false,
+  isLoreScanning = false
+}) {
   return (
     <header className="app-header">
       <div className="header-container">
@@ -24,7 +31,13 @@ export default function Header({ activeTab, setActiveTab, subtitleCount, onOpenA
           >
             <FileText size={18} />
             <span>Biên Tập Subtitle</span>
-            {subtitleCount > 0 && <span className="badge-count">{subtitleCount}</span>}
+            {isBatchProcessing ? (
+              <span className="badge badge-purple flex-center gap-1" style={{ fontSize: '10px', padding: '1px 6px', animation: 'pulse 1.5s infinite' }}>
+                <Sparkles size={10} className="spinner" /> Đang dịch
+              </span>
+            ) : (
+              subtitleCount > 0 && <span className="badge-count">{subtitleCount}</span>
+            )}
           </button>
 
           <button
@@ -57,7 +70,13 @@ export default function Header({ activeTab, setActiveTab, subtitleCount, onOpenA
           >
             <Users size={18} className="text-purple" />
             <span>Hồ Sơ Nhân Vật & Chú Thích</span>
+            {isLoreScanning && (
+              <span className="badge badge-green flex-center gap-1" style={{ fontSize: '10px', padding: '1px 6px', animation: 'pulse 1.5s infinite' }}>
+                <RefreshCw size={10} className="spinner text-green" /> Đang quét
+              </span>
+            )}
           </button>
+
 
           <button
             className="nav-btn ai-settings-btn"
