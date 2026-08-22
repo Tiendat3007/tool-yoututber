@@ -446,9 +446,11 @@ export default function CharacterLoreStudio({
     return offset + localMs;
   };
 
+  const [tagDurationSec, setTagDurationSec] = useState(2); // 2s display duration by default
+
   // Export SRT Intro Tags (defaults to Full Movie MP4 continuous timeline)
   const handleExportIntroSRT = (isFullMovie = true) => {
-    const srtContent = generateCharacterIntroSRT(characters, effectiveTargetFiles, isFullMovie, fileDurations, gapSeconds);
+    const srtContent = generateCharacterIntroSRT(characters, effectiveTargetFiles, isFullMovie, fileDurations, gapSeconds, tagDurationSec);
     if (!srtContent) {
       alert('Chưa có nhân vật nào được bật để xuất file chú thích!');
       return;
@@ -458,13 +460,14 @@ export default function CharacterLoreStudio({
 
   // Export ASS Intro Tags (defaults to Full Movie MP4 continuous timeline)
   const handleExportIntroASS = (isFullMovie = true) => {
-    const assContent = generateCharacterIntroASS(characters, effectiveTargetFiles, isFullMovie, fileDurations, gapSeconds);
+    const assContent = generateCharacterIntroASS(characters, effectiveTargetFiles, isFullMovie, fileDurations, gapSeconds, tagDurationSec);
     if (!assContent) {
       alert('Chưa có nhân vật nào được bật để xuất file chú thích!');
       return;
     }
     downloadTextFile(assContent, isFullMovie ? `Full_Movie_${effectiveTargetFiles.length}Tap_Character_Tags.ass` : 'Character_Intro_Tags.ass');
   };
+
 
   // Export Full Stitched Movie SRT (Continuous Timeline)
   const handleExportFullStitchedSRT = () => {
@@ -615,6 +618,24 @@ export default function CharacterLoreStudio({
 
         {/* Global Export Buttons */}
         <div className="flex-center gap-2" style={{ flexWrap: 'wrap' }}>
+          <div className="flex-center gap-1 text-sm" style={{ background: 'rgba(255,255,255,0.06)', padding: '5px 10px', borderRadius: '6px', border: '1px solid rgba(255,255,255,0.1)' }} title="Thời lượng mỗi thẻ chú thích nhân vật / thần binh xuất hiện trên màn hình">
+            <Clock size={14} className="text-cyan" />
+            <span className="text-xs font-bold">Hiện thẻ:</span>
+            <select
+              value={tagDurationSec}
+              onChange={(e) => setTagDurationSec(Number(e.target.value))}
+              className="input-field select-field input-xs font-bold"
+              style={{ color: '#06b6d4', background: 'rgba(0,0,0,0.5)', width: 'auto', padding: '2px 6px' }}
+            >
+              <option value={1.5}>1.5 Giây</option>
+              <option value={2}>2.0 Giây (Chuẩn 2s)</option>
+              <option value={2.5}>2.5 Giây</option>
+              <option value={3}>3.0 Giây</option>
+              <option value={4}>4.0 Giây</option>
+              <option value={5}>5.0 Giây</option>
+            </select>
+          </div>
+
           <button
             className="btn btn-secondary btn-sm flex-center gap-1"
             onClick={handleCopyLoreForYouTube}
@@ -640,6 +661,7 @@ export default function CharacterLoreStudio({
             <Download size={14} /> Xuất Chú Thích (.ASS - Theo Video MP4)
           </button>
         </div>
+
       </div>
 
 

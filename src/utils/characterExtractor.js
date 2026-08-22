@@ -574,14 +574,16 @@ export function computeFileOffsets(files = [], fileDurations = {}, gapSeconds = 
   return { fileOffsets, totalMovieDurationMs: cumulativeOffsetMs };
 }
 
-// Generate Separate SRT file for Character Intro Tags (Strictly Sorted Chronologically from Start to End)
-export function generateCharacterIntroSRT(characters, files, isFullMovie = false, fileDurations = {}, gapSeconds = 0) {
+// Generate Separate SRT file for Character Intro Tags (Strictly Sorted Chronologically, 2s Display Duration)
+export function generateCharacterIntroSRT(characters, files, isFullMovie = false, fileDurations = {}, gapSeconds = 0, displayDurationSec = 2) {
   const activeChars = characters.filter(c => c.enabled !== false);
   if (activeChars.length === 0) return '';
 
   const { fileOffsets, totalMovieDurationMs } = isFullMovie 
     ? computeFileOffsets(files, fileDurations, gapSeconds) 
     : { fileOffsets: {}, totalMovieDurationMs: 0 };
+
+  const durationMs = (Number(displayDurationSec) || 2) * 1000;
 
   // Build tag items with exact start and end millisecond timestamps
   const tagItems = activeChars.map(char => {
@@ -598,7 +600,7 @@ export function generateCharacterIntroSRT(characters, files, isFullMovie = false
       }
     }
 
-    const endMs = startMs + 5000; // 5s display duration
+    const endMs = startMs + durationMs; // 2s display duration
     const text = char.introTag || `【 NHÂN VẬT: ${char.name.toUpperCase()} | ${char.sect} | ${char.realm} 】`;
 
     return {
@@ -622,8 +624,8 @@ export function generateCharacterIntroSRT(characters, files, isFullMovie = false
   return srtLines.join('\n');
 }
 
-// Generate Beautiful Advanced ASS Subtitle file (Top-Center Glowing Yellow Ancient Calligraphy Style, Strictly Sorted)
-export function generateCharacterIntroASS(characters, files, isFullMovie = false, fileDurations = {}, gapSeconds = 0) {
+// Generate Beautiful Advanced ASS Subtitle file (Top-Center Glowing Yellow Ancient Calligraphy Style, Strictly Sorted, 2s Duration)
+export function generateCharacterIntroASS(characters, files, isFullMovie = false, fileDurations = {}, gapSeconds = 0, displayDurationSec = 2) {
   const activeChars = characters.filter(c => c.enabled !== false);
   if (activeChars.length === 0) return '';
 
@@ -657,6 +659,8 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
     ? computeFileOffsets(files, fileDurations, gapSeconds) 
     : { fileOffsets: {}, totalMovieDurationMs: 0 };
 
+  const durationMs = (Number(displayDurationSec) || 2) * 1000;
+
   // Build tag items with exact start and end millisecond timestamps
   const tagItems = activeChars.map(char => {
     const fileOffset = isFullMovie ? findFileOffset(char, files, fileOffsets) : 0;
@@ -671,7 +675,7 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
       }
     }
 
-    const endMs = startMs + 5000;
+    const endMs = startMs + durationMs;
     const text = char.introTag || `【 NHÂN VẬT: ${char.name.toUpperCase()} | ${char.sect} | ${char.realm} 】`;
 
     return {
@@ -692,6 +696,7 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
 
   return assHeader + dialogueLines.join('\n');
 }
+
 
 
 
