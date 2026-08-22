@@ -138,7 +138,7 @@ export async function scanVideoFramesWithVisionAI({
   apiKey,
   aiProvider = 'orimise',
   baseUrl = 'https://api.orimise.com/v1',
-  model = 'gemini-2.5-flash',
+  model = 'gemini-2.5-flash-lite',
   batchSize = 4,
   concurrency = 5,
   onProgress = () => {}
@@ -194,10 +194,11 @@ export async function scanVideoFramesWithVisionAI({
             'Authorization': `Bearer ${apiKey}`
           },
           body: JSON.stringify({
-            model: model || 'gemini-2.5-flash',
+            model: model || 'gemini-2.5-flash-lite',
             messages: [{ role: 'user', content }],
             temperature: 0.2
           })
+
         });
 
         if (response.ok) {

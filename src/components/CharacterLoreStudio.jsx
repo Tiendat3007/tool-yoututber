@@ -366,6 +366,7 @@ export default function CharacterLoreStudio({
   const [visionVideoFile, setVisionVideoFile] = useState(null);
   const [visionIntervalSec, setVisionIntervalSec] = useState(3);
   const [visionConcurrency, setVisionConcurrency] = useState(6); // 6 parallel threads by default
+  const [visionModel, setVisionModel] = useState(() => localStorage.getItem('tutien_vision_model') || 'gemini-2.5-flash-lite'); // Default to Gemini 2.5 Flash Lite for ultra token efficiency
   const [visionFlipHorizontal, setVisionFlipHorizontal] = useState(true); // Default true for mirrored/flipped re-up videos
   const [isVisionScanning, setIsVisionScanning] = useState(false);
   const [visionProgress, setVisionProgress] = useState(null);
@@ -413,7 +414,7 @@ export default function CharacterLoreStudio({
       }
 
       // 2. Scan with Multi-threaded Vision AI (Runs 6-10 parallel streams)
-      setVisionProgress({ phase: 'ai_scanning', percent: 0, message: `Bắt đầu khởi chạy ${visionConcurrency} luồng AI Vision song song...` });
+      setVisionProgress({ phase: 'ai_scanning', percent: 0, message: `Bắt đầu khởi chạy ${visionConcurrency} luồng AI Vision song song (${visionModel})...` });
 
       const detected = await scanVideoFramesWithVisionAI({
         frames,
@@ -421,7 +422,7 @@ export default function CharacterLoreStudio({
         apiKey: effectiveKey,
         aiProvider,
         baseUrl: orimiseBaseUrl,
-        model: aiModel || 'gemini-2.5-flash',
+        model: visionModel || 'gemini-2.5-flash-lite',
         batchSize: 4,
         concurrency: Number(visionConcurrency) || 6,
         onProgress: (p) => {
@@ -435,6 +436,7 @@ export default function CharacterLoreStudio({
           }
         }
       });
+
 
 
       if (detected.length === 0) {
@@ -1211,6 +1213,27 @@ export default function CharacterLoreStudio({
                     <span>Quét Toàn Bộ 100% Video</span>
                   </div>
 
+                  <div className="flex-center gap-1 text-sm font-bold" style={{ background: 'rgba(6, 182, 212, 0.1)', padding: '6px 12px', borderRadius: '6px', border: '1px solid rgba(6, 182, 212, 0.3)' }}>
+                    <Sparkles size={15} className="text-cyan" />
+                    <span>Mô Hình AI Vision:</span>
+                    <select
+                      value={visionModel}
+                      onChange={(e) => {
+                        setVisionModel(e.target.value);
+                        localStorage.setItem('tutien_vision_model', e.target.value);
+                      }}
+                      className="input-field select-field input-xs font-bold text-cyan"
+                      style={{ background: 'rgba(0,0,0,0.5)', width: 'auto' }}
+                      title="Chọn mô hình AI quét thị giác khung hình video MP4"
+                    >
+                      <option value="gemini-2.5-flash-lite">⚡ Gemini 2.5 Flash Lite (Mặc định ⭐ Siêu Tiết Kiệm Token & Cực Nhanh)</option>
+                      <option value="gemini-2.5-flash">Gemini 2.5 Flash (Tiêu Chuẩn Cân Bằng)</option>
+                      <option value="gemini-1.5-pro">Gemini 1.5 Pro (Độ Chính Xác Cao)</option>
+                      <option value="claude-fable-5">Claude Fable 5</option>
+                      <option value="claude-sonnet-5">Claude Sonnet 5</option>
+                    </select>
+                  </div>
+
                   <div className="flex-center gap-1 text-sm font-bold" style={{ background: 'rgba(234, 179, 8, 0.1)', padding: '6px 12px', borderRadius: '6px', border: '1px solid rgba(234, 179, 8, 0.3)' }}>
                     <Zap size={15} className="text-yellow" />
                     <span>Đa Luồng AI:</span>
@@ -1226,6 +1249,7 @@ export default function CharacterLoreStudio({
                       <option value={15}>15 Luồng (Tối Đa)</option>
                     </select>
                   </div>
+
 
 
 
