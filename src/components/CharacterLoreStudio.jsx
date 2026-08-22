@@ -853,10 +853,11 @@ export default function CharacterLoreStudio({
                       onChange={(e) => setVisionIntervalSec(Number(e.target.value))}
                       className="input-field select-field input-sm font-bold"
                     >
-                      <option value={5}>Mỗi 5 giây (Quét rất kỹ)</option>
-                      <option value={10}>Mỗi 10 giây (Khuyên dùng - Cân bằng & Chuẩn)</option>
-                      <option value={15}>Mỗi 15 giây (Nhanh)</option>
-                      <option value={20}>Mỗi 20 giây (Siêu nhanh)</option>
+                      <option value={2}>Mỗi 2 giây (Chắc chắn 100% không bỏ sót - Khuyên dùng)</option>
+                      <option value={3}>Mỗi 3 giây (Độ chính xác 99% - Rất chuẩn & Nhanh)</option>
+                      <option value={5}>Mỗi 5 giây (Độ chính xác ~95%)</option>
+                      <option value={10}>Mỗi 10 giây (Quét nhanh)</option>
+                      <option value={15}>Mỗi 15 giây (Siêu tốc)</option>
                     </select>
                   </div>
 
@@ -868,11 +869,14 @@ export default function CharacterLoreStudio({
                       onChange={(e) => setVisionMaxFrames(Number(e.target.value))}
                       className="input-field select-field input-sm font-bold"
                     >
-                      <option value={80}>80 Khung hình (~15 phút phim)</option>
-                      <option value={150}>150 Khung hình (~25-30 phút phim)</option>
-                      <option value={250}>250 Khung hình (Phim dài)</option>
+                      <option value={150}>150 Khung hình (~5-10 phút video)</option>
+                      <option value={300}>300 Khung hình (~15-20 phút video)</option>
+                      <option value={600}>600 Khung hình (~30-40 phút video)</option>
+                      <option value={1200}>1200 Khung hình (~1-2 tiếng video)</option>
+                      <option value={3000}>3000 Khung hình (Video gộp cả bộ 3-4 tiếng)</option>
                     </select>
                   </div>
+
                 </div>
 
                 <button
