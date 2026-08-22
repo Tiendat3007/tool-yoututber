@@ -130,23 +130,42 @@ HÃY TRẢ VỀ DUY NHẤT 1 MẢNG JSON CÁC NHÂN VẬT THEO ĐÚNG CẤU TRÚ
 
     const characters = JSON.parse(jsonStr);
     if (Array.isArray(characters)) {
-      return characters.map((char, idx) => ({
-        id: `char_${Date.now()}_${idx}`,
-        name: char.name || 'Nhân vật ẩn danh',
-        originalName: char.originalName || '',
-        role: char.role || 'Chưa rõ',
-        sect: char.sect || 'Vô Môn Phái',
-        realm: char.realm || 'Phàm nhân',
-        firstFileId: char.firstFileId || (files[0] ? files[0].id : ''),
-        firstFileName: char.firstFileName || (files[0] ? files[0].name : ''),
-        firstLineIndex: char.firstLineIndex || 1,
-        firstTimestamp: char.firstTimestamp || '00:01:00,000',
-        firstEndTimestamp: char.firstEndTimestamp || '00:01:05,000',
-        quote: char.quote || '',
-        introTag: char.introTag || `【 NHÂN VẬT: ${char.name.toUpperCase()} | ${char.sect} | ${char.realm} 】`,
-        personality: char.personality || '',
-        enabled: true
-      }));
+      return characters.map((char, idx) => {
+        // Match character to real file in files array
+        let matchedFile = files[0] || null;
+        if (char.firstFileId) {
+          const directMatch = files.find(f => f.id === char.firstFileId);
+          if (directMatch) matchedFile = directMatch;
+        }
+        if (!matchedFile && char.firstFileName) {
+          const cleanTarget = char.firstFileName.split(/[/\\]/).pop().replace(/\.[^/.]+$/, '').trim().toLowerCase();
+          matchedFile = files.find(f => {
+            const cleanF = f.name.split(/[/\\]/).pop().replace(/\.[^/.]+$/, '').trim().toLowerCase();
+            return cleanF === cleanTarget || cleanF.includes(cleanTarget) || cleanTarget.includes(cleanF);
+          });
+        }
+        if (!matchedFile && files.length > 0) {
+          matchedFile = files[0];
+        }
+
+        return {
+          id: `char_${Date.now()}_${idx}`,
+          name: char.name || 'Nhân vật ẩn danh',
+          originalName: char.originalName || '',
+          role: char.role || 'Chưa rõ',
+          sect: char.sect || 'Vô Môn Phái',
+          realm: char.realm || 'Phàm nhân',
+          firstFileId: matchedFile ? matchedFile.id : (char.firstFileId || ''),
+          firstFileName: matchedFile ? matchedFile.name : (char.firstFileName || ''),
+          firstLineIndex: char.firstLineIndex || 1,
+          firstTimestamp: char.firstTimestamp || '00:01:00,000',
+          firstEndTimestamp: char.firstEndTimestamp || '00:01:05,000',
+          quote: char.quote || '',
+          introTag: char.introTag || `【 NHÂN VẬT: ${char.name.toUpperCase()} | ${char.sect} | ${char.realm} 】`,
+          personality: char.personality || '',
+          enabled: true
+        };
+      });
     }
     return [];
   } catch (err) {
@@ -218,7 +237,7 @@ export function findFileOffset(char, files = [], fileOffsets = {}) {
   return 0;
 }
 
-// Compute File Offsets Map
+// Compute File Offsets Map and Total Movie Duration
 export function computeFileOffsets(files = [], fileDurations = {}, gapSeconds = 0) {
   let cumulativeOffsetMs = 0;
   const fileOffsets = {};
@@ -235,7 +254,7 @@ export function computeFileOffsets(files = [], fileDurations = {}, gapSeconds = 
     cumulativeOffsetMs += durationMs + (gapSeconds * 1000);
   });
 
-  return fileOffsets;
+  return { fileOffsets, totalMovieDurationMs: cumulativeOffsetMs };
 }
 
 // Generate Separate SRT file for Character Intro Tags (Strictly Sorted Chronologically from Start to End)
@@ -243,13 +262,25 @@ export function generateCharacterIntroSRT(characters, files, isFullMovie = false
   const activeChars = characters.filter(c => c.enabled !== false);
   if (activeChars.length === 0) return '';
 
-  const fileOffsets = isFullMovie ? computeFileOffsets(files, fileDurations, gapSeconds) : {};
+  const { fileOffsets, totalMovieDurationMs } = isFullMovie 
+    ? computeFileOffsets(files, fileDurations, gapSeconds) 
+    : { fileOffsets: {}, totalMovieDurationMs: 0 };
 
   // Build tag items with exact start and end millisecond timestamps
   const tagItems = activeChars.map(char => {
     const fileOffset = isFullMovie ? findFileOffset(char, files, fileOffsets) : 0;
     const charLocalStartMs = srtTimeToMs(char.firstTimestamp);
-    const startMs = fileOffset + charLocalStartMs;
+    let startMs = fileOffset + charLocalStartMs;
+
+    // Bounds checking
+    if (totalMovieDurationMs > 0 && startMs > totalMovieDurationMs) {
+      if (charLocalStartMs < totalMovieDurationMs) {
+        startMs = charLocalStartMs;
+      } else {
+        startMs = Math.max(0, totalMovieDurationMs - 10000);
+      }
+    }
+
     const endMs = startMs + 5000; // 5s display duration
     const text = char.introTag || `【 NHÂN VẬT: ${char.name.toUpperCase()} | ${char.sect} | ${char.realm} 】`;
 
@@ -305,13 +336,24 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
     return `${main}.${centis}`;
   };
 
-  const fileOffsets = isFullMovie ? computeFileOffsets(files, fileDurations, gapSeconds) : {};
+  const { fileOffsets, totalMovieDurationMs } = isFullMovie 
+    ? computeFileOffsets(files, fileDurations, gapSeconds) 
+    : { fileOffsets: {}, totalMovieDurationMs: 0 };
 
   // Build tag items with exact start and end millisecond timestamps
   const tagItems = activeChars.map(char => {
     const fileOffset = isFullMovie ? findFileOffset(char, files, fileOffsets) : 0;
     const charLocalStartMs = srtTimeToMs(char.firstTimestamp);
-    const startMs = fileOffset + charLocalStartMs;
+    let startMs = fileOffset + charLocalStartMs;
+
+    if (totalMovieDurationMs > 0 && startMs > totalMovieDurationMs) {
+      if (charLocalStartMs < totalMovieDurationMs) {
+        startMs = charLocalStartMs;
+      } else {
+        startMs = Math.max(0, totalMovieDurationMs - 10000);
+      }
+    }
+
     const endMs = startMs + 5000;
     const text = char.introTag || `【 NHÂN VẬT: ${char.name.toUpperCase()} | ${char.sect} | ${char.realm} 】`;
 
@@ -333,6 +375,7 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
 
   return assHeader + dialogueLines.join('\n');
 }
+
 
 
 
