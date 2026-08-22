@@ -67,7 +67,7 @@ function matchVideoToFile(videoName, fileList) {
 export default function CharacterLoreStudio({ 
   files = [], 
   aiProvider = 'orimise',
-  orimiseKey = 'sk-544e5d8289b304b8198e534f18da07085ce0768a95d2ca1b76970a2d8a1d082f',
+  orimiseKey = '',
   orimiseBaseUrl = 'https://api.orimise.com/v1',
   geminiKey = '',
   aiModel = 'gemini-2.5-flash',
@@ -75,6 +75,7 @@ export default function CharacterLoreStudio({
   setCharacters,
   onScanningStateChange
 }) {
+
   const [isScanning, setIsScanning] = useState(false);
   const [scanProgress, setScanProgress] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
@@ -160,8 +161,9 @@ export default function CharacterLoreStudio({
   // Handle AI Scan
   const handleScanCharacters = async () => {
     const effectiveKey = aiProvider === 'orimise'
-      ? (orimiseKey || 'sk-544e5d8289b304b8198e534f18da07085ce0768a95d2ca1b76970a2d8a1d082f')
+      ? orimiseKey
       : geminiKey;
+
 
     if (!effectiveKey) {
       alert(`Vui lòng nhập ${aiProvider === 'orimise' ? 'Orimise' : 'Google Gemini'} API Key trong mục "Cấu Hình AI Gemini" trước khi quét!`);
@@ -379,8 +381,9 @@ export default function CharacterLoreStudio({
     }
 
     const effectiveKey = aiProvider === 'orimise'
-      ? (orimiseKey || 'sk-544e5d8289b304b8198e534f18da07085ce0768a95d2ca1b76970a2d8a1d082f')
+      ? orimiseKey
       : geminiKey;
+
 
     if (!effectiveKey) {
       alert(`Vui lòng nhập ${aiProvider === 'orimise' ? 'Orimise' : 'Google Gemini'} API Key trong Cấu Hình AI!`);

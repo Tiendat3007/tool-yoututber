@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { X, Key, Cpu, Sparkles, ExternalLink, Check, AlertCircle, Server, Zap } from 'lucide-react';
+import { X, Key, Cpu, Sparkles, ExternalLink, Check, AlertCircle, Server, Zap, Eye, EyeOff } from 'lucide-react';
 
 export default function AISettingsModal({
   isOpen,
@@ -20,6 +20,9 @@ export default function AISettingsModal({
   setCustomPrompt
 }) {
   const [testStatus, setTestStatus] = useState(null);
+  const [showOrimiseKey, setShowOrimiseKey] = useState(false);
+  const [showGeminiKey, setShowGeminiKey] = useState(false);
+
 
   if (!isOpen) return null;
 
@@ -144,13 +147,24 @@ export default function AISettingsModal({
                     Orimise Keys Dashboard <ExternalLink size={14} />
                   </a>
                 </label>
-                <input
-                  type="password"
-                  className="input-field font-mono text-cyan"
-                  placeholder="sk-..."
-                  value={orimiseKey}
-                  onChange={e => setOrimiseKey(e.target.value)}
-                />
+                <div style={{ position: 'relative' }}>
+                  <input
+                    type={showOrimiseKey ? "text" : "password"}
+                    className="input-field font-mono text-cyan"
+                    style={{ paddingRight: '40px' }}
+                    placeholder="sk-..."
+                    value={orimiseKey}
+                    onChange={e => setOrimiseKey(e.target.value)}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowOrimiseKey(!showOrimiseKey)}
+                    style={{ position: 'absolute', right: '10px', top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', color: '#94a3b8', cursor: 'pointer' }}
+                    title={showOrimiseKey ? "Ẩn Key" : "Hiện Key"}
+                  >
+                    {showOrimiseKey ? <EyeOff size={16} /> : <Eye size={16} />}
+                  </button>
+                </div>
               </div>
 
               <div className="form-group">
@@ -214,14 +228,26 @@ export default function AISettingsModal({
                     Google AI Studio <ExternalLink size={14} />
                   </a>
                 </label>
-                <input
-                  type="password"
-                  className="input-field font-mono"
-                  placeholder="AIzaSy..."
-                  value={geminiKey}
-                  onChange={e => setGeminiKey(e.target.value)}
-                />
+                <div style={{ position: 'relative' }}>
+                  <input
+                    type={showGeminiKey ? "text" : "password"}
+                    className="input-field font-mono"
+                    style={{ paddingRight: '40px' }}
+                    placeholder="AIzaSy..."
+                    value={geminiKey}
+                    onChange={e => setGeminiKey(e.target.value)}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowGeminiKey(!showGeminiKey)}
+                    style={{ position: 'absolute', right: '10px', top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', color: '#94a3b8', cursor: 'pointer' }}
+                    title={showGeminiKey ? "Ẩn Key" : "Hiện Key"}
+                  >
+                    {showGeminiKey ? <EyeOff size={16} /> : <Eye size={16} />}
+                  </button>
+                </div>
               </div>
+
 
               <div className="form-group">
                 <label className="form-label">Mô Hình Gemini:</label>

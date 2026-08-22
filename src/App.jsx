@@ -89,10 +89,11 @@ export default function App() {
 
   // AI Provider & Keys state
   const [aiProvider, setAiProvider] = useState(() => localStorage.getItem('tutien_ai_provider') || 'orimise');
-  const [orimiseKey, setOrimiseKey] = useState(() => localStorage.getItem('tutien_orimise_key') || 'sk-544e5d8289b304b8198e534f18da07085ce0768a95d2ca1b76970a2d8a1d082f');
-  const [orimiseBaseUrl, setOrimiseBaseUrl] = useState(() => localStorage.getItem('tutien_orimise_url') || 'https://api.orimise.com/v1');
-  const [geminiKey, setGeminiKey] = useState(() => localStorage.getItem('tutien_gemini_key') || '');
+  const [orimiseKey, setOrimiseKey] = useState(() => localStorage.getItem('tutien_orimise_key') || import.meta.env.VITE_ORIMISE_KEY || '');
+  const [orimiseBaseUrl, setOrimiseBaseUrl] = useState(() => localStorage.getItem('tutien_orimise_url') || import.meta.env.VITE_ORIMISE_BASE_URL || 'https://api.orimise.com/v1');
+  const [geminiKey, setGeminiKey] = useState(() => localStorage.getItem('tutien_gemini_key') || import.meta.env.VITE_GEMINI_KEY || '');
   const [aiModel, setAiModel] = useState(() => localStorage.getItem('tutien_ai_model') || 'gemini-2.5-flash');
+
   const [concurrency, setConcurrency] = useState(() => Number(localStorage.getItem('tutien_concurrency')) || 4);
 
   const [customPrompt, setCustomPrompt] = useState(() => localStorage.getItem('tutien_custom_prompt') || '');
