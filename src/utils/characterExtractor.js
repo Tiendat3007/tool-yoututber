@@ -185,7 +185,7 @@ export function srtTimeToMs(srtTime) {
 }
 
 // Generate Separate SRT file for Character Intro Tags
-export function generateCharacterIntroSRT(characters, files, isFullMovie = false, fileDurations = {}) {
+export function generateCharacterIntroSRT(characters, files, isFullMovie = false, fileDurations = {}, gapSeconds = 0) {
   const activeChars = characters.filter(c => c.enabled !== false);
   if (activeChars.length === 0) return '';
 
@@ -193,7 +193,7 @@ export function generateCharacterIntroSRT(characters, files, isFullMovie = false
   let counter = 1;
 
   if (!isFullMovie) {
-    // Generate per file
+    // Generate per file (Local Episode Timestamps)
     activeChars.forEach(char => {
       const startTime = char.firstTimestamp || '00:00:05,000';
       const endTime = char.firstEndTimestamp || msToSrtTime(srtTimeToMs(startTime) + 5000); // 5s duration
@@ -202,22 +202,21 @@ export function generateCharacterIntroSRT(characters, files, isFullMovie = false
       srtLines.push(`${counter++}\n${startTime} --> ${endTime}\n${text}\n`);
     });
   } else {
-    // Generate for Full Stitched Long Movie
-    // Compute cumulative offset for each file
+    // Generate for Full Stitched Long Movie (Exact MP4 Video Timeline)
     let cumulativeOffsetMs = 0;
     const fileOffsets = {};
 
     files.forEach(file => {
       fileOffsets[file.id] = cumulativeOffsetMs;
-      // Get file duration (from user input, video element duration, or last sub endTime)
+      // Get exact duration from MP4 video file, user input, or last sub endTime
       let durationMs = 0;
       if (fileDurations[file.id]) {
         durationMs = fileDurations[file.id] * 1000;
       } else if (file.subtitles.length > 0) {
         const lastSub = file.subtitles[file.subtitles.length - 1];
-        durationMs = srtTimeToMs(lastSub.endTime) + 2000; // 2s tail buffer
+        durationMs = srtTimeToMs(lastSub.endTime);
       }
-      cumulativeOffsetMs += durationMs;
+      cumulativeOffsetMs += durationMs + (gapSeconds * 1000);
     });
 
     activeChars.forEach(char => {
@@ -238,7 +237,7 @@ export function generateCharacterIntroSRT(characters, files, isFullMovie = false
 }
 
 // Generate Beautiful Advanced ASS Subtitle file (Top-Center Glowing Yellow Ancient Calligraphy Style for CapCut/Premiere)
-export function generateCharacterIntroASS(characters, files, isFullMovie = false, fileDurations = {}) {
+export function generateCharacterIntroASS(characters, files, isFullMovie = false, fileDurations = {}, gapSeconds = 0) {
   const activeChars = characters.filter(c => c.enabled !== false);
   if (activeChars.length === 0) return '';
 
@@ -289,9 +288,9 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
         durationMs = fileDurations[file.id] * 1000;
       } else if (file.subtitles.length > 0) {
         const lastSub = file.subtitles[file.subtitles.length - 1];
-        durationMs = srtTimeToMs(lastSub.endTime) + 2000;
+        durationMs = srtTimeToMs(lastSub.endTime);
       }
-      cumulativeOffsetMs += durationMs;
+      cumulativeOffsetMs += durationMs + (gapSeconds * 1000);
     });
 
     activeChars.forEach(char => {
@@ -306,6 +305,7 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
 
   return assHeader + dialogueLines.join('\n');
 }
+
 
 // Stitch All File SRTs into 1 Seamless Full Movie SRT with Continuous Timeline
 export function stitchAllFilesToFullMovieSRT(files, fileDurations = {}, gapSeconds = 0) {

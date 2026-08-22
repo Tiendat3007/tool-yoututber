@@ -180,9 +180,26 @@ export default function CharacterLoreStudio({
     setEditingChar(null);
   };
 
-  // Export SRT Intro Tags
-  const handleExportIntroSRT = (isFullMovie = false) => {
-    const srtContent = generateCharacterIntroSRT(characters, effectiveTargetFiles, isFullMovie, fileDurations);
+  // Helper to compute cumulative full movie MP4 timestamp for each character
+  const getFullMovieTimestamp = (char) => {
+    let cumulativeOffsetMs = 0;
+    for (const file of effectiveTargetFiles) {
+      if (file.id === char.firstFileId) {
+        const charLocalStartMs = srtTimeToMs(char.firstTimestamp);
+        return msToSrtTime(cumulativeOffsetMs + charLocalStartMs);
+      }
+      const fileSubs = file.subtitles || [];
+      const lastSub = fileSubs[fileSubs.length - 1];
+      const defaultSubDurationSec = lastSub ? Math.round(srtTimeToMs(lastSub.endTime) / 1000) : 0;
+      const actualDurationSec = fileDurations[file.id] || defaultSubDurationSec;
+      cumulativeOffsetMs += (actualDurationSec * 1000) + (gapSeconds * 1000);
+    }
+    return char.firstTimestamp;
+  };
+
+  // Export SRT Intro Tags (defaults to Full Movie MP4 continuous timeline)
+  const handleExportIntroSRT = (isFullMovie = true) => {
+    const srtContent = generateCharacterIntroSRT(characters, effectiveTargetFiles, isFullMovie, fileDurations, gapSeconds);
     if (!srtContent) {
       alert('Chưa có nhân vật nào được bật để xuất file chú thích!');
       return;
@@ -190,9 +207,9 @@ export default function CharacterLoreStudio({
     downloadTextFile(srtContent, isFullMovie ? `Full_Movie_${effectiveTargetFiles.length}Tap_Character_Tags.srt` : 'Character_Intro_Tags.srt');
   };
 
-  // Export ASS Intro Tags (Stylized Calligraphy)
-  const handleExportIntroASS = (isFullMovie = false) => {
-    const assContent = generateCharacterIntroASS(characters, effectiveTargetFiles, isFullMovie, fileDurations);
+  // Export ASS Intro Tags (defaults to Full Movie MP4 continuous timeline)
+  const handleExportIntroASS = (isFullMovie = true) => {
+    const assContent = generateCharacterIntroASS(characters, effectiveTargetFiles, isFullMovie, fileDurations, gapSeconds);
     if (!assContent) {
       alert('Chưa có nhân vật nào được bật để xuất file chú thích!');
       return;
@@ -219,7 +236,7 @@ export default function CharacterLoreStudio({
       text += `   • Thân phận: ${c.role} | Môn phái: ${c.sect}\n`;
       text += `   • Cảnh giới: ${c.realm}\n`;
       if (c.quote) text += `   • Lời thoại: "${c.quote}"\n`;
-      text += `   • Xuất hiện tại: Tập ${c.firstFileName || '1'} (${c.firstTimestamp})\n\n`;
+      text += `   • Xuất hiện tại: Tập ${c.firstFileName || '1'} (Mốc tập: ${c.firstTimestamp} | Mốc MP4: ${getFullMovieTimestamp(c)})\n\n`;
     });
 
     navigator.clipboard.writeText(text);
@@ -263,7 +280,7 @@ export default function CharacterLoreStudio({
           <Users className="text-cyan" size={24} />
           <div>
             <h2 className="section-title">HỒ SƠ NHÂN VẬT & CHÚ THÍCH PHỤ ĐỀ SRT</h2>
-            <p className="section-desc">AI tự động quét mốc xuất hiện của nhân vật, trích xuất cảnh giới, môn phái & tạo file thẻ chú thích riêng cho CapCut / Premiere</p>
+            <p className="section-desc">AI tự động quét mốc xuất hiện của nhân vật, trích xuất cảnh giới, môn phái & tạo file thẻ chú thích khớp dòng thời gian video MP4</p>
           </div>
         </div>
 
@@ -327,7 +344,7 @@ export default function CharacterLoreStudio({
         </div>
 
         {/* Global Export Buttons */}
-        <div className="flex-center gap-2">
+        <div className="flex-center gap-2" style={{ flexWrap: 'wrap' }}>
           <button
             className="btn btn-secondary btn-sm flex-center gap-1"
             onClick={handleCopyLoreForYouTube}
@@ -339,18 +356,18 @@ export default function CharacterLoreStudio({
 
           <button
             className="btn btn-cyan btn-sm font-bold flex-center gap-1"
-            onClick={() => handleExportIntroSRT(false)}
-            title="Xuất file SRT chứa các thẻ giới thiệu nhân vật để ném vào track trên cùng của CapCut / Premiere"
+            onClick={() => handleExportIntroSRT(true)}
+            title="Xuất file SRT chứa các thẻ giới thiệu nhân vật khớp dòng thời gian video MP4 dài"
           >
-            <Download size={14} /> Xuất Chú Thích (.SRT)
+            <Download size={14} /> Xuất Chú Thích (.SRT - Theo Video MP4)
           </button>
 
           <button
             className="btn btn-green-glow btn-sm font-bold flex-center gap-1"
-            onClick={() => handleExportIntroASS(false)}
-            title="Xuất file .ASS có sẵn hiệu ứng font chữ cổ trang phát sáng viền đen siêu ngầu"
+            onClick={() => handleExportIntroASS(true)}
+            title="Xuất file .ASS có sẵn hiệu ứng font chữ cổ trang phát sáng viền đen khớp dòng thời gian video MP4"
           >
-            <Download size={14} /> Xuất Chú Thích (.ASS)
+            <Download size={14} /> Xuất Chú Thích (.ASS - Theo Video MP4)
           </button>
         </div>
       </div>
@@ -390,69 +407,79 @@ export default function CharacterLoreStudio({
 
           {/* Cards Grid */}
           <div className="character-grid">
-            {filteredCharacters.map(char => (
-              <div key={char.id} className={`character-card card-panel ${char.enabled ? 'enabled' : 'disabled'}`}>
-                <div className="char-card-header flex-between">
-                  <div className="char-title-group">
-                    <h3 className="char-name">{char.name}</h3>
-                    {char.originalName && <span className="char-original text-muted">({char.originalName})</span>}
+            {filteredCharacters.map(char => {
+              const fullMovieTime = getFullMovieTimestamp(char);
+
+              return (
+                <div key={char.id} className={`character-card card-panel ${char.enabled ? 'enabled' : 'disabled'}`}>
+                  <div className="char-card-header flex-between">
+                    <div className="char-title-group">
+                      <h3 className="char-name">{char.name}</h3>
+                      {char.originalName && <span className="char-original text-muted">({char.originalName})</span>}
+                    </div>
+
+                    <div className="char-actions flex-center gap-1">
+                      <input
+                        type="checkbox"
+                        checked={char.enabled !== false}
+                        onChange={() => toggleCharacter(char.id)}
+                        className="custom-checkbox"
+                        title="Bật/Tắt xuất thẻ chú thích cho nhân vật này"
+                      />
+                      <button
+                        className="btn-icon text-muted"
+                        onClick={() => {
+                          setEditingChar(char);
+                          setIsModalOpen(true);
+                        }}
+                        title="Chỉnh sửa thông tin"
+                      >
+                        <Edit3 size={14} />
+                      </button>
+                      <button
+                        className="btn-icon text-red"
+                        onClick={() => deleteCharacter(char.id)}
+                        title="Xóa nhân vật này"
+                      >
+                        <Trash2 size={14} />
+                      </button>
+                    </div>
                   </div>
 
-                  <div className="char-actions flex-center gap-1">
-                    <input
-                      type="checkbox"
-                      checked={char.enabled !== false}
-                      onChange={() => toggleCharacter(char.id)}
-                      className="custom-checkbox"
-                      title="Bật/Tắt xuất thẻ chú thích cho nhân vật này"
-                    />
-                    <button
-                      className="btn-icon text-muted"
-                      onClick={() => {
-                        setEditingChar(char);
-                        setIsModalOpen(true);
-                      }}
-                      title="Chỉnh sửa thông tin"
-                    >
-                      <Edit3 size={14} />
-                    </button>
-                    <button
-                      className="btn-icon text-red"
-                      onClick={() => deleteCharacter(char.id)}
-                      title="Xóa nhân vật này"
-                    >
-                      <Trash2 size={14} />
-                    </button>
+                  <div className="char-badges-row flex-center gap-1 mt-2 mb-2" style={{ justifyContent: 'flex-start', flexWrap: 'wrap' }}>
+                    <span className="badge badge-role">{char.role}</span>
+                    <span className="badge badge-sect">{char.sect}</span>
+                    <span className="badge badge-realm">{char.realm}</span>
+                  </div>
+
+                  {char.quote && (
+                    <div className="char-quote text-muted mt-1">
+                      💬 <em>"{char.quote}"</em>
+                    </div>
+                  )}
+
+                  {/* Dual Timestamps: Local Episode & Full MP4 Video Timeline */}
+                  <div className="char-timestamp-row mt-2 pt-2 border-top flex-between text-xs text-muted">
+                    <span>📍 Tập: <strong>{char.firstFileName || 'Tập 1'}</strong></span>
+                    <span className="font-mono text-muted">⏱️ Trong tập: {char.firstTimestamp}</span>
+                  </div>
+                  <div className="char-timestamp-row mt-1 flex-between text-xs">
+                    <span className="text-cyan font-bold">🎬 Mốc trong Video MP4 Dài:</span>
+                    <span className="highlight-cyan font-mono font-bold text-sm">⏱️ {fullMovieTime}</span>
+                  </div>
+
+                  {/* Intro Tag Preview Banner */}
+                  <div className="char-tag-preview mt-2">
+                    <span className="tag-preview-label">Thẻ chú thích trên video:</span>
+                    <div className="tag-preview-box">
+                      {char.introTag || `【 NHÂN VẬT: ${char.name.toUpperCase()} | ${char.sect} | ${char.realm} 】`}
+                    </div>
                   </div>
                 </div>
-
-                <div className="char-badges-row flex-center gap-1 mt-2 mb-2" style={{ justifyContent: 'flex-start', flexWrap: 'wrap' }}>
-                  <span className="badge badge-role">{char.role}</span>
-                  <span className="badge badge-sect">{char.sect}</span>
-                  <span className="badge badge-realm">{char.realm}</span>
-                </div>
-
-                {char.quote && (
-                  <div className="char-quote text-muted mt-1">
-                    💬 <em>"{char.quote}"</em>
-                  </div>
-                )}
-
-                <div className="char-timestamp-row flex-between text-xs text-muted mt-2 pt-2 border-top">
-                  <span>📍 Lần đầu: <strong>{char.firstFileName || 'Tập 1'}</strong></span>
-                  <span className="highlight-cyan font-mono font-bold">⏱️ {char.firstTimestamp}</span>
-                </div>
-
-                {/* Intro Tag Preview Banner */}
-                <div className="char-tag-preview mt-2">
-                  <span className="tag-preview-label">Thẻ chú thích trên video:</span>
-                  <div className="tag-preview-box">
-                    {char.introTag || `【 NHÂN VẬT: ${char.name.toUpperCase()} | ${char.sect} | ${char.realm} 】`}
-                  </div>
-                </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
+
 
           {filteredCharacters.length === 0 && (
             <div className="empty-state card-panel text-center p-5">
