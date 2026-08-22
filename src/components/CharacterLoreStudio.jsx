@@ -1,7 +1,8 @@
 import React, { useState, useRef } from 'react';
 import { 
   Users, Sparkles, Plus, Download, Copy, Check, Trash2, Edit3, Film, 
-  Layers, Clock, Shield, Search, ChevronRight, Video, ArrowRight, BookOpen, AlertCircle, UploadCloud
+  Layers, Clock, Shield, Search, ChevronRight, Video, ArrowRight, BookOpen, AlertCircle, UploadCloud,
+  Eye, Camera, Play, CheckCircle2
 } from 'lucide-react';
 import { 
   extractCharactersWithAI, 
@@ -12,8 +13,11 @@ import {
   srtTimeToMs,
   readMediaDuration,
   findFileOffset,
-  computeFileOffsets
+  computeFileOffsets,
+  extractFramesFromVideo,
+  scanVideoFramesWithVisionAI
 } from '../utils/characterExtractor';
+
 
 
 // Extract clean file name without path, extension, symbols for fuzzy video matching
@@ -299,6 +303,98 @@ export default function CharacterLoreStudio({
 
 
 
+  // Vision Scanner States
+  const [visionVideoFile, setVisionVideoFile] = useState(null);
+  const [visionIntervalSec, setVisionIntervalSec] = useState(10);
+  const [visionMaxFrames, setVisionMaxFrames] = useState(150);
+  const [isVisionScanning, setIsVisionScanning] = useState(false);
+  const [visionProgress, setVisionProgress] = useState(null);
+  const [liveCurrentFrame, setLiveCurrentFrame] = useState(null);
+  const [visionDetectedChars, setVisionDetectedChars] = useState([]);
+  const visionInputRef = useRef(null);
+
+  // Handle Start Vision Scan on Video Frames
+  const handleStartVisionScan = async () => {
+    if (!visionVideoFile) {
+      alert('Vui lòng chọn hoặc kéo thả file video MP4 cần quét thị giác!');
+      return;
+    }
+
+    const effectiveKey = aiProvider === 'orimise'
+      ? (orimiseKey || 'sk-544e5d8289b304b8198e534f18da07085ce0768a95d2ca1b76970a2d8a1d082f')
+      : geminiKey;
+
+    if (!effectiveKey) {
+      alert(`Vui lòng nhập ${aiProvider === 'orimise' ? 'Orimise' : 'Google Gemini'} API Key trong Cấu Hình AI!`);
+      return;
+    }
+
+    setIsVisionScanning(true);
+    setVisionDetectedChars([]);
+    setVisionProgress({ phase: 'extracting', percent: 0, message: 'Đang trích xuất các khung hình từ video...' });
+
+    try {
+      // 1. Extract frames locally in browser canvas (0 MB video upload, ultra fast)
+      const frames = await extractFramesFromVideo(visionVideoFile, {
+        intervalSec: Number(visionIntervalSec),
+        maxFrames: Number(visionMaxFrames),
+        onProgress: (p) => {
+          setVisionProgress({
+            phase: 'extracting',
+            percent: p.percent,
+            message: `Đang chụp khung hình ${p.current}/${p.total} (Mốc ${p.timeFormatted})...`
+          });
+        }
+      });
+
+      if (frames.length === 0) {
+        throw new Error('Không trích xuất được khung hình nào từ video.');
+      }
+
+      // 2. Scan with Vision AI (Gemini Vision / Orimise Vision)
+      setVisionProgress({ phase: 'ai_scanning', percent: 0, message: `Bắt đầu gửi ${frames.length} khung hình sang AI Vision soi bảng tên chữ Hán...` });
+
+      const detected = await scanVideoFramesWithVisionAI({
+        frames,
+        videoFileName: visionVideoFile.name,
+        apiKey: effectiveKey,
+        aiProvider,
+        baseUrl: orimiseBaseUrl,
+        model: aiModel || 'gemini-2.5-flash',
+        batchSize: 4,
+        onProgress: (p) => {
+          setVisionProgress({
+            phase: 'ai_scanning',
+            percent: p.percent,
+            message: p.message
+          });
+          if (frames[p.current - 1]) {
+            setLiveCurrentFrame(frames[p.current - 1].base64Full);
+          }
+        }
+      });
+
+      if (detected.length === 0) {
+        alert('AI đã quét các khung hình nhưng không phát hiện bảng tên nhân vật nào. Bạn có thể chọn khoảng cách quét dày hơn (VD: 5 giây) để quét chi tiết hơn.');
+      } else {
+        setVisionDetectedChars(detected);
+        setCharacters(prev => {
+          const existingNames = new Set(prev.map(c => c.name.toLowerCase().trim()));
+          const newChars = detected.filter(c => !existingNames.has(c.name.toLowerCase().trim()));
+          return [...newChars, ...prev];
+        });
+        setScanProgress(`🎉 AI Vision đã tìm thấy ${detected.length} bảng tên nhân vật chính xác từng khung hình trên video!`);
+        setTimeout(() => setScanProgress(''), 5000);
+      }
+    } catch (err) {
+      alert(`Lỗi khi quét thị giác video: ${err.message}`);
+    } finally {
+      setIsVisionScanning(false);
+      setVisionProgress(null);
+      setLiveCurrentFrame(null);
+    }
+  };
+
   // Toggle Character Enabled
   const toggleCharacter = (id) => {
     setCharacters(prev => prev.map(c => c.id === id ? { ...c, enabled: !c.enabled } : c));
@@ -331,12 +427,18 @@ export default function CharacterLoreStudio({
 
   // Helper to compute cumulative full movie MP4 timestamp for each character
   const getFullMovieTimestamp = (char) => {
+    if (char.source === 'vision_ocr') {
+      return char.firstTimestamp; // Vision OCR has exact MP4 timestamp directly!
+    }
     const offset = findFileOffset(char, effectiveTargetFiles, fileOffsets);
     const localMs = srtTimeToMs(char.firstTimestamp);
     return msToSrtTime(offset + localMs);
   };
 
   const getFullMovieStartMs = (char) => {
+    if (char.source === 'vision_ocr') {
+      return srtTimeToMs(char.firstTimestamp);
+    }
     const offset = findFileOffset(char, effectiveTargetFiles, fileOffsets);
     const localMs = srtTimeToMs(char.firstTimestamp);
     return offset + localMs;
@@ -429,19 +531,28 @@ export default function CharacterLoreStudio({
           <Users className="text-cyan" size={24} />
           <div>
             <h2 className="section-title">HỒ SƠ NHÂN VẬT & CHÚ THÍCH PHỤ ĐỀ SRT</h2>
-            <p className="section-desc">AI tự động quét mốc xuất hiện của nhân vật, trích xuất cảnh giới, môn phái & tạo file thẻ chú thích khớp dòng thời gian video MP4</p>
+            <p className="section-desc">AI Thị Giác quét trực tiếp bảng tên đồ họa chữ Hán trên video MP4 & tạo file thẻ chú thích khớp 100% từng khung hình</p>
           </div>
         </div>
 
-        <div className="header-actions flex-center gap-2">
+        <div className="header-actions flex-center gap-2" style={{ flexWrap: 'wrap' }}>
           <button
-            className="btn btn-purple btn-glow font-bold flex-center gap-1"
+            className="btn btn-green-glow btn-glow font-bold flex-center gap-1"
+            onClick={() => setActiveTabSub('vision_scan')}
+            title="Sử dụng AI Thị Giác để quét trực tiếp bảng tên nhân vật đồ họa trên từng khung hình video MP4"
+          >
+            <Eye size={16} />
+            <span>👁️ AI Quét Thị Giác Video MP4</span>
+          </button>
+
+          <button
+            className="btn btn-purple btn-sm font-bold flex-center gap-1"
             onClick={handleScanCharacters}
             disabled={isScanning}
-            title={`AI tự động phân tích ${effectiveTargetFiles.length} tập phim đang chọn`}
+            title={`AI tự động phân tích phụ đề SRT từ ${effectiveTargetFiles.length} tập phim đang chọn`}
           >
-            <Sparkles size={16} className={isScanning ? 'spinner' : ''} />
-            <span>{isScanning ? 'Đang Quét Nhân Vật...' : `🧠 AI Quét Nhân Vật (${effectiveTargetFiles.length} Tập)`}</span>
+            <Sparkles size={15} className={isScanning ? 'spinner' : ''} />
+            <span>{isScanning ? 'Đang Quét SRT...' : `Quét Từ Phụ Đề SRT (${effectiveTargetFiles.length} Tập)`}</span>
           </button>
 
           <button
@@ -462,7 +573,7 @@ export default function CharacterLoreStudio({
               setIsModalOpen(true);
             }}
           >
-            <Plus size={15} /> Thêm Nhân Vật
+            <Plus size={15} /> Thêm Thủ Công
           </button>
         </div>
       </div>
@@ -482,6 +593,14 @@ export default function CharacterLoreStudio({
             onClick={() => setActiveTabSub('characters')}
           >
             <Users size={16} /> Danh Sách Nhân Vật ({characters.length})
+          </button>
+
+          <button
+            className={`tab-pill-btn ${activeTabSub === 'vision_scan' ? 'active' : ''}`}
+            onClick={() => setActiveTabSub('vision_scan')}
+            style={{ borderColor: 'var(--green-glow, #10b981)' }}
+          >
+            <Eye size={16} className="text-green" /> 👁️ AI Quét Khung Hình Video MP4
           </button>
 
           <button
@@ -520,6 +639,7 @@ export default function CharacterLoreStudio({
           </button>
         </div>
       </div>
+
 
       {/* TAB 1: CHARACTER CARDS GRID */}
       {activeTabSub === 'characters' && (
@@ -595,10 +715,23 @@ export default function CharacterLoreStudio({
                     </div>
                   </div>
 
+                  {/* Character Video Frame Snapshot Thumbnail */}
+                  {char.thumbnail && (
+                    <div className="char-thumbnail-preview mt-2 mb-2" style={{ borderRadius: '8px', overflow: 'hidden', border: '1px solid rgba(6, 182, 212, 0.4)', position: 'relative' }}>
+                      <img src={char.thumbnail} alt={char.name} style={{ width: '100%', height: '140px', objectFit: 'cover' }} />
+                      <div style={{ position: 'absolute', bottom: '6px', left: '6px', background: 'rgba(0,0,0,0.75)', padding: '2px 6px', borderRadius: '4px', fontSize: '11px', color: '#38bdf8' }}>
+                        👁️ Khung hình video ({char.firstTimestamp})
+                      </div>
+                    </div>
+                  )}
+
                   <div className="char-badges-row flex-center gap-1 mt-2 mb-2" style={{ justifyContent: 'flex-start', flexWrap: 'wrap' }}>
                     <span className="badge badge-role">{char.role}</span>
                     <span className="badge badge-sect">{char.sect}</span>
                     <span className="badge badge-realm">{char.realm}</span>
+                    {char.source === 'vision_ocr' && (
+                      <span className="badge badge-done" style={{ fontSize: '10px' }}>👁️ Thị Giác Video</span>
+                    )}
                   </div>
 
                   {char.quote && (
@@ -634,11 +767,212 @@ export default function CharacterLoreStudio({
             <div className="empty-state card-panel text-center p-5">
               <Users size={48} className="text-muted mb-2" />
               <h3>Chưa có nhân vật nào trong hồ sơ</h3>
-              <p className="text-muted">Nhấn <strong>"🧠 AI Quét Nhân Vật"</strong> để AI tự động đọc kịch bản và lập hồ sơ toàn bộ nhân vật!</p>
+              <p className="text-muted">Nhấn <strong>"👁️ AI Quét Thị Giác Video MP4"</strong> để AI soi trực tiếp bảng tên đồ họa trên từng khung hình video!</p>
             </div>
           )}
         </div>
       )}
+
+      {/* TAB 2: AI VIDEO VISION SCANNER (BẢNG TÊN & CHỮ HÁN TRÊN KHUNG HÌNH VIDEO) */}
+      {activeTabSub === 'vision_scan' && (
+        <div className="vision-scan-tab-content fade-in">
+          {/* Banner Introduction */}
+          <div className="alert-box green mb-3">
+            <Eye size={24} className="text-green flex-shrink-0" />
+            <div>
+              <strong className="text-lg">AI Quét Thị Giác Khung Hình Video MP4 (Bảng Tên Đồ Họa & Chữ Hán Cổ Trang)</strong>
+              <p className="text-sm mt-1">
+                AI sẽ trực tiếp soi các khung hình video để phát hiện bảng tên nhân vật đồ họa (ví dụ: bảng đỏ <strong>[主角]</strong>, chữ thư pháp <strong>[赵昀]</strong>, môn phái, cảnh giới...) xuất hiện trên màn hình. Mốc thời gian được lấy <strong>chính xác 100% từng khung hình</strong> và tự động chụp lại ảnh đại diện nhân vật!
+              </p>
+            </div>
+          </div>
+
+          {/* Video Drop / File Selection Zone */}
+          <div 
+            className={`video-detection-bar card-panel p-4 mb-3 ${isDraggingVideo ? 'drag-over' : ''}`}
+            style={{ 
+              border: '2px dashed rgba(16, 185, 129, 0.4)',
+              background: 'rgba(16, 185, 129, 0.05)',
+              borderRadius: '12px'
+            }}
+            onDragOver={(e) => { e.preventDefault(); setIsDraggingVideo(true); }}
+            onDragLeave={() => setIsDraggingVideo(false)}
+            onDrop={(e) => { 
+              e.preventDefault(); 
+              setIsDraggingVideo(false); 
+              const rawFiles = Array.from(e.dataTransfer?.files || []);
+              const video = rawFiles.find(f => f.type.startsWith('video/') || /\.(mp4|mkv|avi|mov|webm|flv|ts|m4v)$/i.test(f.name));
+              if (video) setVisionVideoFile(video);
+            }}
+          >
+            <div className="flex-between" style={{ flexWrap: 'wrap', gap: '16px' }}>
+              <div className="flex-center gap-3">
+                <div style={{ background: 'rgba(16, 185, 129, 0.2)', padding: '12px', borderRadius: '10px' }}>
+                  <Video className="text-green" size={32} />
+                </div>
+                <div>
+                  <h4 className="font-bold text-lg">
+                    {visionVideoFile ? `🎬 Đã nạp: ${visionVideoFile.name}` : 'Kéo Thả Video MP4 Cần Quét Hoặc Chọn Từ Máy Tính'}
+                  </h4>
+                  <p className="text-xs text-muted mt-1">
+                    {visionVideoFile 
+                      ? `Dung lượng: ${(visionVideoFile.size / (1024 * 1024)).toFixed(1)} MB (Đọc trực tiếp trong trình duyệt, không tốn băng thông upload)` 
+                      : 'Hỗ trợ các định dạng .MP4, .MKV, .AVI, .MOV...'}
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex-center gap-2">
+                <input
+                  type="file"
+                  ref={visionInputRef}
+                  accept="video/*,.mp4,.mkv,.avi,.mov,.webm,.flv,.ts,.m4v"
+                  style={{ display: 'none' }}
+                  onChange={(e) => {
+                    if (e.target.files?.[0]) setVisionVideoFile(e.target.files[0]);
+                  }}
+                />
+                <button
+                  className="btn btn-secondary flex-center gap-1 font-bold"
+                  onClick={() => visionInputRef.current?.click()}
+                >
+                  <UploadCloud size={16} /> {visionVideoFile ? 'Đổi Video Khác' : 'Chọn File Video MP4'}
+                </button>
+              </div>
+            </div>
+
+            {/* Vision Scan Controls */}
+            {visionVideoFile && (
+              <div className="vision-controls-row mt-4 pt-3 border-top flex-between" style={{ flexWrap: 'wrap', gap: '16px' }}>
+                <div className="flex-center gap-3" style={{ flexWrap: 'wrap' }}>
+                  <div className="flex-center gap-1 text-sm">
+                    <Clock size={15} className="text-muted" />
+                    <span>Tần suất chụp frame:</span>
+                    <select
+                      value={visionIntervalSec}
+                      onChange={(e) => setVisionIntervalSec(Number(e.target.value))}
+                      className="input-field select-field input-sm font-bold"
+                    >
+                      <option value={5}>Mỗi 5 giây (Quét rất kỹ)</option>
+                      <option value={10}>Mỗi 10 giây (Khuyên dùng - Cân bằng & Chuẩn)</option>
+                      <option value={15}>Mỗi 15 giây (Nhanh)</option>
+                      <option value={20}>Mỗi 20 giây (Siêu nhanh)</option>
+                    </select>
+                  </div>
+
+                  <div className="flex-center gap-1 text-sm">
+                    <Layers size={15} className="text-muted" />
+                    <span>Số frame tối đa:</span>
+                    <select
+                      value={visionMaxFrames}
+                      onChange={(e) => setVisionMaxFrames(Number(e.target.value))}
+                      className="input-field select-field input-sm font-bold"
+                    >
+                      <option value={80}>80 Khung hình (~15 phút phim)</option>
+                      <option value={150}>150 Khung hình (~25-30 phút phim)</option>
+                      <option value={250}>250 Khung hình (Phim dài)</option>
+                    </select>
+                  </div>
+                </div>
+
+                <button
+                  className="btn btn-green-glow font-bold flex-center gap-2"
+                  style={{ padding: '10px 24px', fontSize: '15px' }}
+                  onClick={handleStartVisionScan}
+                  disabled={isVisionScanning}
+                >
+                  <Eye size={18} className={isVisionScanning ? 'spinner' : ''} />
+                  <span>{isVisionScanning ? 'Đang Quét Thị Giác...' : '🚀 BẮT ĐẦU QUÉT THỊ GIÁC VIDEO'}</span>
+                </button>
+              </div>
+            )}
+          </div>
+
+          {/* Live Scanning Status & Preview Box */}
+          {isVisionScanning && visionProgress && (
+            <div className="live-vision-box card-panel p-4 mb-4" style={{ background: 'rgba(0,0,0,0.4)', border: '1px solid rgba(16, 185, 129, 0.4)' }}>
+              <div className="flex-between mb-2">
+                <div className="flex-center gap-2">
+                  <Sparkles size={18} className="text-green spinner" />
+                  <strong className="text-green">{visionProgress.message}</strong>
+                </div>
+                <span className="font-bold highlight-cyan">{visionProgress.percent}%</span>
+              </div>
+
+              {/* Progress Bar */}
+              <div style={{ width: '100%', height: '8px', background: 'rgba(255,255,255,0.1)', borderRadius: '4px', overflow: 'hidden' }} className="mb-3">
+                <div 
+                  style={{ 
+                    width: `${visionProgress.percent}%`, 
+                    height: '100%', 
+                    background: 'linear-gradient(90deg, #10b981, #06b6d4)', 
+                    transition: 'width 0.3s ease' 
+                  }} 
+                />
+              </div>
+
+              {/* Live Frame Preview */}
+              {liveCurrentFrame && (
+                <div className="flex-center flex-column gap-2 mt-2">
+                  <div style={{ position: 'relative', maxWidth: '420px', borderRadius: '8px', overflow: 'hidden', border: '2px solid #10b981' }}>
+                    <img src={liveCurrentFrame} alt="Live frame" style={{ width: '100%', display: 'block' }} />
+                    <div style={{ position: 'absolute', top: '8px', left: '8px', background: 'rgba(0,0,0,0.7)', color: '#10b981', padding: '3px 8px', borderRadius: '4px', fontSize: '11px', fontWeight: 'bold' }}>
+                      🔴 LIVE AI VISION SCANNING
+                    </div>
+                  </div>
+                  <span className="text-xs text-muted">AI đang phóng to soi chữ thư pháp và bảng đỏ trên khung hình này</span>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Detected Characters Live List from Vision */}
+          {visionDetectedChars.length > 0 && (
+            <div className="vision-results-card card-panel p-4 mb-3">
+              <div className="flex-between mb-3">
+                <div className="flex-center gap-2">
+                  <CheckCircle2 size={20} className="text-green" />
+                  <h3 className="font-bold">Đã Nhận Diện {visionDetectedChars.length} Bảng Tên Nhân Vật Từ Video MP4:</h3>
+                </div>
+                <button
+                  className="btn btn-cyan btn-sm font-bold flex-center gap-1"
+                  onClick={() => handleExportIntroSRT(true)}
+                >
+                  <Download size={14} /> Xuất Thẻ Chú Thích (.SRT Khớp 100% Video)
+                </button>
+              </div>
+
+              <div className="character-grid">
+                {visionDetectedChars.map((char) => (
+                  <div key={char.id} className="character-card card-panel enabled" style={{ border: '1px solid rgba(16, 185, 129, 0.4)' }}>
+                    {char.thumbnail && (
+                      <div style={{ borderRadius: '6px', overflow: 'hidden', marginBottom: '8px', border: '1px solid rgba(16, 185, 129, 0.3)' }}>
+                        <img src={char.thumbnail} alt={char.name} style={{ width: '100%', height: '140px', objectFit: 'cover' }} />
+                      </div>
+                    )}
+                    <div className="flex-between">
+                      <h4 className="font-bold text-base text-green">{char.name} {char.originalName ? `(${char.originalName})` : ''}</h4>
+                      <span className="badge badge-done" style={{ fontSize: '10px' }}>👁️ Bảng Tên Video</span>
+                    </div>
+                    <div className="flex-center gap-1 mt-1 mb-1" style={{ justifyContent: 'flex-start' }}>
+                      <span className="badge badge-role">{char.role}</span>
+                      <span className="badge badge-sect">{char.sect}</span>
+                    </div>
+                    <div className="text-xs mt-2 pt-2 border-top flex-between">
+                      <span className="text-muted">Mốc xuất hiện trên video:</span>
+                      <strong className="text-cyan font-mono text-sm">⏱️ {char.firstTimestamp}</strong>
+                    </div>
+                    <div className="tag-preview-box mt-2 text-xs">
+                      {char.introTag}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
 
       {/* TAB 2: TIMELINE STITCHING & CONTINUOUS FULL MOVIE */}
       {activeTabSub === 'stitching' && (

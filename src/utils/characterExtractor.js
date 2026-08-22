@@ -1,6 +1,265 @@
 import { parseSRT, generateSRT } from './srtParser';
 
-// Default Character Lore System Prompt for Xianxia/Anime
+// Vision Character Detection Prompt for Chinese 3D Donghua / Xianxia Videos
+export const VISION_CHARACTER_PROMPT = `
+Bạn là Chuyên gia Thị giác AI & OCR Phim Hoạt Hình 3D Trung Quốc / Tu Tiên / Kiếm Hiệp.
+Nhiệm vụ của bạn là soi kỹ các khung hình video được gửi kèm để tìm BẢNG TÊN / THẺ CHÚ THÍCH NHÂN VẬT (Character Introduction Graphic).
+
+ĐẶC ĐIỂM BẢNG TÊN NHÂN VẬT TRÊN PHIM HOẠT HÌNH TRUNG QUỐC:
+- Chữ Hán thư pháp lớn dọc hoặc ngang cạnh nhân vật (VD: 赵昀, 萧炎, 陆阳, 慕容复, 林动...).
+- Nhãn đỏ / Khung đỏ / Bảng bài chứa thân phận: 主角 (Chủ Giác = Nhân vật chính), 反派 (Phản Diện), 宗主 (Tông Chủ), 大师兄 (Đại Sư Huynh), 长老 (Trưởng Lão), 圣女 (Thánh Nữ)...
+- Có thể kèm theo Môn phái (VD: 玄天宗, 青云门, 萧家, 云岚宗) và Cảnh giới tu luyện (VD: 洞虚境, 七境, 金丹, 斗之气...).
+
+YÊU CẦU ĐẦU RA JSON ARRAY CHÍNH XÁC:
+[
+  {
+    "hasCharacterTag": true,
+    "frameIndex": 1,
+    "timestamp": "00:00:18,200",
+    "name": "Tên nhân vật Hán-Việt chuẩn xác (VD: Triệu Quân, Tiêu Viêm, Lục Dương)",
+    "originalName": "Chữ Hán trên bảng tên video (VD: 赵昀, 萧炎)",
+    "role": "Thân phận ghi trên bảng đỏ/thư pháp (VD: Nhân vật chính / 主角, Đại sư huynh, Tông chủ)",
+    "sect": "Tông môn / Gia tộc nếu có ghi trên màn hình (VD: Huyền Thiên Tông, Tiêu Gia)",
+    "realm": "Cảnh giới tu luyện nếu có ghi (VD: Động Hư Cảnh, Kim Đan, Thất Cảnh)",
+    "introTag": "【 NHÂN VẬT: TRIỆU QUÂN | HUYỀN THIÊN TÔNG | CHỦ GIÁC 】",
+    "description": "Mô tả ngắn trang phục / bối cảnh lúc xuất hiện"
+  }
+]
+Nếu không có khung hình nào chứa bảng tên nhân vật, trả về mảng rỗng [].
+`;
+
+// Extract video frames in browser memory via HTML5 Canvas
+export async function extractFramesFromVideo(videoFile, {
+  intervalSec = 10,
+  maxFrames = 150,
+  onProgress = () => {},
+  videoDuration = 0
+}) {
+  return new Promise((resolve, reject) => {
+    const video = document.createElement('video');
+    video.preload = 'auto';
+    video.muted = true;
+    video.playsInline = true;
+    const url = URL.createObjectURL(videoFile);
+    video.src = url;
+
+    const canvas = document.createElement('canvas');
+    // Resolution for optimal vision token usage and high OCR accuracy (640x360)
+    canvas.width = 640;
+    canvas.height = 360;
+    const ctx = canvas.getContext('2d');
+
+    video.onloadedmetadata = async () => {
+      const duration = videoDuration || video.duration;
+      const timestamps = [];
+      for (let t = 2; t < duration; t += intervalSec) {
+        timestamps.push(Math.round(t * 10) / 10);
+        if (timestamps.length >= maxFrames) break;
+      }
+
+      const frames = [];
+
+      for (let i = 0; i < timestamps.length; i++) {
+        const time = timestamps[i];
+        if (onProgress) {
+          onProgress({
+            phase: 'extracting',
+            current: i + 1,
+            total: timestamps.length,
+            time,
+            timeFormatted: msToSrtTime(time * 1000),
+            percent: Math.round(((i + 1) / timestamps.length) * 100)
+          });
+        }
+
+        await new Promise((res) => {
+          let timeoutTimer;
+          const onSeeked = () => {
+            clearTimeout(timeoutTimer);
+            video.removeEventListener('seeked', onSeeked);
+            ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+            const base64Full = canvas.toDataURL('image/jpeg', 0.65);
+            const base64Data = base64Full.split(',')[1];
+            frames.push({
+              frameIndex: i + 1,
+              timestampSec: time,
+              timestampFormatted: msToSrtTime(time * 1000),
+              base64Data,
+              base64Full
+            });
+            res();
+          };
+          timeoutTimer = setTimeout(() => {
+            video.removeEventListener('seeked', onSeeked);
+            res();
+          }, 3500);
+          video.addEventListener('seeked', onSeeked);
+          video.currentTime = time;
+        });
+      }
+
+      URL.revokeObjectURL(url);
+      video.src = '';
+      resolve(frames);
+    };
+
+    video.onerror = () => {
+      URL.revokeObjectURL(url);
+      reject(new Error('Không thể tải video để trích xuất khung hình.'));
+    };
+  });
+}
+
+// Scan video frames using Gemini Vision or Orimise Vision in small batches
+export async function scanVideoFramesWithVisionAI({
+  frames = [],
+  videoFileName = 'video.mp4',
+  apiKey,
+  aiProvider = 'orimise',
+  baseUrl = 'https://api.orimise.com/v1',
+  model = 'gemini-2.5-flash',
+  batchSize = 4,
+  onProgress = () => {}
+}) {
+  if (!frames || frames.length === 0) return [];
+  if (!apiKey) {
+    throw new Error(`Vui lòng nhập ${aiProvider === 'orimise' ? 'Orimise' : 'Google Gemini'} API Key trong Cấu Hình AI!`);
+  }
+
+  const allDetectedCharacters = [];
+  const seenNames = new Set();
+
+  for (let i = 0; i < frames.length; i += batchSize) {
+    const batch = frames.slice(i, i + batchSize);
+    const batchInfo = batch.map((f, idx) => `[Ảnh ${idx + 1} lúc ${f.timestampFormatted}]`).join(', ');
+
+    if (onProgress) {
+      onProgress({
+        phase: 'ai_scanning',
+        current: Math.min(i + batchSize, frames.length),
+        total: frames.length,
+        percent: Math.round((Math.min(i + batchSize, frames.length) / frames.length) * 100),
+        message: `AI Vision đang soi bảng tên chữ Hán tại các mốc ${batchInfo}...`
+      });
+    }
+
+    const userPromptText = `${VISION_CHARACTER_PROMPT}\n\nDưới đây là ${batch.length} khung hình chụp từ video: ${batchInfo}. Hãy kiểm tra xem có bảng tên nhân vật nào xuất hiện không!`;
+
+    let rawResult = '';
+
+    try {
+      if (aiProvider === 'orimise') {
+        const content = [
+          { type: 'text', text: userPromptText }
+        ];
+        batch.forEach((f) => {
+          content.push({
+            type: 'image_url',
+            image_url: {
+              url: `data:image/jpeg;base64,${f.base64Data}`
+            }
+          });
+        });
+
+        const endpoint = baseUrl.endsWith('/chat/completions')
+          ? baseUrl
+          : `${baseUrl.replace(/\/$/, '')}/chat/completions`;
+
+        const response = await fetch(endpoint, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${apiKey}`
+          },
+          body: JSON.stringify({
+            model: model || 'gemini-2.5-flash',
+            messages: [{ role: 'user', content }],
+            temperature: 0.2
+          })
+        });
+
+        if (response.ok) {
+          const data = await response.json();
+          rawResult = data.choices?.[0]?.message?.content || '';
+        }
+      } else {
+        // Google Gemini Vision API
+        const parts = [{ text: userPromptText }];
+        batch.forEach((f) => {
+          parts.push({
+            inlineData: {
+              mimeType: 'image/jpeg',
+              data: f.base64Data
+            }
+          });
+        });
+
+        const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
+        const response = await fetch(url, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            contents: [{ role: 'user', parts }],
+            generationConfig: {
+              temperature: 0.2,
+              responseMimeType: 'application/json'
+            }
+          })
+        });
+
+        if (response.ok) {
+          const data = await response.json();
+          rawResult = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
+        }
+      }
+
+      if (rawResult) {
+        let jsonStr = rawResult.trim();
+        if (jsonStr.startsWith('```json')) {
+          jsonStr = jsonStr.replace(/^```json/, '').replace(/```$/, '').trim();
+        } else if (jsonStr.startsWith('```')) {
+          jsonStr = jsonStr.replace(/^```/, '').replace(/```$/, '').trim();
+        }
+
+        const detectedList = JSON.parse(jsonStr);
+        if (Array.isArray(detectedList)) {
+          detectedList.forEach((char) => {
+            const cleanName = (char.name || '').trim().toLowerCase();
+            if (cleanName && !seenNames.has(cleanName)) {
+              seenNames.add(cleanName);
+
+              // Find closest frame to attach thumbnail
+              const matchedFrame = (char.frameIndex && batch[char.frameIndex - 1]) ? batch[char.frameIndex - 1] : batch[0];
+              const actualTimestamp = char.timestamp || matchedFrame.timestampFormatted;
+
+              allDetectedCharacters.push({
+                id: `char_vision_${Date.now()}_${allDetectedCharacters.length}`,
+                name: char.name || 'Nhân vật',
+                originalName: char.originalName || '',
+                role: char.role || 'Chưa rõ',
+                sect: char.sect || 'Vô Môn Phái',
+                realm: char.realm || 'Chưa rõ',
+                firstFileName: videoFileName,
+                firstTimestamp: actualTimestamp,
+                firstEndTimestamp: msToSrtTime(srtTimeToMs(actualTimestamp) + 5000),
+                thumbnail: matchedFrame.base64Full,
+                introTag: char.introTag || `【 NHÂN VẬT: ${char.name.toUpperCase()} | ${char.sect || 'VÔ MÔN PHÁI'} | ${char.role || ''} 】`,
+                source: 'vision_ocr',
+                enabled: true
+              });
+            }
+          });
+        }
+      }
+    } catch (err) {
+      console.warn("Lỗi khi phân tích batch frame vision:", err);
+    }
+  }
+
+  return allDetectedCharacters;
+}
+
+// Default Character Lore System Prompt for Xianxia/Anime (SRT Text Fallback)
 export const CHARACTER_EXTRACTION_PROMPT = `
 Bạn là Chuyên gia Phân Tích Nhân Vật & Cốt Truyện Phim Hoạt Hình 3D Trung Quốc / Tu Tiên / Kiếm Hiệp.
 Nhiệm vụ của bạn là đọc toàn bộ danh sách phụ đề của các tập phim dưới đây và trích xuất DANH SÁCH TẤT CẢ NHÂN VẬT XUẤT HIỆN LẦN ĐẦU (First Appearance).
@@ -24,6 +283,7 @@ YÊU CẦU ĐẦU RA JSON CHÍNH XÁC (KHÔNG thêm markdown hay văn bản ngo�
   }
 ]
 `;
+
 
 // Extract characters with AI (supports both Orimise and Gemini APIs)
 export async function extractCharactersWithAI({
