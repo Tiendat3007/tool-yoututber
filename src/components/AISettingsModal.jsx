@@ -168,20 +168,37 @@ export default function AISettingsModal({
                 <label className="form-label">Mô Hình AI Đang Hoạt Động (Orimise Active Models):</label>
                 <select
                   className="input-field select-field"
-                  value={aiModel}
-                  onChange={e => setAiModel(e.target.value)}
+                  value={['gemini-2.5-flash', 'claude-sonnet-5', 'claude-fable-5', 'gemini-3.6-flash', 'gpt-5.6-sol', 'gpt-5.6-luna', 'claude-opus-5'].includes(aiModel) ? aiModel : 'custom'}
+                  onChange={e => {
+                    if (e.target.value !== 'custom') {
+                      setAiModel(e.target.value);
+                    }
+                  }}
                 >
-                  <option value="gemini-2.5-flash">⚡ gemini-2.5-flash (Khuyên dùng 1 - Siêu nhanh, Chuẩn Tu Tiên)</option>
-                  <option value="claude-sonnet-5">🎨 claude-sonnet-5 (Khuyên dùng 2 - Đỉnh cao văn học Anthropic Claude)</option>
+                  <option value="gemini-2.5-flash">⚡ gemini-2.5-flash (Khuyên dùng 1 - Siêu nhanh, Chuẩn Tu Tiên & Vision)</option>
+                  <option value="claude-fable-5">🎭 claude-fable-5 (Model sáng tạo văn phong & dịch thuật của Orimise)</option>
+                  <option value="claude-sonnet-5">🎨 claude-sonnet-5 (Đỉnh cao văn học Anthropic Claude)</option>
                   <option value="gemini-3.6-flash">gemini-3.6-flash (Google Gemini 3.6 Mới nhất)</option>
                   <option value="gpt-5.6-sol">gpt-5.6-sol (Mô hình OpenAI GPT-5.6)</option>
                   <option value="gpt-5.6-luna">gpt-5.6-luna (Mô hình OpenAI GPT-5.6 Luna)</option>
                   <option value="claude-opus-5">claude-opus-5 (Anthropic Claude Opus 5)</option>
-                  <option value="claude-haiku-4-5-20251001">claude-4.5-haiku (Lưu ý: Bị Orimise bọc CLI Code - Không nên dùng)</option>
+                  <option value="custom">⚙️ Tự Nhập Tên Model Khác...</option>
                 </select>
 
-
+                {!['gemini-2.5-flash', 'claude-sonnet-5', 'claude-fable-5', 'gemini-3.6-flash', 'gpt-5.6-sol', 'gpt-5.6-luna', 'claude-opus-5'].includes(aiModel) && (
+                  <div className="mt-2">
+                    <label className="text-xs text-muted mb-1 block">Nhập chính xác mã Model từ Orimise:</label>
+                    <input
+                      type="text"
+                      className="input-field font-mono text-cyan input-sm"
+                      value={aiModel}
+                      onChange={e => setAiModel(e.target.value)}
+                      placeholder="VD: claude-fable-5, claude-3-7-sonnet..."
+                    />
+                  </div>
+                )}
               </div>
+
             </>
           ) : (
             <>
