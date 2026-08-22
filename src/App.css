@@ -2091,10 +2091,19 @@
   background: rgba(255, 255, 255, 0.02);
 }
 
+.stitching-table tr.selected-row {
+  background: rgba(168, 85, 247, 0.14) !important;
+}
+
+.stitching-table tr.selected-row td {
+  border-color: rgba(168, 85, 247, 0.25);
+}
+
 .full-movie-actions-card {
   background: linear-gradient(135deg, rgba(168, 85, 247, 0.12), rgba(6, 182, 212, 0.12));
   border: 1px solid rgba(168, 85, 247, 0.35);
   border-radius: 12px;
 }
+
 
 

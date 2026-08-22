@@ -29,6 +29,10 @@ export default function CharacterLoreStudio({
   const [copiedText, setCopiedText] = useState(false);
   const [activeTabSub, setActiveTabSub] = useState('characters'); // 'characters' | 'stitching'
 
+  // File filtering and selection for timeline stitching & selective AI scan
+  const [fileSearchQuery, setFileSearchQuery] = useState('');
+  const [selectedFileIds, setSelectedFileIds] = useState([]);
+
   // Video Duration Table for Timeline Stitching: { [fileId]: durationInSeconds }
   const [fileDurations, setFileDurations] = useState({});
   const [gapSeconds, setGapSeconds] = useState(0);
@@ -38,6 +42,34 @@ export default function CharacterLoreStudio({
   const [isModalOpen, setIsModalOpen] = useState(false);
 
   const videoInputRef = useRef(null);
+
+  // Filtered files for timeline stitching
+  const filteredFiles = files.filter(f => f.name.toLowerCase().includes(fileSearchQuery.toLowerCase()));
+
+  // Effective target files for scanning and stitching
+  const effectiveTargetFiles = selectedFileIds.length > 0 
+    ? files.filter(f => selectedFileIds.includes(f.id)) 
+    : (fileSearchQuery ? filteredFiles : files);
+
+  const isAllFilteredSelected = filteredFiles.length > 0 && filteredFiles.every(f => selectedFileIds.includes(f.id));
+  const someFilteredSelected = filteredFiles.some(f => selectedFileIds.includes(f.id));
+
+  const handleSelectAllFilteredFiles = () => {
+    const filteredIdSet = new Set(filteredFiles.map(f => f.id));
+    setSelectedFileIds(prev => Array.from(new Set([...prev, ...filteredIdSet])));
+  };
+
+  const handleDeselectFilteredFiles = () => {
+    const filteredIdSet = new Set(filteredFiles.map(f => f.id));
+    setSelectedFileIds(prev => prev.filter(id => !filteredIdSet.has(id)));
+  };
+
+  const toggleSelectFile = (fileId, e) => {
+    e?.stopPropagation();
+    setSelectedFileIds(prev =>
+      prev.includes(fileId) ? prev.filter(id => id !== fileId) : [...prev, fileId]
+    );
+  };
 
   // Handle AI Scan
   const handleScanCharacters = async () => {
@@ -49,17 +81,17 @@ export default function CharacterLoreStudio({
       alert(`Vui lòng nhập ${aiProvider === 'orimise' ? 'Orimise' : 'Google Gemini'} API Key trong mục "Cấu Hình AI Gemini" trước khi quét!`);
       return;
     }
-    if (!files || files.length === 0) {
-      alert('Vui lòng nạp ít nhất 1 file phụ đề SRT trong mục "Biên Tập Subtitle"!');
+    if (!effectiveTargetFiles || effectiveTargetFiles.length === 0) {
+      alert('Vui lòng chọn ít nhất 1 file phụ đề SRT để quét!');
       return;
     }
 
     setIsScanning(true);
-    setScanProgress(`AI đang đọc và phân tích cốt truyện từ ${files.length} tập phim...`);
+    setScanProgress(`AI đang đọc và phân tích cốt truyện từ ${effectiveTargetFiles.length} tập phim...`);
 
     try {
       const extracted = await extractCharactersWithAI({
-        files,
+        files: effectiveTargetFiles,
         apiKey: effectiveKey,
         aiProvider,
         baseUrl: orimiseBaseUrl,
@@ -84,6 +116,7 @@ export default function CharacterLoreStudio({
       setIsScanning(false);
     }
   };
+
 
 
   // Handle Video Upload to auto-detect clip durations
@@ -149,32 +182,32 @@ export default function CharacterLoreStudio({
 
   // Export SRT Intro Tags
   const handleExportIntroSRT = (isFullMovie = false) => {
-    const srtContent = generateCharacterIntroSRT(characters, files, isFullMovie, fileDurations);
+    const srtContent = generateCharacterIntroSRT(characters, effectiveTargetFiles, isFullMovie, fileDurations);
     if (!srtContent) {
       alert('Chưa có nhân vật nào được bật để xuất file chú thích!');
       return;
     }
-    downloadTextFile(srtContent, isFullMovie ? 'Full_Movie_Character_Tags.srt' : 'Character_Intro_Tags.srt');
+    downloadTextFile(srtContent, isFullMovie ? `Full_Movie_${effectiveTargetFiles.length}Tap_Character_Tags.srt` : 'Character_Intro_Tags.srt');
   };
 
   // Export ASS Intro Tags (Stylized Calligraphy)
   const handleExportIntroASS = (isFullMovie = false) => {
-    const assContent = generateCharacterIntroASS(characters, files, isFullMovie, fileDurations);
+    const assContent = generateCharacterIntroASS(characters, effectiveTargetFiles, isFullMovie, fileDurations);
     if (!assContent) {
       alert('Chưa có nhân vật nào được bật để xuất file chú thích!');
       return;
     }
-    downloadTextFile(assContent, isFullMovie ? 'Full_Movie_Character_Tags.ass' : 'Character_Intro_Tags.ass');
+    downloadTextFile(assContent, isFullMovie ? `Full_Movie_${effectiveTargetFiles.length}Tap_Character_Tags.ass` : 'Character_Intro_Tags.ass');
   };
 
   // Export Full Stitched Movie SRT (Continuous Timeline)
   const handleExportFullStitchedSRT = () => {
-    if (!files || files.length === 0) {
-      alert('Chưa có file phụ đề nào để ghép nối!');
+    if (!effectiveTargetFiles || effectiveTargetFiles.length === 0) {
+      alert('Chưa có tập phim nào được chọn để ghép nối!');
       return;
     }
-    const fullSRT = stitchAllFilesToFullMovieSRT(files, fileDurations, gapSeconds);
-    downloadTextFile(fullSRT, 'Full_Movie_TronBo_Continuous.srt');
+    const fullSRT = stitchAllFilesToFullMovieSRT(effectiveTargetFiles, fileDurations, gapSeconds);
+    downloadTextFile(fullSRT, `Full_Movie_${effectiveTargetFiles.length}Tap_TronBo_Continuous.srt`);
   };
 
   // Copy Lore to Clipboard for YouTube Community/Description
@@ -218,6 +251,10 @@ export default function CharacterLoreStudio({
     return matchesSearch;
   });
 
+  const targetLabel = selectedFileIds.length > 0
+    ? `${selectedFileIds.length} Tập Đang Chọn`
+    : (fileSearchQuery ? `${filteredFiles.length} Tập Đang Lọc ("${fileSearchQuery}")` : `Tất Cả ${files.length} Tập`);
+
   return (
     <div className="character-lore-studio card-panel fade-in">
       {/* Header Banner */}
@@ -235,10 +272,10 @@ export default function CharacterLoreStudio({
             className="btn btn-purple btn-glow font-bold flex-center gap-1"
             onClick={handleScanCharacters}
             disabled={isScanning}
-            title="AI tự động phân tích toàn bộ phụ đề và tạo hồ sơ nhân vật"
+            title={`AI tự động phân tích ${effectiveTargetFiles.length} tập phim đang chọn`}
           >
             <Sparkles size={16} className={isScanning ? 'spinner' : ''} />
-            <span>{isScanning ? 'Đang Quét Nhân Vật...' : `🧠 AI Quét Nhân Vật (${files.length} File)`}</span>
+            <span>{isScanning ? 'Đang Quét Nhân Vật...' : `🧠 AI Quét Nhân Vật (${effectiveTargetFiles.length} Tập)`}</span>
           </button>
 
           <button
@@ -272,7 +309,7 @@ export default function CharacterLoreStudio({
       )}
 
       {/* Sub Navigation Bar */}
-      <div className="sub-nav-bar mt-3 mb-3 flex-between">
+      <div className="sub-nav-bar mt-3 mb-3 flex-between" style={{ flexWrap: 'wrap', gap: '12px' }}>
         <div className="flex-center gap-2">
           <button
             className={`tab-pill-btn ${activeTabSub === 'characters' ? 'active' : ''}`}
@@ -285,7 +322,7 @@ export default function CharacterLoreStudio({
             className={`tab-pill-btn ${activeTabSub === 'stitching' ? 'active' : ''}`}
             onClick={() => setActiveTabSub('stitching')}
           >
-            <Clock size={16} /> ⚡ Ghép Nối Dòng Thời Gian Video Dài ({files.length} Tập)
+            <Clock size={16} /> ⚡ Ghép Nối Dòng Thời Gian Video Dài ({effectiveTargetFiles.length}/{files.length} Tập)
           </button>
         </div>
 
@@ -440,8 +477,72 @@ export default function CharacterLoreStudio({
             </div>
           </div>
 
+          {/* 🔍 FILE SEARCH & FILTER TOOLBAR FOR STITCHING */}
+          {files.length > 0 && (
+            <div className="file-filter-toolbar mb-3">
+              <div className="search-box">
+                <Search size={16} className="search-icon" />
+                <input
+                  type="text"
+                  placeholder="🔍 Gõ mã tập muốn lọc / ghép nối (VD: d7, d1, burned...)..."
+                  value={fileSearchQuery}
+                  onChange={e => setFileSearchQuery(e.target.value)}
+                  className="input-field"
+                />
+                {fileSearchQuery && (
+                  <button
+                    className="btn-clear-search text-muted"
+                    onClick={() => setFileSearchQuery('')}
+                  >
+                    ✕
+                  </button>
+                )}
+              </div>
+
+              <div className="filter-controls-group">
+                {filteredFiles.length > 0 && (
+                  <button
+                    className="btn btn-cyan btn-sm font-bold flex-center gap-1"
+                    onClick={handleSelectAllFilteredFiles}
+                    title={`Chọn toàn bộ ${filteredFiles.length} tập đang hiển thị`}
+                  >
+                    <Check size={14} />
+                    <span>CHỌN TẤT CẢ {filteredFiles.length} TẬP{fileSearchQuery ? ` ("${fileSearchQuery}")` : ''}</span>
+                  </button>
+                )}
+
+                {someFilteredSelected && (
+                  <button
+                    className="btn btn-secondary btn-sm text-muted"
+                    onClick={handleDeselectFilteredFiles}
+                    title="Bỏ chọn các tập đang lọc"
+                  >
+                    Bỏ Chọn
+                  </button>
+                )}
+
+                <div className="filter-counter text-muted flex-center gap-2">
+                  <span>Đang hiện: <strong className="highlight-cyan">{filteredFiles.length}</strong> / {files.length} tập</span>
+                  {selectedFileIds.length > 0 && (
+                    <span className="badge badge-done" style={{ padding: '3px 8px', fontSize: '0.8rem' }}>
+                      Đã chọn: <strong className="highlight-cyan font-bold">{selectedFileIds.length}</strong> tập
+                    </span>
+                  )}
+                  {selectedFileIds.length > 0 && (
+                    <button
+                      className="btn btn-secondary btn-xs text-muted"
+                      onClick={() => setSelectedFileIds([])}
+                    >
+                      Bỏ chọn hết
+                    </button>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
+
           {/* Video Clip Duration Detector Controls */}
-          <div className="video-detection-bar card-panel flex-between mb-3">
+          <div className="video-detection-bar card-panel flex-between mb-3" style={{ flexWrap: 'wrap', gap: '12px' }}>
             <div className="flex-center gap-2">
               <Film className="text-cyan" size={20} />
               <div>
@@ -487,18 +588,28 @@ export default function CharacterLoreStudio({
             <table className="stitching-table">
               <thead>
                 <tr>
-                  <th style={{ width: '60px' }}>STT</th>
+                  <th style={{ width: '40px', textAlign: 'center' }}>
+                    <input
+                      type="checkbox"
+                      checked={isAllFilteredSelected}
+                      onChange={isAllFilteredSelected ? handleDeselectFilteredFiles : handleSelectAllFilteredFiles}
+                      className="custom-checkbox"
+                      title="Chọn/Bỏ chọn tất cả các tập đang lọc"
+                    />
+                  </th>
+                  <th style={{ width: '50px' }}>STT</th>
                   <th>Tên Tập Phim (File SRT)</th>
-                  <th style={{ width: '140px' }}>Mốc Bắt Đầu (Trong Video Dài)</th>
+                  <th style={{ width: '150px' }}>Mốc Bắt Đầu (Video Dài)</th>
                   <th style={{ width: '160px' }}>Thời Lượng Thực Tế (Giây)</th>
-                  <th style={{ width: '140px' }}>Mốc Kết Thúc (Video Dài)</th>
+                  <th style={{ width: '150px' }}>Mốc Kết Thúc (Video Dài)</th>
                   <th style={{ width: '110px' }}>Số Dòng Thoại</th>
                 </tr>
               </thead>
               <tbody>
                 {(() => {
                   let cumulativeOffsetMs = 0;
-                  return files.map((file, idx) => {
+                  return filteredFiles.map((file, idx) => {
+                    const isSelected = selectedFileIds.includes(file.id);
                     const fileSubs = file.subtitles || [];
                     const lastSub = fileSubs[fileSubs.length - 1];
                     const defaultSubDurationSec = lastSub ? Math.round(srtTimeToMs(lastSub.endTime) / 1000) : 0;
@@ -507,19 +618,33 @@ export default function CharacterLoreStudio({
                     const startMs = cumulativeOffsetMs;
                     const endMs = startMs + (actualDurationSec * 1000);
                     
+                    // If selected or no filter, advance cumulative timeline
                     cumulativeOffsetMs = endMs + (gapSeconds * 1000);
 
                     return (
-                      <tr key={file.id}>
+                      <tr 
+                        key={file.id} 
+                        className={isSelected ? 'selected-row' : ''}
+                        onClick={() => toggleSelectFile(file.id)}
+                        style={{ cursor: 'pointer' }}
+                      >
+                        <td className="text-center" onClick={e => e.stopPropagation()}>
+                          <input
+                            type="checkbox"
+                            checked={isSelected}
+                            onChange={(e) => toggleSelectFile(file.id, e)}
+                            className="custom-checkbox"
+                          />
+                        </td>
                         <td className="text-center font-bold">{idx + 1}</td>
                         <td>
                           <div className="flex-center gap-1" style={{ justifyContent: 'flex-start' }}>
-                            <Film size={15} className="text-cyan" />
+                            <Film size={15} className={isSelected ? 'text-purple' : 'text-cyan'} />
                             <span className="font-bold">{file.name}</span>
                           </div>
                         </td>
                         <td className="font-mono text-cyan font-bold">{msToSrtTime(startMs)}</td>
-                        <td>
+                        <td onClick={e => e.stopPropagation()}>
                           <div className="flex-center gap-1">
                             <input
                               type="number"
@@ -541,30 +666,40 @@ export default function CharacterLoreStudio({
                     );
                   });
                 })()}
+
+                {filteredFiles.length === 0 && (
+                  <tr>
+                    <td colSpan={7} className="text-center p-4 text-muted">
+                      Không tìm thấy tập phim nào khớp với từ khóa "{fileSearchQuery}".
+                    </td>
+                  </tr>
+                )}
               </tbody>
             </table>
           </div>
 
           {/* Full Movie Actions */}
-          <div className="full-movie-actions-card card-panel flex-between p-3">
+          <div className="full-movie-actions-card card-panel flex-between p-3" style={{ flexWrap: 'wrap', gap: '12px' }}>
             <div>
               <h4 className="font-bold text-cyan flex-center gap-1" style={{ justifyContent: 'flex-start' }}>
-                <Sparkles size={16} /> Xuất File Cho Video Dài Trọn Bộ (Full Movie):
+                <Sparkles size={16} /> Thao Tác Ghép Nối Cho: <strong className="highlight-cyan">{targetLabel}</strong>
               </h4>
               <p className="text-xs text-muted mt-1">Dòng thời gian được nối tiếp chuẩn xác 100% từng giây khớp hoàn hảo với video dài trên CapCut / Premiere</p>
             </div>
 
-            <div className="flex-center gap-2">
+            <div className="flex-center gap-2" style={{ flexWrap: 'wrap' }}>
               <button
                 className="btn btn-purple btn-glow font-bold flex-center gap-1"
                 onClick={handleExportFullStitchedSRT}
+                title={`Ghép nối và xuất file SRT thoại dài cho ${effectiveTargetFiles.length} tập`}
               >
-                <Download size={16} /> 📥 Xuất Thoại Liền Mạch (Full_Movie.srt)
+                <Download size={16} /> 📥 Xuất Thoại Liền Mạch ({effectiveTargetFiles.length} Tập)
               </button>
 
               <button
                 className="btn btn-cyan btn-glow font-bold flex-center gap-1"
                 onClick={() => handleExportIntroSRT(true)}
+                title={`Xuất thẻ chú thích nhân vật khớp dòng thời gian video dài của ${effectiveTargetFiles.length} tập`}
               >
                 <Download size={16} /> 📥 Xuất Thẻ Chú Thích Video Dài (.SRT)
               </button>
@@ -572,6 +707,7 @@ export default function CharacterLoreStudio({
               <button
                 className="btn btn-green-glow font-bold flex-center gap-1"
                 onClick={() => handleExportIntroASS(true)}
+                title={`Xuất thẻ chú thích định dạng .ASS đồ họa cổ trang cho video dài của ${effectiveTargetFiles.length} tập`}
               >
                 <Download size={16} /> 📥 Xuất Thẻ Chú Thích Video Dài (.ASS)
               </button>
