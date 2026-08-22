@@ -85,12 +85,13 @@ export default function AutoGlossaryModal({
   };
 
   return (
-    <div className="modal-overlay" onClick={onClose}>
+    <div className="modal-backdrop modal-overlay" onClick={onClose}>
       <div
         className="modal-content card-panel"
-        style={{ maxWidth: '920px', width: '95vw', maxHeight: '90vh', display: 'flex', flexDirection: 'column' }}
+        style={{ maxWidth: '920px', width: '95vw', maxHeight: '90vh', padding: '16px 20px', display: 'flex', flexDirection: 'column' }}
         onClick={e => e.stopPropagation()}
       >
+
         {/* Header */}
         <div className="modal-header flex-between mb-3 pb-2" style={{ borderBottom: '1px solid var(--border-color)' }}>
           <div className="flex-center gap-2">

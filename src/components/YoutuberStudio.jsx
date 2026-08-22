@@ -1873,12 +1873,13 @@ ${fullImagePromptEn || generatedData.imagePromptEn}
 
       {/* 🚀 Batch Studio Results Modal (Feature 6) */}
       {showBatchModal && batchResults && (
-        <div className="modal-overlay" onClick={() => setShowBatchModal(false)}>
+        <div className="modal-backdrop modal-overlay" onClick={() => setShowBatchModal(false)}>
           <div
             className="modal-content card-panel"
-            style={{ maxWidth: '1050px', width: '95vw', maxHeight: '90vh', display: 'flex', flexDirection: 'column' }}
+            style={{ maxWidth: '1050px', width: '95vw', maxHeight: '90vh', padding: '16px 20px', display: 'flex', flexDirection: 'column' }}
             onClick={e => e.stopPropagation()}
           >
+
             {/* Header */}
             <div className="modal-header flex-between mb-3 pb-2" style={{ borderBottom: '1px solid var(--border-color)' }}>
               <div className="flex-center gap-2">
