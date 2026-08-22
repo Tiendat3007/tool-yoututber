@@ -1,12 +1,29 @@
 import JSZip from 'jszip';
 import { parseSRT } from './srtParser';
 
-// Recursively scan a FileSystemEntry (File or Directory) for .srt files
+// Detect if a file is a SubGoc / raw Chinese subtitle file
+export function isSubGocFile(filePathOrName) {
+  if (!filePathOrName) return false;
+  const n = filePathOrName.toLowerCase();
+  return (
+    n.includes('subgoc') ||
+    n.includes('sucgoc') ||
+    n.includes('sub_goc') ||
+    n.includes('sub gốc') ||
+    n.includes('sub-goc') ||
+    n.includes('sub goc')
+  );
+}
+
+// Recursively scan a FileSystemEntry (File or Directory) for .srt files (excluding SubGoc files)
 async function scanEntry(entry, path = '') {
   const srtFiles = [];
 
   if (entry.isFile) {
-    if (entry.name.toLowerCase().endsWith('.srt')) {
+    const isSrt = entry.name.toLowerCase().endsWith('.srt');
+    const isSubGoc = isSubGocFile(entry.name) || isSubGocFile(path);
+
+    if (isSrt && !isSubGoc) {
       const file = await new Promise((resolve, reject) => {
         entry.file(resolve, reject);
       });
@@ -52,14 +69,17 @@ export async function getFilesFromDataTransfer(dataTransferItems) {
   return srtFileObjects;
 }
 
-// Process a .ZIP archive containing nested folders and .srt files
+// Process a .ZIP archive containing nested folders and .srt files (excluding SubGoc files)
 export async function processZipFile(zipFile) {
   const zip = await JSZip.loadAsync(zipFile);
   const srtItems = [];
 
   for (const relativePath of Object.keys(zip.files)) {
     const zipEntry = zip.files[relativePath];
-    if (!zipEntry.dir && relativePath.toLowerCase().endsWith('.srt')) {
+    const isSrt = relativePath.toLowerCase().endsWith('.srt');
+    const isSubGoc = isSubGocFile(relativePath);
+
+    if (!zipEntry.dir && isSrt && !isSubGoc) {
       const text = await zipEntry.async('string');
       const parsed = parseSRT(text);
       if (parsed.length > 0) {
@@ -84,6 +104,7 @@ export async function processZipFile(zipFile) {
 
   return srtItems;
 }
+
 
 // Format smart file name for nested directory files
 export function getSmartFileName(fileObj) {
