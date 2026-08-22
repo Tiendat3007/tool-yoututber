@@ -1,7 +1,7 @@
 import React, { useState, useRef } from 'react';
 import { 
   Users, Sparkles, Plus, Download, Copy, Check, Trash2, Edit3, Film, 
-  Layers, Clock, Shield, Search, ChevronRight, Video, ArrowRight, BookOpen, AlertCircle
+  Layers, Clock, Shield, Search, ChevronRight, Video, ArrowRight, BookOpen, AlertCircle, UploadCloud
 } from 'lucide-react';
 import { 
   extractCharactersWithAI, 
@@ -9,8 +9,49 @@ import {
   generateCharacterIntroASS, 
   stitchAllFilesToFullMovieSRT,
   msToSrtTime,
-  srtTimeToMs
+  srtTimeToMs,
+  readMediaDuration
 } from '../utils/characterExtractor';
+
+// Extract clean file name without path, extension, symbols for fuzzy video matching
+function extractCleanName(filename) {
+  if (!filename) return '';
+  const base = filename.split(/[/\\]/).pop();
+  return base.replace(/\.[^/.]+$/, '').trim().toLowerCase();
+}
+
+// Smart Video to Subtitle File Matcher
+function matchVideoToFile(videoName, fileList) {
+  const cleanVideo = extractCleanName(videoName);
+  if (!cleanVideo) return null;
+
+  // 1. Exact match with clean filename
+  for (const file of fileList) {
+    const cleanSrt = extractCleanName(file.name);
+    if (cleanSrt === cleanVideo) return file;
+  }
+
+  // 2. Substring match
+  for (const file of fileList) {
+    const cleanSrt = extractCleanName(file.name);
+    if (cleanSrt.includes(cleanVideo) || cleanVideo.includes(cleanSrt)) return file;
+  }
+
+  // 3. Number/Episode extraction match (e.g. 'd7_01' matches 'd7_01.mp4' or '01' matches '01.mp4')
+  const videoNumbers = cleanVideo.match(/\d+/g);
+  if (videoNumbers && videoNumbers.length > 0) {
+    const videoKey = videoNumbers.join('_');
+    for (const file of fileList) {
+      const cleanSrt = extractCleanName(file.name);
+      const srtNumbers = cleanSrt.match(/\d+/g);
+      if (srtNumbers && srtNumbers.join('_') === videoKey) {
+        return file;
+      }
+    }
+  }
+
+  return null;
+}
 
 export default function CharacterLoreStudio({ 
   files = [], 
@@ -36,6 +77,7 @@ export default function CharacterLoreStudio({
   // Video Duration Table for Timeline Stitching: { [fileId]: durationInSeconds }
   const [fileDurations, setFileDurations] = useState({});
   const [gapSeconds, setGapSeconds] = useState(0);
+  const [isDraggingVideo, setIsDraggingVideo] = useState(false);
 
   // Edit / Add Character Modal State
   const [editingChar, setEditingChar] = useState(null);
@@ -117,40 +159,69 @@ export default function CharacterLoreStudio({
     }
   };
 
+  // Handle Video Upload or Drop to auto-detect clip durations
+  const handleVideoUpload = async (e) => {
+    const rawFiles = Array.from(e.target?.files || e.dataTransfer?.files || []);
+    const uploadedVideos = rawFiles.filter(
+      f => f.type.startsWith('video/') || /\.(mp4|mkv|avi|mov|webm|flv|ts|m4v)$/i.test(f.name)
+    );
 
+    if (uploadedVideos.length === 0) {
+      alert('Vui lòng chọn hoặc kéo thả các file video (định dạng .mp4, .mkv, .avi, .mov...)!');
+      return;
+    }
 
-  // Handle Video Upload to auto-detect clip durations
-  const handleVideoUpload = (e) => {
-    const uploadedVideos = Array.from(e.target.files || []);
-    if (uploadedVideos.length === 0) return;
+    setIsScanning(true);
+    setScanProgress(`🎬 Đang đọc thời lượng từ ${uploadedVideos.length} video clip...`);
 
-    uploadedVideos.forEach(videoFile => {
-      const videoElement = document.createElement('video');
-      videoElement.preload = 'metadata';
-      videoElement.src = URL.createObjectURL(videoFile);
-      videoElement.onloadedmetadata = () => {
-        URL.revokeObjectURL(videoElement.src);
-        const duration = Math.round(videoElement.duration * 100) / 100;
+    const newDurations = {};
+    let matchedCount = 0;
 
-        // Try to match with loaded SRT files by name
-        const cleanVideoName = videoFile.name.replace(/\.[^/.]+$/, "").toLowerCase();
-        const matchedFile = files.find(f => {
-          const cleanSrtName = f.name.replace(/\.[^/.]+$/, "").toLowerCase();
-          return cleanSrtName.includes(cleanVideoName) || cleanVideoName.includes(cleanSrtName);
-        });
+    // Sort uploaded videos alphabetically/numerically
+    uploadedVideos.sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true }));
+
+    const targetPool = effectiveTargetFiles.length > 0 ? effectiveTargetFiles : files;
+
+    for (let i = 0; i < uploadedVideos.length; i++) {
+      const videoFile = uploadedVideos[i];
+      const duration = await readMediaDuration(videoFile);
+
+      if (duration !== null && duration > 0) {
+        // Try smart match against effectiveTargetFiles
+        let matchedFile = matchVideoToFile(videoFile.name, targetPool);
+
+        // If not matched, try all files
+        if (!matchedFile && targetPool !== files) {
+          matchedFile = matchVideoToFile(videoFile.name, files);
+        }
+
+        // Sequential fallback match if name matching fails
+        if (!matchedFile && i < targetPool.length) {
+          matchedFile = targetPool[i];
+        }
 
         if (matchedFile) {
-          setFileDurations(prev => ({
-            ...prev,
-            [matchedFile.id]: duration
-          }));
+          newDurations[matchedFile.id] = duration;
+          matchedCount++;
         }
-      };
-    });
+      }
+    }
 
-    setScanProgress(`✅ Đã tự động đọc thời lượng thực tế từ ${uploadedVideos.length} video clip!`);
-    setTimeout(() => setScanProgress(''), 4000);
+    setFileDurations(prev => ({ ...prev, ...newDurations }));
+    setIsScanning(false);
+
+    if (matchedCount > 0) {
+      setScanProgress(`✅ Đã đọc và khớp thời lượng thành công cho ${matchedCount} / ${uploadedVideos.length} video clip!`);
+      setTimeout(() => setScanProgress(''), 5000);
+    } else {
+      alert(`Đã nhận ${uploadedVideos.length} video nhưng không thể tự động trích xuất thời lượng. Bạn có thể nhập trực tiếp số giây vào bảng.`);
+    }
+
+    if (videoInputRef.current) {
+      videoInputRef.current.value = '';
+    }
   };
+
 
   // Toggle Character Enabled
   const toggleCharacter = (id) => {
@@ -569,32 +640,47 @@ export default function CharacterLoreStudio({
           )}
 
           {/* Video Clip Duration Detector Controls */}
-          <div className="video-detection-bar card-panel flex-between mb-3" style={{ flexWrap: 'wrap', gap: '12px' }}>
+          <div 
+            className={`video-detection-bar card-panel flex-between mb-3 ${isDraggingVideo ? 'drag-over' : ''}`}
+            style={{ 
+              flexWrap: 'wrap', 
+              gap: '12px',
+              border: isDraggingVideo ? '2px dashed var(--cyan-primary)' : '1px solid rgba(6, 182, 212, 0.3)',
+              background: isDraggingVideo ? 'rgba(6, 182, 212, 0.15)' : 'rgba(6, 182, 212, 0.08)',
+              transition: 'all 0.2s ease'
+            }}
+            onDragOver={(e) => { e.preventDefault(); setIsDraggingVideo(true); }}
+            onDragLeave={() => setIsDraggingVideo(false)}
+            onDrop={(e) => { e.preventDefault(); setIsDraggingVideo(false); handleVideoUpload(e); }}
+          >
             <div className="flex-center gap-2">
-              <Film className="text-cyan" size={20} />
+              <Film className="text-cyan" size={24} />
               <div>
-                <strong>Tự Động Đọc Thời Lượng Thực Tế Từ File Video MP4:</strong>
-                <p className="text-xs text-muted">Kéo thả các file video clip để trình duyệt tự đọc độ dài chính xác từng mili-giây (khớp cả đoạn nhạc nghỉ ở đuôi)</p>
+                <strong>Tự Động Đọc Thời Lượng Thực Tế Từ File Video MP4 (Kéo Thả Trực Tiếp):</strong>
+                <p className="text-xs text-muted">
+                  Kéo thả hoặc chọn các file video clip (.MP4, .MKV, .AVI...) để tự động đọc chính xác từng mili-giây thời lượng thực tế
+                </p>
               </div>
             </div>
 
-            <div className="flex-center gap-2">
+            <div className="flex-center gap-2" style={{ flexWrap: 'wrap' }}>
               <input
                 type="file"
                 ref={videoInputRef}
                 multiple
-                accept="video/*"
+                accept="video/*,.mp4,.mkv,.avi,.mov,.webm,.flv,.ts,.m4v"
                 style={{ display: 'none' }}
                 onChange={handleVideoUpload}
               />
               <button
-                className="btn btn-secondary btn-sm flex-center gap-1"
+                className="btn btn-cyan btn-sm font-bold flex-center gap-1"
                 onClick={() => videoInputRef.current?.click()}
+                title="Bấm để chọn file video clip từ máy tính"
               >
-                <Video size={15} /> Chọn File Video Clip (.MP4)
+                <UploadCloud size={16} /> Chọn File Video Clip (.MP4)
               </button>
 
-              <div className="flex-center gap-1 text-sm">
+              <div className="flex-center gap-1 text-sm ml-2">
                 <span>Khoảng nghỉ đệm (Gap):</span>
                 <input
                   type="number"
@@ -627,7 +713,7 @@ export default function CharacterLoreStudio({
                   <th style={{ width: '50px' }}>STT</th>
                   <th>Tên Tập Phim (File SRT)</th>
                   <th style={{ width: '150px' }}>Mốc Bắt Đầu (Video Dài)</th>
-                  <th style={{ width: '160px' }}>Thời Lượng Thực Tế (Giây)</th>
+                  <th style={{ width: '180px' }}>Thời Lượng Thực Tế</th>
                   <th style={{ width: '150px' }}>Mốc Kết Thúc (Video Dài)</th>
                   <th style={{ width: '110px' }}>Số Dòng Thoại</th>
                 </tr>
@@ -641,6 +727,7 @@ export default function CharacterLoreStudio({
                     const lastSub = fileSubs[fileSubs.length - 1];
                     const defaultSubDurationSec = lastSub ? Math.round(srtTimeToMs(lastSub.endTime) / 1000) : 0;
                     
+                    const isFromMp4 = !!fileDurations[file.id];
                     const actualDurationSec = fileDurations[file.id] || defaultSubDurationSec;
                     const startMs = cumulativeOffsetMs;
                     const endMs = startMs + (actualDurationSec * 1000);
@@ -668,11 +755,16 @@ export default function CharacterLoreStudio({
                           <div className="flex-center gap-1" style={{ justifyContent: 'flex-start' }}>
                             <Film size={15} className={isSelected ? 'text-purple' : 'text-cyan'} />
                             <span className="font-bold">{file.name}</span>
+                            {isFromMp4 && (
+                              <span className="badge" style={{ background: '#059669', color: '#fff', fontSize: '0.7rem', padding: '1px 5px', borderRadius: '4px' }}>
+                                🎬 MP4
+                              </span>
+                            )}
                           </div>
                         </td>
                         <td className="font-mono text-cyan font-bold">{msToSrtTime(startMs)}</td>
                         <td onClick={e => e.stopPropagation()}>
-                          <div className="flex-center gap-1">
+                          <div className="flex-center gap-1" style={{ justifyContent: 'flex-start' }}>
                             <input
                               type="number"
                               step="0.1"
@@ -682,9 +774,14 @@ export default function CharacterLoreStudio({
                                 setFileDurations(prev => ({ ...prev, [file.id]: val }));
                               }}
                               className="input-field input-xs font-mono font-bold"
-                              style={{ width: '90px' }}
+                              style={{ width: '85px' }}
                             />
-                            <span className="text-xs text-muted">giây</span>
+                            <span className="text-xs text-muted">s</span>
+                            {!isFromMp4 && (
+                              <span className="text-xs text-muted" title="Thời lượng ước tính từ dòng sub cuối cùng">
+                                (từ sub)
+                              </span>
+                            )}
                           </div>
                         </td>
                         <td className="font-mono text-green font-bold">{msToSrtTime(endMs)}</td>
@@ -704,6 +801,7 @@ export default function CharacterLoreStudio({
               </tbody>
             </table>
           </div>
+
 
           {/* Full Movie Actions */}
           <div className="full-movie-actions-card card-panel flex-between p-3" style={{ flexWrap: 'wrap', gap: '12px' }}>

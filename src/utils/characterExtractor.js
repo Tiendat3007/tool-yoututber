@@ -348,3 +348,117 @@ export function stitchAllFilesToFullMovieSRT(files, fileDurations = {}, gapSecon
 
   return generateSRT(allMergedSubtitles);
 }
+
+// Fast MP4 Box Parser to extract duration from 'mvhd' atom without decoding
+export async function extractMp4DurationFromBuffer(file) {
+  try {
+    const slice = file.slice(0, Math.min(file.size, 1024 * 1024 * 10)); // first 10MB
+    const buffer = await slice.arrayBuffer();
+    const dataView = new DataView(buffer);
+
+    let offset = 0;
+    while (offset < buffer.byteLength - 8) {
+      const size = dataView.getUint32(offset);
+      const type = String.fromCharCode(
+        dataView.getUint8(offset + 4),
+        dataView.getUint8(offset + 5),
+        dataView.getUint8(offset + 6),
+        dataView.getUint8(offset + 7)
+      );
+
+      if (size < 8) break;
+
+      if (type === 'moov') {
+        let moovOffset = offset + 8;
+        const moovEnd = Math.min(offset + size, buffer.byteLength);
+        while (moovOffset < moovEnd - 8) {
+          const subSize = dataView.getUint32(moovOffset);
+          const subType = String.fromCharCode(
+            dataView.getUint8(moovOffset + 4),
+            dataView.getUint8(moovOffset + 5),
+            dataView.getUint8(moovOffset + 6),
+            dataView.getUint8(moovOffset + 7)
+          );
+          if (subType === 'mvhd') {
+            const version = dataView.getUint8(moovOffset + 8);
+            let timescale = 0;
+            let duration = 0;
+            if (version === 1) {
+              timescale = dataView.getUint32(moovOffset + 28);
+              const durHigh = dataView.getUint32(moovOffset + 32);
+              const durLow = dataView.getUint32(moovOffset + 36);
+              duration = durHigh * 4294967296 + durLow;
+            } else {
+              timescale = dataView.getUint32(moovOffset + 20);
+              duration = dataView.getUint32(moovOffset + 24);
+            }
+            if (timescale > 0 && duration > 0) {
+              return Math.round((duration / timescale) * 100) / 100;
+            }
+          }
+          if (subSize < 8) break;
+          moovOffset += subSize;
+        }
+      }
+
+      offset += size;
+    }
+  } catch (e) {
+    // ignore
+  }
+  return null;
+}
+
+// Universal Media Duration Reader (Binary MP4 parser + HTML5 Video element fallback)
+export async function readMediaDuration(file) {
+  // 1. Try fast binary header parse first (0.005s)
+  const binaryDur = await extractMp4DurationFromBuffer(file);
+  if (binaryDur !== null && binaryDur > 0) {
+    return binaryDur;
+  }
+
+  // 2. Try HTML5 Video element
+  return new Promise((resolve) => {
+    try {
+      const url = URL.createObjectURL(file);
+      const video = document.createElement('video');
+      video.preload = 'metadata';
+      video.muted = true;
+      video.playsInline = true;
+
+      let resolved = false;
+      const done = (dur) => {
+        if (!resolved) {
+          resolved = true;
+          try {
+            URL.revokeObjectURL(url);
+            video.src = '';
+          } catch {}
+          resolve(dur);
+        }
+      };
+
+      const timer = setTimeout(() => done(null), 6000);
+
+      video.onloadedmetadata = () => {
+        clearTimeout(timer);
+        const dur = video.duration;
+        if (dur && !isNaN(dur) && isFinite(dur) && dur > 0) {
+          done(Math.round(dur * 100) / 100);
+        } else {
+          done(null);
+        }
+      };
+
+      video.onerror = () => {
+        clearTimeout(timer);
+        done(null);
+      };
+
+      video.src = url;
+    } catch (err) {
+      resolve(null);
+    }
+  });
+}
+
