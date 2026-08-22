@@ -180,12 +180,19 @@ export default function CharacterLoreStudio({
       if (extracted.length === 0) {
         alert('Không tìm thấy nhân vật nào nổi bật trong các file phụ đề.');
       } else {
+        const movieLabel = effectiveTargetFiles.length === 1 
+          ? effectiveTargetFiles[0].name 
+          : `${effectiveTargetFiles.length}_Tap_SRT`;
+        const extractedWithMovie = extracted.map(c => ({
+          ...c,
+          movieName: c.movieName || c.firstFileName || movieLabel
+        }));
         setCharacters(prev => {
-          // Merge with existing avoiding duplicate names
-          const existingNames = new Set(prev.map(c => c.name.toLowerCase().trim()));
-          const newUnique = extracted.filter(c => !existingNames.has(c.name.toLowerCase().trim()));
+          const existingNames = new Set(prev.filter(c => (c.movieName || c.firstFileName) === movieLabel).map(c => c.name.toLowerCase().trim()));
+          const newUnique = extractedWithMovie.filter(c => !existingNames.has(c.name.toLowerCase().trim()));
           return [...prev, ...newUnique];
         });
+        setActiveMovieFilter(movieLabel);
 
         // 💾 Save Scan Session to History
         const session = {
@@ -194,14 +201,15 @@ export default function CharacterLoreStudio({
           videoName: `${effectiveTargetFiles.length} Tập Phụ Đề SRT (${effectiveTargetFiles.map(f => f.name).slice(0, 2).join(', ')}${effectiveTargetFiles.length > 2 ? '...' : ''})`,
           type: 'srt',
           count: extracted.length,
-          characters: extracted,
+          characters: extractedWithMovie,
           tagDurationSec: tagDurationSec || 2
         };
         setScanHistory(prev => [session, ...prev.slice(0, 29)]);
 
-        setScanProgress(`✅ Đã tìm thấy ${extracted.length} nhân vật và tự động lưu vào lịch sử quét!`);
+        setScanProgress(`✅ Đã tìm thấy ${extracted.length} nhân vật cho phim [${movieLabel}] và tự động lưu vào lịch sử quét!`);
         setTimeout(() => setScanProgress(''), 4000);
       }
+
     } catch (err) {
       alert(`Lỗi khi quét nhân vật: ${err.message}`);
     } finally {
@@ -422,12 +430,18 @@ export default function CharacterLoreStudio({
       if (detected.length === 0) {
         alert('AI đã quét các khung hình nhưng không phát hiện bảng tên nhân vật nào. Bạn có thể chọn khoảng cách quét dày hơn (VD: 5 giây) để quét chi tiết hơn.');
       } else {
-        setVisionDetectedChars(detected);
+        const detectedWithMovie = detected.map(c => ({
+          ...c,
+          movieName: visionVideoFile.name,
+          firstFileName: visionVideoFile.name
+        }));
+        setVisionDetectedChars(detectedWithMovie);
         setCharacters(prev => {
-          const existingNames = new Set(prev.map(c => c.name.toLowerCase().trim()));
-          const newChars = detected.filter(c => !existingNames.has(c.name.toLowerCase().trim()));
+          const existingNames = new Set(prev.filter(c => (c.movieName || c.firstFileName) === visionVideoFile.name).map(c => c.name.toLowerCase().trim()));
+          const newChars = detectedWithMovie.filter(c => !existingNames.has(c.name.toLowerCase().trim()));
           return [...newChars, ...prev];
         });
+        setActiveMovieFilter(visionVideoFile.name);
 
         // 💾 Save Vision Scan Session to History
         const session = {
@@ -437,7 +451,7 @@ export default function CharacterLoreStudio({
           videoSize: `${(visionVideoFile.size / (1024 * 1024)).toFixed(1)} MB`,
           type: 'vision',
           count: detected.length,
-          characters: detected,
+          characters: detectedWithMovie,
           tagDurationSec: tagDurationSec || 2,
           settings: {
             intervalSec: visionIntervalSec,
@@ -447,9 +461,10 @@ export default function CharacterLoreStudio({
         };
         setScanHistory(prev => [session, ...prev.slice(0, 29)]);
 
-        setScanProgress(`🎉 AI Vision đã tìm thấy ${detected.length} bảng tên nhân vật chính xác từng khung hình và tự động lưu vào lịch sử quét!`);
+        setScanProgress(`🎉 AI Vision đã tìm thấy ${detected.length} bảng tên nhân vật cho phim [${visionVideoFile.name}] và tự động lưu vào lịch sử!`);
         setTimeout(() => setScanProgress(''), 5000);
       }
+
     } catch (err) {
       alert(`Lỗi khi quét thị giác video: ${err.message}`);
     } finally {
@@ -581,27 +596,61 @@ export default function CharacterLoreStudio({
     setTimeout(() => setScanProgress(''), 4000);
   };
 
+  // Movie Profile / File Separation State (Each movie has its own isolated character list)
+  const [activeMovieFilter, setActiveMovieFilter] = useState('all');
+
+  // List of all unique movies in characters
+  const availableMovies = Array.from(
+    new Set(characters.map(c => c.movieName || c.firstFileName || 'Mặc định').filter(Boolean))
+  );
+
+  // Characters belonging to active movie
+  const activeMovieCharacters = activeMovieFilter === 'all'
+    ? characters
+    : characters.filter(c => (c.movieName || c.firstFileName || 'Mặc định') === activeMovieFilter);
+
+  // Delete characters of active movie only
+  const handleDeleteCurrentMovieCharacters = () => {
+    if (activeMovieFilter === 'all') {
+      if (window.confirm(`Bạn có chắc chắn muốn xóa TOÀN BỘ ${characters.length} nhân vật của tất cả các phim không?`)) {
+        setCharacters([]);
+        setScanProgress('🗑️ Đã xóa toàn bộ nhân vật của tất cả các phim!');
+        setTimeout(() => setScanProgress(''), 3000);
+      }
+    } else {
+      const count = characters.filter(c => (c.movieName || c.firstFileName || 'Mặc định') === activeMovieFilter).length;
+      if (window.confirm(`Bạn có chắc muốn xóa ${count} nhân vật của phim [${activeMovieFilter}] không? Các phim khác vẫn sẽ được giữ nguyên 100%.`)) {
+        setCharacters(prev => prev.filter(c => (c.movieName || c.firstFileName || 'Mặc định') !== activeMovieFilter));
+        setActiveMovieFilter('all');
+        setScanProgress(`🗑️ Đã xóa ${count} nhân vật của phim [${activeMovieFilter}]!`);
+        setTimeout(() => setScanProgress(''), 3000);
+      }
+    }
+  };
+
   // Export SRT Intro Tags (defaults to Full Movie MP4 continuous timeline)
   const handleExportIntroSRT = (isFullMovie = true) => {
-    const srtContent = generateCharacterIntroSRT(characters, effectiveTargetFiles, isFullMovie, fileDurations, gapSeconds, tagDurationSec, tagFormatTemplate, customTagPattern);
+    const targetChars = activeMovieCharacters;
+    const srtContent = generateCharacterIntroSRT(targetChars, effectiveTargetFiles, isFullMovie, fileDurations, gapSeconds, tagDurationSec, tagFormatTemplate, customTagPattern);
     if (!srtContent) {
-      alert('Chưa có nhân vật nào được bật để xuất file chú thích!');
+      alert('Chưa có nhân vật nào được bật trong phim này để xuất file chú thích!');
       return;
     }
-    downloadTextFile(srtContent, isFullMovie ? `Full_Movie_${effectiveTargetFiles.length}Tap_Character_Tags.srt` : 'Character_Intro_Tags.srt');
+    const safeMovie = activeMovieFilter === 'all' ? `Full_${effectiveTargetFiles.length}Tap` : activeMovieFilter.replace(/[^a-zA-Z0-9_-]/g, '_');
+    downloadTextFile(srtContent, `${safeMovie}_Character_Tags.srt`);
   };
 
   // Export ASS Intro Tags (defaults to Full Movie MP4 continuous timeline)
   const handleExportIntroASS = (isFullMovie = true) => {
-    const assContent = generateCharacterIntroASS(characters, effectiveTargetFiles, isFullMovie, fileDurations, gapSeconds, tagDurationSec, tagFormatTemplate, customTagPattern);
+    const targetChars = activeMovieCharacters;
+    const assContent = generateCharacterIntroASS(targetChars, effectiveTargetFiles, isFullMovie, fileDurations, gapSeconds, tagDurationSec, tagFormatTemplate, customTagPattern);
     if (!assContent) {
-      alert('Chưa có nhân vật nào được bật để xuất file chú thích!');
+      alert('Chưa có nhân vật nào được bật trong phim này để xuất file chú thích!');
       return;
     }
-    downloadTextFile(assContent, isFullMovie ? `Full_Movie_${effectiveTargetFiles.length}Tap_Character_Tags.ass` : 'Character_Intro_Tags.ass');
+    const safeMovie = activeMovieFilter === 'all' ? `Full_${effectiveTargetFiles.length}Tap` : activeMovieFilter.replace(/[^a-zA-Z0-9_-]/g, '_');
+    downloadTextFile(assContent, `${safeMovie}_Character_Tags.ass`);
   };
-
-
 
   // Export Full Stitched Movie SRT (Continuous Timeline)
   const handleExportFullStitchedSRT = () => {
@@ -615,15 +664,16 @@ export default function CharacterLoreStudio({
 
   // Copy Lore to Clipboard for YouTube Community/Description (Sorted chronologically)
   const handleCopyLoreForYouTube = () => {
-    if (characters.length === 0) return;
-    const sortedActive = [...characters].filter(c => c.enabled !== false).sort((a, b) => getFullMovieStartMs(a) - getFullMovieStartMs(b));
-    let text = `📜 BẢNG HỒ SƠ NHÂN VẬT & CẢNH GIỚI TU TIÊN (THEO THỨ TỰ XUẤT HIỆN TRONG VIDEO):\n\n`;
+    const targetChars = activeMovieCharacters;
+    if (targetChars.length === 0) return;
+    const sortedActive = [...targetChars].filter(c => c.enabled !== false).sort((a, b) => getFullMovieStartMs(a) - getFullMovieStartMs(b));
+    let text = `📜 BẢNG HỒ SƠ NHÂN VẬT & CẢNH GIỚI ${activeMovieFilter !== 'all' ? `[PHIM: ${activeMovieFilter}] ` : ''}(THEO THỨ TỰ XUẤT HIỆN TRONG VIDEO):\n\n`;
     sortedActive.forEach((c, idx) => {
       text += `${idx + 1}. 👤 ${c.name} ${c.originalName ? `(${c.originalName})` : ''}\n`;
       text += `   • Thân phận: ${c.role} | Môn phái: ${c.sect}\n`;
       text += `   • Cảnh giới: ${c.realm}\n`;
       if (c.quote) text += `   • Lời thoại: "${c.quote}"\n`;
-      text += `   • Xuất hiện tại: Tập ${c.firstFileName || '1'} (Mốc MP4: ${getFullMovieTimestamp(c)})\n\n`;
+      text += `   • Xuất hiện tại: ${c.firstFileName || 'Tập 1'} (Mốc MP4: ${getFullMovieTimestamp(c)})\n\n`;
     });
 
     navigator.clipboard.writeText(text);
@@ -646,6 +696,10 @@ export default function CharacterLoreStudio({
   // Filtered and Chronologically Sorted Characters
   const filteredCharacters = characters
     .filter(c => {
+      const charMovie = c.movieName || c.firstFileName || 'Mặc định';
+      if (activeMovieFilter !== 'all' && charMovie !== activeMovieFilter) {
+        return false;
+      }
       const matchesSearch = c.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
         (c.sect && c.sect.toLowerCase().includes(searchQuery.toLowerCase())) ||
         (c.realm && c.realm.toLowerCase().includes(searchQuery.toLowerCase()));
@@ -653,9 +707,11 @@ export default function CharacterLoreStudio({
       if (filterRole === 'all') return matchesSearch;
       if (filterRole === 'main') return matchesSearch && (c.role.toLowerCase().includes('chính') || c.role.toLowerCase().includes('nữ chính'));
       if (filterRole === 'antagonist') return matchesSearch && (c.role.toLowerCase().includes('phản') || c.role.toLowerCase().includes('ma'));
+      if (filterRole === 'weapon') return matchesSearch && (c.type === 'weapon');
       return matchesSearch;
     })
     .sort((a, b) => getFullMovieStartMs(a) - getFullMovieStartMs(b));
+
 
 
   const targetLabel = selectedFileIds.length > 0
@@ -859,6 +915,50 @@ export default function CharacterLoreStudio({
             </button>
           </div>
 
+          {/* Movie Profiles Bar (Each movie has its own isolated character list) */}
+          <div className="movie-profiles-bar card-panel p-2 mb-3 flex-between" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.1)', flexWrap: 'wrap', gap: '8px' }}>
+            <div className="flex-center gap-2" style={{ flexWrap: 'wrap' }}>
+              <span className="text-xs font-bold text-muted flex-center gap-1">
+                <Film size={14} className="text-cyan" /> PHIM:
+              </span>
+              <button
+                className={`btn btn-xs font-bold ${activeMovieFilter === 'all' ? 'btn-cyan' : 'btn-secondary'}`}
+                onClick={() => setActiveMovieFilter('all')}
+              >
+                🎬 Tất Cả Phim ({characters.length})
+              </button>
+              {availableMovies.map((movieName) => {
+                const count = characters.filter(c => (c.movieName || c.firstFileName || 'Mặc định') === movieName).length;
+                return (
+                  <button
+                    key={movieName}
+                    className={`btn btn-xs font-bold ${activeMovieFilter === movieName ? 'btn-cyan' : 'btn-secondary'}`}
+                    onClick={() => setActiveMovieFilter(movieName)}
+                    style={{ maxWidth: '280px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
+                    title={movieName}
+                  >
+                    🎬 {movieName} ({count})
+                  </button>
+                );
+              })}
+            </div>
+
+            {activeMovieFilter !== 'all' && (
+              <div className="flex-center gap-2">
+                <span className="text-xs text-cyan font-bold">
+                  Đang chọn: <strong>{activeMovieFilter}</strong> ({activeMovieCharacters.length} thẻ)
+                </span>
+                <button
+                  className="btn btn-danger btn-xs font-bold flex-center gap-1"
+                  onClick={handleDeleteCurrentMovieCharacters}
+                  title="Xóa toàn bộ nhân vật thuộc bộ phim này mà không ảnh hưởng tới phim khác"
+                >
+                  <Trash2 size={13} /> Xóa Nhân Vật Của Phim Này
+                </button>
+              </div>
+            )}
+          </div>
+
           {/* Filter Bar */}
           <div className="filter-controls-group mb-3 flex-between">
             <div className="search-box" style={{ maxWidth: '350px' }}>
@@ -872,16 +972,16 @@ export default function CharacterLoreStudio({
               />
             </div>
 
-
             <div className="flex-center gap-2">
               <select
                 value={filterRole}
                 onChange={e => setFilterRole(e.target.value)}
                 className="input-field select-field input-sm"
               >
-                <option value="all">Tất cả vai trò ({characters.length})</option>
+                <option value="all">Tất cả vai trò ({activeMovieCharacters.length})</option>
                 <option value="main">Nhân vật chính / Nữ chính</option>
                 <option value="antagonist">Phản diện / Ma đạo</option>
+                <option value="weapon">⚔️ Thần Binh / Pháp Bảo</option>
               </select>
 
               <span className="text-muted text-sm">
@@ -941,14 +1041,32 @@ export default function CharacterLoreStudio({
                     </div>
                   )}
 
-                  <div className="char-badges-row flex-center gap-1 mt-2 mb-2" style={{ justifyContent: 'flex-start', flexWrap: 'wrap' }}>
-                    <span className="badge badge-role">{char.role}</span>
-                    <span className="badge badge-sect">{char.sect}</span>
-                    <span className="badge badge-realm">{char.realm}</span>
+                  <div className="char-badges-row flex-center gap-2 mt-2 mb-2" style={{ justifyContent: 'flex-start', flexWrap: 'wrap' }}>
+                    {char.type === 'weapon' && (
+                      <span className="badge badge-purple font-bold">⚔️ Thần Binh</span>
+                    )}
+                    {char.type === 'location' && (
+                      <span className="badge badge-cyan font-bold">🏛️ Địa Danh</span>
+                    )}
+                    {char.role && !['chưa rõ', 'không xác định', 'nhân vật phụ', 'none', 'null', ''].includes(char.role.toLowerCase()) && (
+                      <span className="badge badge-role">👤 {char.role}</span>
+                    )}
+                    {char.sect && !['chưa rõ', 'không xác định', 'vô môn phái', 'none', 'null', ''].includes(char.sect.toLowerCase()) && (
+                      <span className="badge badge-sect">🏛️ {char.sect}</span>
+                    )}
+                    {char.realm && !['chưa rõ', 'không xác định', 'none', 'null', ''].includes(char.realm.toLowerCase()) && (
+                      <span className="badge badge-realm">⚡ {char.realm}</span>
+                    )}
                     {char.source === 'vision_ocr' && (
                       <span className="badge badge-done" style={{ fontSize: '10px' }}>👁️ Thị Giác Video</span>
                     )}
+                    {char.firstFileName && (
+                      <span className="badge" style={{ background: 'rgba(255,255,255,0.06)', color: '#94a3b8', fontSize: '10px' }}>
+                        🎬 {char.firstFileName}
+                      </span>
+                    )}
                   </div>
+
 
                   {char.quote && (
                     <div className="char-quote text-muted mt-1">
@@ -1748,23 +1866,14 @@ export default function CharacterLoreStudio({
 
             <div className="grid-2-col gap-2 mb-2">
               <div className="form-group">
-                <label className="form-label">Xuất hiện tại tập:</label>
-                <select
-                  value={editingChar.firstFileId || ''}
-                  onChange={e => {
-                    const selFile = files.find(f => f.id === e.target.value);
-                    setEditingChar(prev => ({
-                      ...prev,
-                      firstFileId: e.target.value,
-                      firstFileName: selFile ? selFile.name : ''
-                    }));
-                  }}
-                  className="input-field select-field"
-                >
-                  {files.map(f => (
-                    <option key={f.id} value={f.id}>{f.name}</option>
-                  ))}
-                </select>
+                <label className="form-label">Thuộc Bộ Phim / Video:</label>
+                <input
+                  type="text"
+                  value={editingChar.movieName || editingChar.firstFileName || ''}
+                  onChange={e => setEditingChar(prev => ({ ...prev, movieName: e.target.value, firstFileName: e.target.value }))}
+                  className="input-field text-cyan font-bold"
+                  placeholder="VD: JOINED_VOICE_d2_01.mp4, Hoàn Mỹ Thế Giới..."
+                />
               </div>
 
               <div className="form-group">
@@ -1778,6 +1887,7 @@ export default function CharacterLoreStudio({
                 />
               </div>
             </div>
+
 
             <div className="form-group mb-3">
               <label className="form-label">Mẫu thẻ chú thích hiện trên video:</label>
