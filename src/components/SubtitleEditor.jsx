@@ -106,6 +106,8 @@ export default function SubtitleEditor({
     }));
   };
 
+  const [translatingLineId, setTranslatingLineId] = useState(null);
+
   const handleTranslateSingleLine = (id) => {
     const activeRules = PRONOUN_PRESETS.find(p => p.id === activePresetId)?.rules || [];
     setSubtitles(subtitles.map(s => {
@@ -121,6 +123,57 @@ export default function SubtitleEditor({
       return s;
     }));
   };
+
+  // 🧠 Single Line AI Translation (Incorporating Context + JSON Glossary)
+  const handleTranslateSingleLineAI = async (id) => {
+    const sub = subtitles.find(s => s.id === id);
+    if (!sub) return;
+
+    const isOrimise = aiProvider === 'orimise';
+    const activeKey = isOrimise ? orimiseKey : geminiKey;
+
+    if (!activeKey) {
+      alert(`Vui lòng nhập ${isOrimise ? 'Orimise' : 'Google Gemini'} API Key trong menu Cấu hình AI!`);
+      return;
+    }
+
+    // Get 3-5 previous subtitles as context history to ensure consistent tone and pronouns
+    const subIndex = subtitles.findIndex(s => s.id === id);
+    const contextSubs = subtitles.slice(Math.max(0, subIndex - 4), subIndex);
+
+    setTranslatingLineId(id);
+    try {
+      const fn = isOrimise ? translateBatchWithOrimise : translateBatchWithGemini;
+      const resultMap = await fn({
+        subtitles: [sub],
+        contextSubtitles: contextSubs,
+        apiKey: activeKey,
+        baseUrl: orimiseBaseUrl,
+        systemPrompt: customPrompt,
+        glossary,
+        model: aiModel
+      });
+
+      if (resultMap.has(sub.index)) {
+        setSubtitles(prev => prev.map(s => {
+          if (s.id === id) {
+            return {
+              ...s,
+              previousText: s.translatedText,
+              translatedText: resultMap.get(sub.index),
+              status: 'translated'
+            };
+          }
+          return s;
+        }));
+      }
+    } catch (err) {
+      alert(`Lỗi khi dịch AI dòng này: ${err.message}`);
+    } finally {
+      setTranslatingLineId(null);
+    }
+  };
+
 
   // 1-Click Glossary Replace on selected or all lines
   const handleApplyGlossaryBatch = () => {
@@ -779,9 +832,17 @@ export default function SubtitleEditor({
                         <td style={{ textAlign: 'right' }}>
                           <div className="btn-group-column">
                             <button
+                              className="btn-icon text-purple"
+                              onClick={() => handleTranslateSingleLineAI(sub.id)}
+                              disabled={translatingLineId === sub.id}
+                              title="Dịch lại dòng này bằng AI (kèm ngữ cảnh câu trước & từ điển JSON)"
+                            >
+                              <Sparkles size={16} className={translatingLineId === sub.id ? 'spinner' : ''} />
+                            </button>
+                            <button
                               className="btn-icon text-cyan"
                               onClick={() => handleTranslateSingleLine(sub.id)}
-                              title="Dịch dòng này bằng từ điển"
+                              title="Dịch dòng này bằng từ điển Hán-Việt offline"
                             >
                               <BookOpen size={16} />
                             </button>
@@ -793,6 +854,7 @@ export default function SubtitleEditor({
                               <Trash2 size={16} />
                             </button>
                           </div>
+
                         </td>
                       </tr>
                     );
