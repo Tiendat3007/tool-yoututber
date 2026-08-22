@@ -306,7 +306,6 @@ export default function CharacterLoreStudio({
   // Vision Scanner States
   const [visionVideoFile, setVisionVideoFile] = useState(null);
   const [visionIntervalSec, setVisionIntervalSec] = useState(3);
-  const [visionMaxFrames, setVisionMaxFrames] = useState(300);
   const [visionFlipHorizontal, setVisionFlipHorizontal] = useState(true); // Default true for mirrored/flipped re-up videos
   const [isVisionScanning, setIsVisionScanning] = useState(false);
   const [visionProgress, setVisionProgress] = useState(null);
@@ -332,13 +331,12 @@ export default function CharacterLoreStudio({
 
     setIsVisionScanning(true);
     setVisionDetectedChars([]);
-    setVisionProgress({ phase: 'extracting', percent: 0, message: 'Đang trích xuất các khung hình từ video...' });
+    setVisionProgress({ phase: 'extracting', percent: 0, message: 'Đang trích xuất toàn bộ khung hình từ video...' });
 
     try {
-      // 1. Extract frames locally in browser canvas (0 MB video upload, auto mirror flip correction)
+      // 1. Extract frames locally in browser canvas (0 MB video upload, scans 100% of video)
       const frames = await extractFramesFromVideo(visionVideoFile, {
         intervalSec: Number(visionIntervalSec),
-        maxFrames: Number(visionMaxFrames),
         flipHorizontal: Boolean(visionFlipHorizontal),
         onProgress: (p) => {
           setVisionProgress({
@@ -348,6 +346,7 @@ export default function CharacterLoreStudio({
           });
         }
       });
+
 
       if (frames.length === 0) {
         throw new Error('Không trích xuất được khung hình nào từ video.');
@@ -864,21 +863,11 @@ export default function CharacterLoreStudio({
                     </select>
                   </div>
 
-                  <div className="flex-center gap-1 text-sm">
-                    <Layers size={15} className="text-muted" />
-                    <span>Số frame tối đa:</span>
-                    <select
-                      value={visionMaxFrames}
-                      onChange={(e) => setVisionMaxFrames(Number(e.target.value))}
-                      className="input-field select-field input-sm font-bold"
-                    >
-                      <option value={150}>150 Khung hình (~5-10 phút video)</option>
-                      <option value={300}>300 Khung hình (~15-20 phút video)</option>
-                      <option value={600}>600 Khung hình (~30-40 phút video)</option>
-                      <option value={1200}>1200 Khung hình (~1-2 tiếng video)</option>
-                      <option value={3000}>3000 Khung hình (Video gộp cả bộ 3-4 tiếng)</option>
-                    </select>
+                  <div className="flex-center gap-1 text-sm text-green font-bold" style={{ background: 'rgba(16, 185, 129, 0.1)', padding: '6px 12px', borderRadius: '6px', border: '1px solid rgba(16, 185, 129, 0.2)' }}>
+                    <Layers size={15} />
+                    <span>Quét Toàn Bộ 100% Video (Không Giới Hạn)</span>
                   </div>
+
 
                   <label 
                     className="flex-center gap-2 text-sm font-bold cursor-pointer"

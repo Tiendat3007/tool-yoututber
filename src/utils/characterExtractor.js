@@ -41,8 +41,7 @@ Nếu trong các khung hình không có thẻ đồ họa nào, trả về [].
 
 // Extract video frames in browser memory via HTML5 Canvas with Flip Horizontal Mirror Support
 export async function extractFramesFromVideo(videoFile, {
-  intervalSec = 5,
-  maxFrames = 300,
+  intervalSec = 3,
   flipHorizontal = false,
   onProgress = () => {},
   videoDuration = 0
@@ -66,10 +65,10 @@ export async function extractFramesFromVideo(videoFile, {
       const timestamps = [];
       for (let t = 2; t < duration; t += intervalSec) {
         timestamps.push(Math.round(t * 10) / 10);
-        if (timestamps.length >= maxFrames) break;
       }
 
       const frames = [];
+
 
       for (let i = 0; i < timestamps.length; i++) {
         const time = timestamps[i];
