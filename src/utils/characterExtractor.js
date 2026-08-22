@@ -1,37 +1,49 @@
 import { parseSRT, generateSRT } from './srtParser';
 
-// Vision Character Detection Prompt for Chinese 3D Donghua / Xianxia Videos
+// Vision Character & Weapon/Lore Detection Prompt for Chinese 3D Donghua / Xianxia Videos
 export const VISION_CHARACTER_PROMPT = `
-Bạn là Chuyên gia Thị giác AI & OCR Phim Hoạt Hình 3D Trung Quốc / Tu Tiên / Kiếm Hiệp.
-Nhiệm vụ của bạn là soi kỹ các khung hình video được gửi kèm để tìm BẢNG TÊN / THẺ CHÚ THÍCH NHÂN VẬT (Character Introduction Graphic).
+Bạn là Chuyên gia Thị giác AI & OCR Phim Hoạt Hình 3D Trung Quốc / Tu Tiên / Kiếm Hiệp (Tencent, Bilibili, Youku, iQiyi).
+Nhiệm vụ của bạn là soi kỹ các khung hình video (đã được lật thuận chiều xuôi chuẩn) để tìm và đọc TẤT CẢ CÁC BẢNG TÊN / THẺ CHÚ THÍCH ĐỒ HỌA xuất hiện trên màn hình.
 
-ĐẶC ĐIỂM BẢNG TÊN NHÂN VẬT TRÊN PHIM HOẠT HÌNH TRUNG QUỐC:
-- Chữ Hán thư pháp lớn dọc hoặc ngang cạnh nhân vật (VD: 赵昀, 萧炎, 陆阳, 慕容复, 林动...).
-- Nhãn đỏ / Khung đỏ / Bảng bài chứa thân phận: 主角 (Chủ Giác = Nhân vật chính), 反派 (Phản Diện), 宗主 (Tông Chủ), 大师兄 (Đại Sư Huynh), 长老 (Trưởng Lão), 圣女 (Thánh Nữ)...
-- Có thể kèm theo Môn phái (VD: 玄天宗, 青云门, 萧家, 云岚宗) và Cảnh giới tu luyện (VD: 洞虚境, 七境, 金丹, 斗之气...).
+CÁC LOẠI THẺ ĐỒ HỌA TRÊN PHIM HOẠT HÌNH 3D TRUNG QUỐC:
+1. 👤 BẢNG TÊN NHÂN VẬT (Character Card):
+   - Chữ Hán thư pháp tên nhân vật (VD: 欧阳青 [Âu Dương Thanh], 赵昀 [Triệu Quân], 萧炎 [Tiêu Viêm], 陆阳 [Lục Dương], 慕容复...).
+   - Nhãn đỏ / Khung đỏ chứa thân phận: 主角 (Chủ Giác = Nhân vật chính), 反派 (Phản Diện), 宗主 (Tông Chủ), 大师兄 (Đại Sư Huynh), 圣女 (Thánh Nữ), 长老 (Trưởng Lão), 门主 (Môn Chủ)...
+   - Tông môn / Cảnh giới (VD: 玄天宗, 青云门, 洞虚境, 七境, 金丹, 斗王...).
+   - Tag mẫu: 【 NHÂN VẬT: ÂU DƯƠNG THANH | HUYỀN THIÊN TÔNG | ĐẠI SƯ HUYNH 】
 
-YÊU CẦU ĐẦU RA JSON ARRAY CHÍNH XÁC:
+2. ⚔️ THẦN BINH / BẢO VẬT / VŨ KHÍ (Weapon / Artifact):
+   - Chữ thư pháp lớn giới thiệu kiếm, bảo kiếm, thần binh, pháp bảo (VD: 镇宅神剑 [Trấn Trạch Thần Kiếm], 八荒剑阁 [Bát Hoang Kiếm Các], 诛仙剑 [Tru Tiên Kiếm], 焚寂剑...).
+   - Tag mẫu: 【 THẦN BINH: TRẤN TRẠCH THẦN KIẾM | BÁT HOANG KIẾM CÁC 】
+
+3. 🏛️ ĐỊA DANH / TÔNG MÔN / CHIÊU THỨC (Location / Martial Art):
+   - Tên môn phái, thắng cảnh, tuyệt kỹ, trận pháp.
+   - Tag mẫu: 【 ĐỊA DANH: BÁT HOANG KIẾM CÁC 】 hoặc 【 TUYỆT KỸ: BÁT HOANG KIẾM QUYẾT 】
+
+YÊU CẦU ĐẦU RA JSON ARRAY CHÍNH XÁC (Dịch sang âm Hán-Việt chuẩn xác, KHÔNG thêm markdown ngoài JSON):
 [
   {
-    "hasCharacterTag": true,
+    "hasTag": true,
+    "type": "character",
     "frameIndex": 1,
     "timestamp": "00:00:18,200",
-    "name": "Tên nhân vật Hán-Việt chuẩn xác (VD: Triệu Quân, Tiêu Viêm, Lục Dương)",
-    "originalName": "Chữ Hán trên bảng tên video (VD: 赵昀, 萧炎)",
-    "role": "Thân phận ghi trên bảng đỏ/thư pháp (VD: Nhân vật chính / 主角, Đại sư huynh, Tông chủ)",
-    "sect": "Tông môn / Gia tộc nếu có ghi trên màn hình (VD: Huyền Thiên Tông, Tiêu Gia)",
-    "realm": "Cảnh giới tu luyện nếu có ghi (VD: Động Hư Cảnh, Kim Đan, Thất Cảnh)",
-    "introTag": "【 NHÂN VẬT: TRIỆU QUÂN | HUYỀN THIÊN TÔNG | CHỦ GIÁC 】",
-    "description": "Mô tả ngắn trang phục / bối cảnh lúc xuất hiện"
+    "name": "Tên Hán-Việt chuẩn xác (VD: Âu Dương Thanh, Trấn Trạch Thần Kiếm, Triệu Quân)",
+    "originalName": "Chữ Hán gốc trên màn hình (VD: 欧阳青, 镇宅神剑, 赵昀)",
+    "role": "Thân phận / Loại thẻ (VD: Nhân vật chính / 主角, Đại sư huynh, Thần binh bảo kiếm, Tông chủ)",
+    "sect": "Tông môn / Nơi xuất xứ nếu có (VD: Huyền Thiên Tông, Bát Hoang Kiếm Các)",
+    "realm": "Cảnh giới / Cấp bậc nếu có (VD: Thất Cảnh, Động Hư Cảnh, Cực phẩm Linh bảo)",
+    "introTag": "【 NHÂN VẬT: ÂU DƯƠNG THANH | HUYỀN THIÊN TÔNG | ĐẠI SƯ HUYNH 】",
+    "description": "Mô tả ngắn hình ảnh xuất hiện trên video"
   }
 ]
-Nếu không có khung hình nào chứa bảng tên nhân vật, trả về mảng rỗng [].
+Nếu trong các khung hình không có thẻ đồ họa nào, trả về [].
 `;
 
-// Extract video frames in browser memory via HTML5 Canvas
+// Extract video frames in browser memory via HTML5 Canvas with Flip Horizontal Mirror Support
 export async function extractFramesFromVideo(videoFile, {
-  intervalSec = 10,
-  maxFrames = 150,
+  intervalSec = 5,
+  maxFrames = 300,
+  flipHorizontal = false,
   onProgress = () => {},
   videoDuration = 0
 }) {
@@ -77,8 +89,17 @@ export async function extractFramesFromVideo(videoFile, {
           const onSeeked = () => {
             clearTimeout(timeoutTimer);
             video.removeEventListener('seeked', onSeeked);
+
+            // Handle Horizontal Flip (Mirror correction for re-up videos)
+            ctx.save();
+            if (flipHorizontal) {
+              ctx.translate(canvas.width, 0);
+              ctx.scale(-1, 1);
+            }
             ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-            const base64Full = canvas.toDataURL('image/jpeg', 0.65);
+            ctx.restore();
+
+            const base64Full = canvas.toDataURL('image/jpeg', 0.70);
             const base64Data = base64Full.split(',')[1];
             frames.push({
               frameIndex: i + 1,
@@ -109,6 +130,7 @@ export async function extractFramesFromVideo(videoFile, {
     };
   });
 }
+
 
 // Scan video frames using Gemini Vision or Orimise Vision in small batches
 export async function scanVideoFramesWithVisionAI({

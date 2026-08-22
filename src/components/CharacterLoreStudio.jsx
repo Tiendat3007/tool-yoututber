@@ -305,8 +305,9 @@ export default function CharacterLoreStudio({
 
   // Vision Scanner States
   const [visionVideoFile, setVisionVideoFile] = useState(null);
-  const [visionIntervalSec, setVisionIntervalSec] = useState(10);
-  const [visionMaxFrames, setVisionMaxFrames] = useState(150);
+  const [visionIntervalSec, setVisionIntervalSec] = useState(3);
+  const [visionMaxFrames, setVisionMaxFrames] = useState(300);
+  const [visionFlipHorizontal, setVisionFlipHorizontal] = useState(true); // Default true for mirrored/flipped re-up videos
   const [isVisionScanning, setIsVisionScanning] = useState(false);
   const [visionProgress, setVisionProgress] = useState(null);
   const [liveCurrentFrame, setLiveCurrentFrame] = useState(null);
@@ -334,10 +335,11 @@ export default function CharacterLoreStudio({
     setVisionProgress({ phase: 'extracting', percent: 0, message: 'Đang trích xuất các khung hình từ video...' });
 
     try {
-      // 1. Extract frames locally in browser canvas (0 MB video upload, ultra fast)
+      // 1. Extract frames locally in browser canvas (0 MB video upload, auto mirror flip correction)
       const frames = await extractFramesFromVideo(visionVideoFile, {
         intervalSec: Number(visionIntervalSec),
         maxFrames: Number(visionMaxFrames),
+        flipHorizontal: Boolean(visionFlipHorizontal),
         onProgress: (p) => {
           setVisionProgress({
             phase: 'extracting',
@@ -350,6 +352,7 @@ export default function CharacterLoreStudio({
       if (frames.length === 0) {
         throw new Error('Không trích xuất được khung hình nào từ video.');
       }
+
 
       // 2. Scan with Vision AI (Gemini Vision / Orimise Vision)
       setVisionProgress({ phase: 'ai_scanning', percent: 0, message: `Bắt đầu gửi ${frames.length} khung hình sang AI Vision soi bảng tên chữ Hán...` });
@@ -877,6 +880,25 @@ export default function CharacterLoreStudio({
                     </select>
                   </div>
 
+                  <label 
+                    className="flex-center gap-2 text-sm font-bold cursor-pointer"
+                    style={{ 
+                      background: visionFlipHorizontal ? 'rgba(16, 185, 129, 0.2)' : 'rgba(255,255,255,0.05)', 
+                      padding: '6px 12px', 
+                      borderRadius: '6px', 
+                      border: visionFlipHorizontal ? '1px solid #10b981' : '1px solid rgba(255,255,255,0.1)',
+                      color: visionFlipHorizontal ? '#10b981' : 'inherit'
+                    }}
+                    title="Tự động lật ngược lại chiều thuận đối với video re-up bị lật gương (Flip Horizontal) để AI đọc chữ Hán và thư pháp chính xác 100%"
+                  >
+                    <input
+                      type="checkbox"
+                      checked={visionFlipHorizontal}
+                      onChange={(e) => setVisionFlipHorizontal(e.target.checked)}
+                      className="custom-checkbox"
+                    />
+                    <span>🔄 Tự Động Lật Gương (Bỏ Lật Ngược Video Re-up)</span>
+                  </label>
                 </div>
 
                 <button
@@ -891,6 +913,7 @@ export default function CharacterLoreStudio({
               </div>
             )}
           </div>
+
 
           {/* Live Scanning Status & Preview Box */}
           {isVisionScanning && visionProgress && (
