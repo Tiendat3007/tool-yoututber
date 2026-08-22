@@ -74,13 +74,41 @@ export default function SubtitleEditor({
     }
   };
 
-  // Selection
-  const handleSelectAll = (e) => {
-    if (e.target.checked) {
-      setSelectedIds(subtitles.map(s => s.id));
+  // Filter & Search
+  const filteredSubtitles = subtitles.filter(s => {
+    const q = searchTerm.toLowerCase().trim();
+    const matchesSearch = !q ||
+      s.originalText.toLowerCase().includes(q) ||
+      s.translatedText.toLowerCase().includes(q) ||
+      String(s.index).includes(q);
+
+    if (filterStatus === 'all') return matchesSearch;
+    return matchesSearch && s.status === filterStatus;
+  });
+
+  // Check if all currently filtered items are selected
+  const isAllFilteredSelected = filteredSubtitles.length > 0 && filteredSubtitles.every(s => selectedIds.includes(s.id));
+  const someFilteredSelected = filteredSubtitles.some(s => selectedIds.includes(s.id));
+
+  // Select all currently filtered/found items
+  const handleSelectAllFiltered = (e) => {
+    const isChecked = e ? e.target.checked : !isAllFilteredSelected;
+    if (isChecked) {
+      const filteredIdSet = new Set(filteredSubtitles.map(s => s.id));
+      setSelectedIds(prev => Array.from(new Set([...prev, ...filteredIdSet])));
     } else {
-      setSelectedIds([]);
+      const filteredIdSet = new Set(filteredSubtitles.map(s => s.id));
+      setSelectedIds(prev => prev.filter(id => !filteredIdSet.has(id)));
     }
+  };
+
+  const handleSelectOnlyFiltered = () => {
+    setSelectedIds(filteredSubtitles.map(s => s.id));
+  };
+
+  const handleDeselectFiltered = () => {
+    const filteredIdSet = new Set(filteredSubtitles.map(s => s.id));
+    setSelectedIds(prev => prev.filter(id => !filteredIdSet.has(id)));
   };
 
   const toggleSelect = (id) => {
@@ -90,6 +118,7 @@ export default function SubtitleEditor({
       setSelectedIds([...selectedIds, id]);
     }
   };
+
 
   // Line edits
   const handleTextChange = (id, newText) => {
@@ -407,18 +436,9 @@ export default function SubtitleEditor({
     setSubtitles([...subtitles, newSub]);
   };
 
-  // Filter & Search
-  const filteredSubtitles = subtitles.filter(s => {
-    const matchesSearch =
-      s.originalText.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      s.translatedText.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      String(s.index).includes(searchTerm);
-
-    if (filterStatus === 'all') return matchesSearch;
-    return matchesSearch && s.status === filterStatus;
-  });
-
   return (
+
+
     <div className="editor-layout">
       {/* Upload Zone / Multi-file Drop Card */}
       {files.length === 0 ? (
@@ -592,10 +612,11 @@ export default function SubtitleEditor({
                 className="btn btn-purple btn-sm font-bold"
                 onClick={handleAIBatchTranslate}
                 disabled={isTranslating}
-                title={`Dịch file hiện tại bằng AI ${aiProvider === 'orimise' ? `Orimise (${aiModel})` : `Gemini (${aiModel})`}`}
+                title={`Dịch bằng AI ${aiProvider === 'orimise' ? `Orimise (${aiModel})` : `Gemini (${aiModel})`}`}
               >
-                <Sparkles size={16} /> Dịch AI File Này ({concurrency} Luồng)
+                <Sparkles size={16} /> Dịch AI {selectedIds.length > 0 ? `${selectedIds.length} Dòng Đã Chọn` : `File Này (${subtitles.length} dòng)`} ({concurrency} Luồng)
               </button>
+
 
               {/* Red/Green Diff Toggle Button */}
               <button
@@ -735,33 +756,76 @@ export default function SubtitleEditor({
             </div>
 
             {/* Table Search & Filter Bar */}
-            <div className="table-filter-bar">
-              <div className="search-box">
-                <Search size={16} className="search-icon" />
-                <input
-                  type="text"
-                  placeholder="Tìm theo nội dung phụ đề hoặc số ID..."
-                  value={searchTerm}
-                  onChange={e => setSearchTerm(e.target.value)}
-                  className="input-field"
-                />
+            <div className="table-filter-bar flex-between flex-wrap gap-2">
+              <div className="flex-center flex-wrap gap-2" style={{ flex: 1 }}>
+                <div className="search-box" style={{ maxWidth: '320px', minWidth: '220px', flex: 1 }}>
+                  <Search size={16} className="search-icon" />
+                  <input
+                    type="text"
+                    placeholder="🔍 Tìm theo nội dung phụ đề hoặc số ID..."
+                    value={searchTerm}
+                    onChange={e => setSearchTerm(e.target.value)}
+                    className="input-field"
+                  />
+                  {searchTerm && (
+                    <button className="btn-clear-search text-muted" onClick={() => setSearchTerm('')}>✕</button>
+                  )}
+                </div>
+
+                <div className="filter-group flex-center gap-2">
+                  <select
+                    value={filterStatus}
+                    onChange={e => setFilterStatus(e.target.value)}
+                    className="input-field select-field"
+                    style={{ minWidth: '150px' }}
+                  >
+                    <option value="all">Tất cả trạng thái ({subtitles.length})</option>
+                    <option value="pending">Chưa dịch</option>
+                    <option value="translated">Đã dịch</option>
+                    <option value="edited">Đã chỉnh sửa</option>
+                  </select>
+                </div>
+
+                {/* 🎯 Quick Select All Found / Filtered Buttons */}
+                {filteredSubtitles.length > 0 && (
+                  <div className="flex-center gap-1">
+                    <button
+                      className="btn btn-cyan btn-sm font-bold flex-center gap-1"
+                      onClick={handleSelectOnlyFiltered}
+                      title={`Chọn toàn bộ ${filteredSubtitles.length} dòng đã tìm thấy theo từ khóa "${searchTerm || 'bộ lọc'}"`}
+                    >
+                      <Check size={14} />
+                      <span>Chọn Tất Cả {filteredSubtitles.length} Dòng Tìm Thấy</span>
+                    </button>
+                    {someFilteredSelected && (
+                      <button
+                        className="btn btn-secondary btn-sm text-muted"
+                        onClick={handleDeselectFiltered}
+                        title="Bỏ chọn các dòng đang lọc"
+                      >
+                        Bỏ Chọn
+                      </button>
+                    )}
+                  </div>
+                )}
               </div>
 
-              <div className="filter-group">
-                <select
-                  value={filterStatus}
-                  onChange={e => setFilterStatus(e.target.value)}
-                  className="input-field select-field"
-                >
-                  <option value="all">Tất cả trạng thái ({subtitles.length})</option>
-                  <option value="pending">Chưa dịch</option>
-                  <option value="translated">Đã dịch</option>
-                  <option value="edited">Đã chỉnh sửa</option>
-                </select>
-
-                <div className="select-counter">
-                  Đã chọn: <span className="highlight-cyan font-bold">{selectedIds.length}</span> dòng
-                </div>
+              <div className="select-counter flex-center gap-2">
+                <span className="text-sm text-muted">
+                  Đang hiện: <strong className="highlight-cyan">{filteredSubtitles.length}</strong> / {subtitles.length} dòng
+                </span>
+                <span className="badge badge-done" style={{ fontSize: '0.8rem', padding: '4px 10px' }}>
+                  Đã chọn: <strong className="highlight-cyan font-bold">{selectedIds.length}</strong> dòng
+                </span>
+                {selectedIds.length > 0 && (
+                  <button
+                    className="btn btn-secondary btn-xs text-muted"
+                    onClick={() => setSelectedIds([])}
+                    title="Bỏ chọn tất cả các dòng"
+                  >
+                    Bỏ chọn hết
+                  </button>
+                )}
               </div>
             </div>
 
@@ -773,9 +837,10 @@ export default function SubtitleEditor({
                     <th style={{ width: '40px' }}>
                       <input
                         type="checkbox"
-                        checked={selectedIds.length === subtitles.length && subtitles.length > 0}
-                        onChange={handleSelectAll}
+                        checked={isAllFilteredSelected}
+                        onChange={handleSelectAllFiltered}
                         className="custom-checkbox"
+                        title={isAllFilteredSelected ? "Bỏ chọn tất cả dòng đang hiển thị" : `Chọn tất cả ${filteredSubtitles.length} dòng đang hiển thị`}
                       />
                     </th>
                     <th style={{ width: '50px' }}>#</th>
@@ -785,6 +850,7 @@ export default function SubtitleEditor({
                     <th style={{ width: '80px', textAlign: 'right' }}>Thao Tác</th>
                   </tr>
                 </thead>
+
                 <tbody>
                   {filteredSubtitles.map(sub => {
                     const isSelected = selectedIds.includes(sub.id);
