@@ -812,10 +812,10 @@ export default function CharacterLoreStudio({
       if (filterRole === 'skill') return matchesSearch && (c.type === 'skill' || c.type === 'cong_phap');
       if (filterRole === 'location') return matchesSearch && (c.type === 'location');
       if (filterRole === 'realm') return matchesSearch && (c.type === 'realm');
-      if (filterRole === 'system') return matchesSearch && (c.type === 'system');
       if (filterRole === 'main') return matchesSearch && (c.role.toLowerCase().includes('chính') || c.role.toLowerCase().includes('nữ chính'));
       if (filterRole === 'antagonist') return matchesSearch && (c.role.toLowerCase().includes('phản') || c.role.toLowerCase().includes('ma'));
       return matchesSearch;
+
     })
     .sort((a, b) => getFullMovieStartMs(a) - getFullMovieStartMs(b));
 
@@ -1121,14 +1121,14 @@ export default function CharacterLoreStudio({
               >
                 <option value="all">Tất cả thực thể & vai trò ({activeMovieCharacters.length})</option>
                 <option value="character">👤 Nhân Vật</option>
-                <option value="weapon">⚔️ Thần Binh / Pháp Bảo</option>
+                <option value="weapon">⚔️ Thần Binh / Chí Bảo</option>
                 <option value="skill">📜 Công Pháp / Tuyệt Kỹ</option>
                 <option value="location">🏛️ Địa Danh / Tông Môn</option>
                 <option value="realm">⚡ Cảnh Giới Tu Vi</option>
-                <option value="system">🤖 Hệ Thống</option>
                 <option value="main">Nhân vật chính / Nữ chính</option>
                 <option value="antagonist">Phản diện / Ma đạo</option>
               </select>
+
 
               <span className="text-muted text-sm">
                 Đang hiển thị: <strong className="highlight-cyan">{filteredCharacters.length}</strong> thực thể
@@ -1200,12 +1200,10 @@ export default function CharacterLoreStudio({
                     {char.type === 'realm' && (
                       <span className="badge font-bold" style={{ background: 'rgba(59, 130, 246, 0.2)', color: '#60a5fa', border: '1px solid #3b82f6' }}>⚡ Cảnh Giới</span>
                     )}
-                    {char.type === 'system' && (
-                      <span className="badge font-bold" style={{ background: 'rgba(236, 72, 153, 0.2)', color: '#f472b6', border: '1px solid #ec4899' }}>🤖 Hệ Thống</span>
-                    )}
                     {!isInvalidLoreValue(char.role) && (
                       <span className="badge badge-role">👤 {char.role}</span>
                     )}
+
                     {!isInvalidLoreValue(char.sect) && (
                       <span className="badge badge-sect">🏛️ {char.sect}</span>
                     )}

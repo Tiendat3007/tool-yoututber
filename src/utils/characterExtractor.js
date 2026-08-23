@@ -1,4 +1,4 @@
-// Vision Character, Weapon, Skill, Location, Realm, System Lore Detection Prompt for Chinese 3D Donghua / Xianxia Videos
+// Vision Character, Weapon, Skill, Location, Realm Lore Detection Prompt for Chinese 3D Donghua / Xianxia Videos
 export const VISION_CHARACTER_PROMPT = `
 Bạn là Chuyên gia Thị giác AI & OCR Phim Hoạt Hình 3D Trung Quốc / Tu Tiên / Huyền Huyễn (Tencent, Bilibili, Youku, iQiyi).
 Nhiệm vụ của bạn là soi kỹ các khung hình video (đã được lật thuận chiều xuôi chuẩn) để tìm và đọc TẤT CẢ CÁC BẢNG TÊN / THẺ CHÚ THÍCH ĐỒ HỌA xuất hiện trên màn hình, đồng thời đối chiếu với NGỮ CẢNH PHỤ ĐỀ SRT (nếu có) để dịch âm Hán-Việt chuẩn xác 100%.
@@ -21,14 +21,11 @@ CÁC LOẠI THẺ ĐỒ HỌA TRÊN PHIM HOẠT HÌNH 3D TRUNG QUỐC:
 5. ⚡ CẢNH GIỚI TU VI ("type": "realm"):
    - Thẻ hiển thị cấp độ đột phá cảnh giới (VD: Động Hư Cảnh, Nguyên Anh Kỳ, Luyện Khí Cửu Tầng, Đấu Tôn...).
 
-6. 🤖 HỆ THỐNG / BẢNG THUỘC TÍNH ("type": "system"):
-   - Bảng trạng thái nhiệm vụ hệ thống, điểm thưởng, thuộc tính nhân vật (VD: Vạn Giới Đăng Nhập Hệ Thống, Bảng Trạng Thái, Nhiệm Vụ Tông Môn...).
-
 YÊU CẦU ĐẦU RA JSON ARRAY CHÍNH XÁC (Dịch sang âm Hán-Việt chuẩn xác, KHÔNG thêm markdown ngoài JSON):
 [
   {
     "hasTag": true,
-    "type": "character", // 'character' | 'weapon' | 'skill' | 'location' | 'realm' | 'system'
+    "type": "character", // 'character' | 'weapon' | 'skill' | 'location' | 'realm'
     "frameIndex": 1,
     "timestamp": "00:00:18,200",
     "name": "Tên Hán-Việt chuẩn xác (VD: Cố Thần, Bát Hoang Kiếm Quyết, Trấn Trạch Thần Kiếm, Bát Hoang Kiếm Các)",
@@ -36,20 +33,20 @@ YÊU CẦU ĐẦU RA JSON ARRAY CHÍNH XÁC (Dịch sang âm Hán-Việt chuẩn
     "role": "Thân phận / Loại thẻ nếu có (VD: Nhân vật chính, Tông chủ, Thần kiếm, Tuyệt kỹ trấn phái, nếu không có để \"\")",
     "sect": "Tông môn / Xuất xứ nếu có (VD: Bát Hoang Kiếm Các, nếu không có để \"\")",
     "realm": "Cảnh giới / Cấp bậc nếu có (VD: Cực phẩm Linh bảo, Động Hư Cảnh, nếu không có để \"\")",
-    "introTag": "【 NHÂN VẬT: CỐ THẦN | BÁT HOANG KIẾM CÁC 】",
+    "introTag": "【 CỐ THẦN | BÁT HOANG KIẾM CÁC 】",
     "description": "Mô tả ngắn hình ảnh xuất hiện trên video"
   }
 ]
 LƯU Ý QUAN TRỌNG VỀ LỌC RÁC:
 1. CHỈ LẤY: Bảng tên nhân vật, thần binh, chí bảo, pháp bảo, tuyệt kỹ công pháp, môn phái/địa danh xuất hiện dưới dạng thẻ đồ họa đồ sộ.
-2. TUYỆT ĐỐI KHÔNG LẤY: Phụ đề hội thoại chạy ở đáy màn hình, câu thoại dài của nhân vật (VD: "Ngươi muốn làm gì", "Chúng ta đi thôi", "Không thể nào"), logo watermark kênh/nhà đài (Bilibili, Tencent, Youku, iQiyi), chữ quảng cáo hoặc credit.
+2. TUYỆT ĐỐI KHÔNG LẤY: Phụ đề hội thoại chạy ở đáy màn hình, câu thoại dài của nhân vật (VD: "Ngươi muốn làm gì", "Chúng ta đi thôi", "Không thể nào"), logo watermark kênh/nhà đài (Bilibili, Tencent, Youku, iQiyi), bảng nhiệm vụ hệ thống/thuộc tính, chữ quảng cáo hoặc credit.
 3. Tên ("name") BẮT BUỘC NGẮN GỌN (từ 2 đến 6 từ, không chứa dấu câu . , ! ? : ;).
 4. Nếu trên khung hình không ghi Môn Phái hoặc Cảnh Giới, hãy để chuỗi rỗng "" (tuyệt đối KHÔNG ghi "N/A", "Unknown", "Chưa rõ" hay "Không").
 Nếu trong các khung hình không có thẻ đồ họa nào, trả về [].
 `;
 
-
 // Helper: Summarize SRT Subtitles context to inject into Vision AI
+
 export function buildSRTContextSummary(subtitles = [], glossary = [], maxLines = 150) {
   if (!Array.isArray(subtitles) || subtitles.length === 0) return '';
 
@@ -738,8 +735,12 @@ export function isValidLoreEntity(char) {
   // 4. Punctuation check: Real entity names do NOT contain sentence endings / dialogue punctuation
   if (/[.!?,;:，。！？…—~`"'“”‘’(){}[\]\\]/.test(name)) return false;
 
-  // 5. Dialogue / narrative pronouns & verbs filter (Conversational garbage detection)
+  // 5. Dialogue / narrative pronouns, system boards & verbs filter (Conversational garbage detection)
   const nameLower = name.toLowerCase();
+  if (char.type === 'system' || nameLower.includes('hệ thống') || nameLower.includes('bảng thuộc tính') || nameLower.includes('nhiệm vụ')) {
+    return false;
+  }
+
   const garbagePhrases = [
     'chúng ta', 'các ngươi', 'ngươi là', 'ta là', 'hắn là', 'nàng là', 'của ta', 'của ngươi',
     'tại sao', 'làm sao', 'thế nào', 'như thế nào', 'vì sao', 'ngươi dám', 'không thể nào',
@@ -747,7 +748,8 @@ export function isValidLoreEntity(char) {
     'đi thôi', 'lên cho ta', 'giết hắn', 'đứng lại', 'ta không', 'ngươi không',
     'bilibili', 'tencent', 'iqiyi', 'youku', 'tập sau', 'đón xem', 'phụ đề', 'vietsub',
     'thuyết minh', 'kính mời', 'chúc các bạn', 'like và subscribe', 'đăng ký kênh',
-    'cảm ơn đã xem', 'hẹn gặp lại', 'video preview', 'trailer', 'quảng cáo', 'thông báo'
+    'cảm ơn đã xem', 'hẹn gặp lại', 'video preview', 'trailer', 'quảng cáo', 'thông báo',
+    'hệ thống', 'bảng trạng thái'
   ];
   if (garbagePhrases.some(phrase => nameLower.includes(phrase))) {
     return false;
@@ -778,8 +780,6 @@ export function cleanAndFormatIntroTag(char, templateMode = 'clean_compact', cus
     type = 'CÔNG PHÁP';
   } else if (rawType === 'realm' || name.toLowerCase().includes('cảnh') || name.toLowerCase().includes('kỳ') || name.toLowerCase().includes('tầng') || name.toLowerCase().includes('đỉnh phong') || name.toLowerCase().includes('kim đan') || name.toLowerCase().includes('nguyên anh') || name.toLowerCase().includes('luyện khí') || name.toLowerCase().includes('trúc cơ') || name.toLowerCase().includes('hóa thần') || name.toLowerCase().includes('động hư') || name.toLowerCase().includes('đại thừa') || name.toLowerCase().includes('độ kiếp')) {
     type = 'CẢNH GIỚI';
-  } else if (rawType === 'system' || name.toLowerCase().includes('hệ thống') || name.toLowerCase().includes('bảng')) {
-    type = 'HỆ THỐNG';
   } else if (rawType === 'location' || name.toLowerCase().includes('tông') || name.toLowerCase().includes('môn') || name.toLowerCase().includes('phái') || name.toLowerCase().includes('sơn') || name.toLowerCase().includes('điện') || name.toLowerCase().includes('thành') || name.toLowerCase().includes('đảo')) {
     type = 'ĐỊA DANH';
   }
@@ -792,8 +792,6 @@ export function cleanAndFormatIntroTag(char, templateMode = 'clean_compact', cus
   // Strip redundant leading type prefix words from name
   if (type === 'CẢNH GIỚI') {
     name = name.replace(/^cảnh\s*giới\s*[:\s]*/i, '').trim();
-  } else if (type === 'HỆ THỐNG') {
-    name = name.replace(/^hệ\s*thống\s*[:\s]*/i, '').trim();
   } else if (type === 'CHÍ BẢO') {
     name = name.replace(/^(chí\s*bảo|thần\s*binh|pháp\s*bảo)\s*[:\s]*/i, '').trim();
   } else if (type === 'CÔNG PHÁP') {
@@ -839,12 +837,10 @@ export function cleanAndFormatIntroTag(char, templateMode = 'clean_compact', cus
   if (type === 'CẢNH GIỚI') {
     return `【 CẢNH GIỚI: ${name.toUpperCase()} 】`;
   }
-  if (type === 'HỆ THỐNG') {
-    return `【 HỆ THỐNG: ${name.toUpperCase()} 】`;
-  }
   if (type === 'ĐỊA DANH') {
     return `【 ${name.toUpperCase()} 】`;
   }
+
 
   // Prefix handling:
   // - NHÂN VẬT & ĐỊA DANH: NO prefix (User explicitly requested!)
