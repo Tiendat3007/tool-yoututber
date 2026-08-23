@@ -773,10 +773,10 @@ export function cleanAndFormatIntroTag(char, templateMode = 'clean_compact', cus
   const rawType = (char.type || '').toLowerCase();
   let type = 'NHÂN VẬT';
   if (rawType === 'weapon' || name.toLowerCase().includes('kiếm') || name.toLowerCase().includes('bảo') || name.toLowerCase().includes('đao') || name.toLowerCase().includes('chuỳ') || name.toLowerCase().includes('tháp') || name.toLowerCase().includes('kính') || name.toLowerCase().includes('kích') || name.toLowerCase().includes('thương') || name.toLowerCase().includes('trượng') || name.toLowerCase().includes('phiên')) {
-    type = 'THẦN BINH';
+    type = 'CHÍ BẢO';
   } else if (rawType === 'skill' || rawType === 'cong_phap' || name.toLowerCase().includes('quyết') || name.toLowerCase().includes('công') || name.toLowerCase().includes('pháp') || name.toLowerCase().includes('quyền') || name.toLowerCase().includes('chưởng') || name.toLowerCase().includes('trận') || name.toLowerCase().includes('chỉ')) {
     type = 'CÔNG PHÁP';
-  } else if (rawType === 'realm' || name.toLowerCase().includes('cảnh') || name.toLowerCase().includes('kỳ') || name.toLowerCase().includes('tầng')) {
+  } else if (rawType === 'realm' || name.toLowerCase().includes('cảnh') || name.toLowerCase().includes('kỳ') || name.toLowerCase().includes('tầng') || name.toLowerCase().includes('đỉnh phong') || name.toLowerCase().includes('kim đan') || name.toLowerCase().includes('nguyên anh') || name.toLowerCase().includes('luyện khí') || name.toLowerCase().includes('trúc cơ') || name.toLowerCase().includes('hóa thần') || name.toLowerCase().includes('động hư') || name.toLowerCase().includes('đại thừa') || name.toLowerCase().includes('độ kiếp')) {
     type = 'CẢNH GIỚI';
   } else if (rawType === 'system' || name.toLowerCase().includes('hệ thống') || name.toLowerCase().includes('bảng')) {
     type = 'HỆ THỐNG';
@@ -791,28 +791,33 @@ export function cleanAndFormatIntroTag(char, templateMode = 'clean_compact', cus
 
   // Strip redundant leading type prefix words from name
   if (type === 'CẢNH GIỚI') {
-    name = name.replace(/^cảnh\s*giới\s*/i, '').trim();
+    name = name.replace(/^cảnh\s*giới\s*[:\s]*/i, '').trim();
   } else if (type === 'HỆ THỐNG') {
-    name = name.replace(/^hệ\s*thống\s*/i, '').trim();
-  } else if (type === 'THẦN BINH') {
-    name = name.replace(/^thần\s*binh\s*/i, '').trim();
+    name = name.replace(/^hệ\s*thống\s*[:\s]*/i, '').trim();
+  } else if (type === 'CHÍ BẢO') {
+    name = name.replace(/^(chí\s*bảo|thần\s*binh|pháp\s*bảo)\s*[:\s]*/i, '').trim();
   } else if (type === 'CÔNG PHÁP') {
-    name = name.replace(/^công\s*pháp\s*/i, '').trim();
+    name = name.replace(/^(công\s*pháp|tuyệt\s*kỹ|thần\s*thông)\s*[:\s]*/i, '').trim();
+  } else if (type === 'ĐỊA DANH') {
+    name = name.replace(/^địa\s*danh\s*[:\s]*/i, '').trim();
+  } else if (type === 'NHÂN VẬT') {
+    name = name.replace(/^nhân\s*vật\s*[:\s]*/i, '').trim();
   }
 
   const nameLower = name.toLowerCase();
 
-  // 🎯 STRICT DEDUPLICATION: If Realm / Sect / Role is a substring of Name or vice-versa, eliminate it!
+  // 🎯 STRICT DEDUPLICATION: If Realm / Sect / Role has overlapping words with Name, clear it!
   if (realm) {
     const realmLower = realm.toLowerCase();
     if (nameLower === realmLower || nameLower.includes(realmLower) || realmLower.includes(nameLower)) {
       realm = '';
     } else {
-      if (nameLower.includes('linh bảo') && realmLower.includes('linh bảo')) realm = realm.replace(/linh\s*bảo/gi, '').trim();
-      if (nameLower.includes('thần kiếm') && realmLower.includes('thần kiếm')) realm = realm.replace(/thần\s*kiếm/gi, '').trim();
-      if (nameLower.includes('pháp bảo') && realmLower.includes('pháp bảo')) realm = realm.replace(/pháp\s*bảo/gi, '').trim();
-      if (nameLower.includes('thần binh') && realmLower.includes('thần binh')) realm = realm.replace(/thần\s*binh/gi, '').trim();
-      if (nameLower.includes('tiên kiếm') && realmLower.includes('tiên kiếm')) realm = realm.replace(/tiên\s*kiếm/gi, '').trim();
+      // Check partial word overlap (e.g. "Kim Đan" in both "Kim Đan Tam Trọng Đỉnh Phong" and "Kim Đan Kỳ")
+      const realmWords = realmLower.split(/\s+/).filter(w => w.length > 1);
+      const matchedWords = realmWords.filter(w => nameLower.includes(w));
+      if (matchedWords.length >= 2 || (realmWords.length <= 2 && matchedWords.length >= 1)) {
+        realm = '';
+      }
     }
   }
 
@@ -830,35 +835,41 @@ export function cleanAndFormatIntroTag(char, templateMode = 'clean_compact', cus
     }
   }
 
-  // Entities of type CẢNH GIỚI, HỆ THỐNG, ĐỊA DANH should default to 1 concise part
-  if (['CẢNH GIỚI', 'HỆ THỐNG', 'ĐỊA DANH'].includes(type)) {
-    if (realm && (nameLower.includes(realm.toLowerCase()) || realm.toLowerCase().includes(nameLower))) realm = '';
-    if (sect && (nameLower.includes(sect.toLowerCase()) || sect.toLowerCase().includes(nameLower))) sect = '';
-    if (role && (nameLower.includes(role.toLowerCase()) || role.toLowerCase().includes(nameLower))) role = '';
+  // 🎯 Clean single-part entities (No redundant tags!)
+  if (type === 'CẢNH GIỚI') {
+    return `【 CẢNH GIỚI: ${name.toUpperCase()} 】`;
+  }
+  if (type === 'HỆ THỐNG') {
+    return `【 HỆ THỐNG: ${name.toUpperCase()} 】`;
+  }
+  if (type === 'ĐỊA DANH') {
+    return `【 ${name.toUpperCase()} 】`;
   }
 
+  // Prefix handling:
+  // - NHÂN VẬT & ĐỊA DANH: NO prefix (User explicitly requested!)
+  // - CHÍ BẢO / THẦN BINH: "CHÍ BẢO: "
+  // - CÔNG PHÁP: "CÔNG PHÁP: "
+  const prefix = type === 'NHÂN VẬT' ? '' : `${type}: `;
+
   if (templateMode === 'clean_compact') {
-    // 1-2 parts max: Guarantees single-line display on CapCut without line breaks
-    if (['CẢNH GIỚI', 'HỆ THỐNG'].includes(type) && !sect) {
-      return `【 ${type}: ${name.toUpperCase()} 】`;
-    }
     const secondPart = sect || realm || role;
     if (secondPart && secondPart.toUpperCase() !== name.toUpperCase()) {
-      return `【 ${type}: ${name.toUpperCase()} | ${secondPart.toUpperCase()} 】`;
+      return `【 ${prefix}${name.toUpperCase()} | ${secondPart.toUpperCase()} 】`;
     }
-    return `【 ${type}: ${name.toUpperCase()} 】`;
+    return `【 ${prefix}${name.toUpperCase()} 】`;
   }
 
   if (templateMode === 'full_3part') {
-    const parts = [name.toUpperCase()];
+    const parts = [`${prefix}${name.toUpperCase()}`];
     if (sect && !parts.includes(sect.toUpperCase())) parts.push(sect.toUpperCase());
     if (realm && !parts.includes(realm.toUpperCase())) parts.push(realm.toUpperCase());
     else if (role && !parts.includes(role.toUpperCase())) parts.push(role.toUpperCase());
-    return `【 ${type}: ${parts.join(' | ')} 】`;
+    return `【 ${parts.join(' | ')} 】`;
   }
 
   if (templateMode === 'modern_badge') {
-    const icon = type === 'THẦN BINH' ? '⚔️' : (type === 'ĐỊA DANH' ? '🏛️' : (type === 'CẢNH GIỚI' ? '⚡' : (type === 'CÔNG PHÁP' ? '📜' : (type === 'HỆ THỐNG' ? '🤖' : '⭐'))));
+    const icon = type === 'CHÍ BẢO' ? '⚔️' : (type === 'ĐỊA DANH' ? '🏛️' : (type === 'CẢNH GIỚI' ? '⚡' : (type === 'CÔNG PHÁP' ? '📜' : (type === 'HỆ THỐNG' ? '🤖' : '👤'))));
     const extra = [sect, realm || role].filter(Boolean).filter(x => x.toLowerCase() !== nameLower).join(' • ');
     return `${icon} [ ${name.toUpperCase()} ]${extra ? ` • ${extra}` : ''}`;
   }
@@ -870,6 +881,7 @@ export function cleanAndFormatIntroTag(char, templateMode = 'clean_compact', cus
     }
     return `【 ${name.toUpperCase()} 】`;
   }
+
 
 
   if (templateMode === 'custom' && customPattern) {
