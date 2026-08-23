@@ -1392,12 +1392,14 @@ ${fullImagePromptEn || generatedData.imagePromptEn}
               className="input-field select-field font-bold text-cyan"
               title="Chọn mô hình AI chuyên trách phân tích kịch bản và sáng tạo content YouTube"
             >
+              <option value="claude-haiku-4-5-20251001">🔥 claude-haiku-4-5-20251001 (Claude 4.5 Haiku ⭐ Siêu Rẻ & Không Phí Sàn)</option>
               <option value="claude-sonnet-5">🏆 claude-sonnet-5 (Đỉnh Cao Content YouTube)</option>
               <option value="gemini-2.5-flash">⚡ gemini-2.5-flash (Siêu Nhanh 2s & Đọc Nhiều Tập)</option>
               <option value="gpt-4o">🤖 gpt-4o (OpenAI GPT-4o)</option>
               <option value="gpt-4o-mini">🚀 gpt-4o-mini (OpenAI Tiết Kiệm)</option>
               <option value="gemini-2.5-pro">🧠 gemini-2.5-pro (Phân Tích Sâu)</option>
             </select>
+
           </div>
 
           <div className="control-field">

@@ -1445,12 +1445,14 @@ export default function CharacterLoreStudio({
                       style={{ background: 'rgba(0,0,0,0.5)', width: 'auto' }}
                       title="Chọn mô hình AI quét thị giác khung hình video MP4"
                     >
-                      <option value="gemini-2.5-flash-lite">⚡ Gemini 2.5 Flash Lite (Mặc định ⭐ Siêu Tiết Kiệm Token & Cực Nhanh)</option>
+                      <option value="claude-haiku-4-5-20251001">🔥 Claude 4.5 Haiku (claude-haiku-4-5-20251001 ⭐ Không Phí Sàn, Rẻ & Mượt)</option>
+                      <option value="gemini-2.5-flash-lite">⚡ Gemini 2.5 Flash Lite (Mặc định ⭐ Cực Nhanh)</option>
                       <option value="gemini-2.5-flash">Gemini 2.5 Flash (Tiêu Chuẩn Cân Bằng)</option>
                       <option value="gemini-1.5-pro">Gemini 1.5 Pro (Độ Chính Xác Cao)</option>
                       <option value="claude-fable-5">Claude Fable 5</option>
                       <option value="claude-sonnet-5">Claude Sonnet 5</option>
                     </select>
+
                   </div>
 
                   <div className="flex-center gap-1 text-sm font-bold" style={{ background: 'rgba(234, 179, 8, 0.1)', padding: '6px 12px', borderRadius: '6px', border: '1px solid rgba(234, 179, 8, 0.3)' }}>
