@@ -1061,7 +1061,9 @@ export default function App() {
             orimiseBaseUrl={orimiseBaseUrl}
             geminiKey={geminiKey}
             aiModel={aiModel}
+            characters={characters}
           />
+
         </div>
 
         {/* TAB 5: CHARACTER LORE & INTRO TAG STUDIO */}

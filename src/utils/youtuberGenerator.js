@@ -755,10 +755,11 @@ HÃY VIẾT LẠI TÓM TẮT CỐT TRUYỆN THEO ĐÚNG PROMPT TRÊN. XUẤT RA 
 }
 
 
-// 🪄 4. Dedicated AI Generator for Midjourney/Flux Image Prompts according to prompt
+// 🪄 4. Dedicated AI Generator for Midjourney/Flux Image Prompts according to prompt & Character Reference Images
 export async function regenerateImagePromptOnly({
   storySummary = '',
   customPrompt = '',
+  characterReferences = [],
   genre = 'Tu Tiên / Tiên Hiệp',
   contentType = 'Review Phim / Tóm Tắt Phim',
   aiProvider = 'orimise',
@@ -769,32 +770,49 @@ export async function regenerateImagePromptOnly({
   if (!apiKey) {
     throw new Error('Chưa nhập API Key trong Cấu Hình AI!');
   }
-  if (!customPrompt || !customPrompt.trim()) {
-    throw new Error('Vui lòng nhập prompt yêu cầu cho Ý Tưởng Vẽ Ảnh Thumbnail!');
+  if (!customPrompt && (!characterReferences || characterReferences.length === 0)) {
+    throw new Error('Vui lòng nhập prompt yêu cầu hoặc chọn ít nhất 1 ảnh nhân vật tham chiếu!');
   }
 
-  const systemPrompt = `You are an Elite Midjourney & Digital Art Prompt Engineer.
-Create a hyper-detailed 16:9 YouTube Thumbnail Art Prompt in English and a concise Vietnamese visual explanation based on the story and the Creator's Custom Prompt.
+  const systemPrompt = `You are an Elite Midjourney, Stable Diffusion & Flux Digital Art Prompt Engineer.
+Your mission is to craft a hyper-detailed 16:9 YouTube Thumbnail Art Prompt in English and a concise Vietnamese visual description.
+When Character Reference Images or descriptions are provided, inspect the characters' facial structure, hair color, attire, robes, armor, weapons, and magical aura to ACCURATELY describe them in the prompt so the generated art faithfully replicates the characters from the movie!
 
 RULES:
-1. imagePromptEn: Hyper-detailed prompt with lighting, atmosphere, cinematography, 8k render, --ar 16:9 --v 6.1 --style raw.
-2. imagePromptVi: Gợi ý bối cảnh và nhân vật bằng tiếng Việt dễ hiểu.
+1. imagePromptEn: Hyper-detailed prompt with lighting, atmosphere, character appearance, hair, facial features, attire, cinematography, 8k render, --ar 16:9 --v 6.1 --style raw.
+2. imagePromptVi: Gợi ý bối cảnh, nhân vật và bố cục hình ảnh bằng tiếng Việt dễ hiểu.
 3. Return ONLY valid JSON:
 {
-  "imagePromptEn": "Hyper realistic 16:9 cinematic anime render...",
+  "imagePromptEn": "Hyper realistic 16:9 cinematic anime render of...",
   "imagePromptVi": "Mô tả bối cảnh và thần thái nhân vật bằng tiếng Việt..."
 }`;
+
+  let charRefContext = '';
+  if (Array.isArray(characterReferences) && characterReferences.length > 0) {
+    charRefContext = `\n=== 👥 DANH SÁCH NHÂN VẬT THAM CHIẾU TỪ PHIM (${characterReferences.length} nhân vật): ===\n` +
+      characterReferences.map((c, i) => {
+        const info = [
+          c.name ? `Tên: ${c.name}` : '',
+          c.role ? `Thân phận: ${c.role}` : '',
+          c.sect ? `Môn phái: ${c.sect}` : '',
+          c.realm ? `Cảnh giới: ${c.realm}` : '',
+          c.note ? `Ghi chú: ${c.note}` : ''
+        ].filter(Boolean).join(' | ');
+        return `[Nhân vật #${i + 1}] ${info}`;
+      }).join('\n') +
+      `\n=> YÊU CẦU QUAN TRỌNG: Hãy soi kỹ các ảnh tham chiếu đính kèm và mô tả chính xác ngoại hình, kiểu tóc, y phục, thần khí và vũ khí của các nhân vật trên vào Prompt Midjourney/Flux!\n`;
+  }
 
   const userMessage = `THỂ LOẠI: ${genre}
 ĐỊNH DẠNG: ${contentType}
 
 === 🎯 PROMPT YÊU CẦU VẼ ẢNH TỪ CREATOR: ===
-${customPrompt.trim()}
-
+${(customPrompt || 'Tạo ảnh thumbnail kịch tính, hoành tráng, làm nổi bật nhân vật chính của bộ phim').trim()}
+${charRefContext}
 === TÓM TẮT CỐT TRUYỆN GỐC ===
 ${storySummary}
 
-HÃY TẠO PROMPT VẼ ẢNH TIẾNG ANH VÀ Ý TƯỞNG TIẾNG VIỆT THEO ĐÚNG PROMPT TRÊN. XUẤT RA 1 ĐỐI TƯỢNG JSON DUY NHẤT:`;
+HÃY TẠO PROMPT VẼ ẢNH TIẾNG ANH VÀ Ý TƯỞNG TIẾNG VIỆT THEO ĐÚNG PROMPT VÀ ẢNH THAM CHIẾU TRÊN. XUẤT RA 1 ĐỐI TƯỢNG JSON DUY NHẤT:`;
 
   let rawText = '';
 
@@ -803,11 +821,27 @@ HÃY TẠO PROMPT VẼ ẢNH TIẾNG ANH VÀ Ý TƯỞNG TIẾNG VIỆT THEO Đ�
       ? baseUrl
       : `${baseUrl.replace(/\/$/, '')}/chat/completions`;
 
+    // Multi-modal message construction if images exist
+    const userContent = [];
+    userContent.push({ type: 'text', text: userMessage });
+
+    if (Array.isArray(characterReferences)) {
+      characterReferences.forEach((ref) => {
+        const imgUrl = ref.imageBase64 || ref.thumbnail;
+        if (imgUrl && typeof imgUrl === 'string' && imgUrl.startsWith('data:image')) {
+          userContent.push({
+            type: 'image_url',
+            image_url: { url: imgUrl }
+          });
+        }
+      });
+    }
+
     const reqBody = {
       model: model,
       messages: [
         { role: 'system', content: systemPrompt },
-        { role: 'user', content: userMessage }
+        { role: 'user', content: userContent.length > 1 ? userContent : userMessage }
       ],
       temperature: 0.8
     };
@@ -829,15 +863,35 @@ HÃY TẠO PROMPT VẼ ẢNH TIẾNG ANH VÀ Ý TƯỞNG TIẾNG VIỆT THEO Đ�
     const data = await res.json();
     rawText = data.choices?.[0]?.message?.content || '';
   } else {
+    // Gemini API with Vision
     const targetModel = model.includes('gemini') ? model : 'gemini-2.5-flash';
     const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${targetModel}:generateContent?key=${apiKey}`;
+
+    const parts = [{ text: `${systemPrompt}\n\n${userMessage}` }];
+
+    if (Array.isArray(characterReferences)) {
+      characterReferences.forEach((ref) => {
+        const imgUrl = ref.imageBase64 || ref.thumbnail;
+        if (imgUrl && typeof imgUrl === 'string' && imgUrl.startsWith('data:image')) {
+          const mimeMatch = imgUrl.match(/^data:(image\/[a-z]+);base64,/i);
+          const mimeType = mimeMatch ? mimeMatch[1] : 'image/jpeg';
+          const cleanBase64 = imgUrl.replace(/^data:image\/[a-z]+;base64,/, '');
+          parts.push({
+            inlineData: {
+              mimeType: mimeType,
+              data: cleanBase64
+            }
+          });
+        }
+      });
+    }
 
     const res = await fetch(geminiUrl, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         contents: [
-          { role: 'user', parts: [{ text: `${systemPrompt}\n\n${userMessage}` }] }
+          { role: 'user', parts: parts }
         ],
         generationConfig: {
           temperature: 0.8,
@@ -865,6 +919,7 @@ HÃY TẠO PROMPT VẼ ẢNH TIẾNG ANH VÀ Ý TƯỞNG TIẾNG VIỆT THEO Đ�
     imagePromptVi: parsed.imagePromptVi || ''
   };
 }
+
 
 // 🚀 5. Batch Studio Generator for ALL Episodes in the Series
 export async function generateBatchStudioForFiles({

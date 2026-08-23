@@ -2,8 +2,9 @@ import React, { useState, useRef, useEffect } from 'react';
 import {
   Video, Sparkles, Copy, Check, Image as ImageIcon, Tag, FileText,
   Play, RefreshCw, Wand2, Type, Flame, Layers, Upload, Trash2, CheckSquare, Square, Download, Palette, BookOpen,
-  History, Plus, Edit2, Clock, Search, Filter, ArrowUpDown, CheckCircle2, ChevronDown, ChevronUp
+  History, Plus, Edit2, Clock, Search, Filter, ArrowUpDown, CheckCircle2, ChevronDown, ChevronUp, Users
 } from 'lucide-react';
+
 
 import {
   generateYoutubeContent,
@@ -56,6 +57,7 @@ export default function YoutuberStudio({
   orimiseBaseUrl,
   geminiKey,
   aiModel,
+  characters = [],
   onApplySubtitle
 }) {
   // Multi-file selection state: array of selected file IDs
@@ -81,6 +83,11 @@ export default function YoutuberStudio({
   const [descPrompt, setDescPrompt] = useState('');
   const [isRegeneratingDesc, setIsRegeneratingDesc] = useState(false);
 
+  // 👥 Character Reference Images for AI Image Prompt Generation
+  const [characterRefImages, setCharacterRefImages] = useState([]);
+  const [isCharPickerOpen, setIsCharPickerOpen] = useState(false);
+  const charImageInputRef = useRef(null);
+
   // History Sessions State
   const [historySessions, setHistorySessions] = useState([]);
   const [activeSessionId, setActiveSessionId] = useState(null);
@@ -92,6 +99,7 @@ export default function YoutuberStudio({
   const [orimiseRefUrl, setOrimiseRefUrl] = useState(null);
   const [isUploadingRef, setIsUploadingRef] = useState(false);
   const [genProgressText, setGenProgressText] = useState('');
+
   const bgImageInputRef = useRef(null);
 
   // Generated Content State
@@ -743,14 +751,91 @@ ${fullImagePromptEn || generatedData.imagePromptEn}
     }
   };
 
-  // 🪄 3. Re-render AI Image Prompts (En & Vi) according to prompt
+  // 👥 Upload custom character reference photos from computer
+  const handleUploadCharacterImage = (e) => {
+    const fileList = Array.from(e.target.files || []);
+    if (fileList.length === 0) return;
+
+    fileList.forEach(file => {
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        const img = new Image();
+        img.onload = () => {
+          const canvas = document.createElement('canvas');
+          const maxW = 480;
+          const maxH = 480;
+          let width = img.width;
+          let height = img.height;
+          if (width > height) {
+            if (width > maxW) {
+              height = Math.round((height * maxW) / width);
+              width = maxW;
+            }
+          } else {
+            if (height > maxH) {
+              width = Math.round((width * maxH) / height);
+              height = maxH;
+            }
+          }
+          canvas.width = width;
+          canvas.height = height;
+          const ctx = canvas.getContext('2d');
+          ctx.drawImage(img, 0, 0, width, height);
+          const compressedBase64 = canvas.toDataURL('image/jpeg', 0.85);
+
+          const newRef = {
+            id: `ref_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
+            name: file.name.replace(/\.[^/.]+$/, ''),
+            role: 'Nhân vật tham chiếu',
+            sect: '',
+            realm: '',
+            thumbnail: compressedBase64,
+            imageBase64: compressedBase64,
+            source: 'uploaded'
+          };
+          setCharacterRefImages(prev => [...prev, newRef]);
+        };
+        img.src = event.target.result;
+      };
+      reader.readAsDataURL(file);
+    });
+    if (e.target) e.target.value = '';
+  };
+
+  // 🎭 Toggle or select a character from the scanned character list (from Character Lore Studio)
+  const handleToggleLoreCharacterRef = (char) => {
+    const exists = characterRefImages.some(c => c.id === char.id || (c.name && c.name === char.name));
+    if (exists) {
+      setCharacterRefImages(prev => prev.filter(c => c.id !== char.id && c.name !== char.name));
+    } else {
+      setCharacterRefImages(prev => [
+        ...prev,
+        {
+          id: char.id || `lore_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
+          name: char.name,
+          role: char.role || '',
+          sect: char.sect || '',
+          realm: char.realm || '',
+          thumbnail: char.thumbnail,
+          imageBase64: char.thumbnail,
+          source: 'lore'
+        }
+      ]);
+    }
+  };
+
+  const handleRemoveCharacterRef = (id) => {
+    setCharacterRefImages(prev => prev.filter(c => c.id !== id));
+  };
+
+  // 🪄 3. Re-render AI Image Prompts (En & Vi) according to prompt & Character Reference Images
   const handleRegenerateImagePrompt = async () => {
     if (!generatedData) {
       alert('Vui lòng phân tích tạo content bằng AI trước!');
       return;
     }
-    if (!imageIdeaPrompt.trim()) {
-      alert('Vui lòng nhập prompt yêu cầu cho Ý Tưởng & Prompt Vẽ Ảnh!');
+    if (!imageIdeaPrompt.trim() && characterRefImages.length === 0) {
+      alert('Vui lòng nhập prompt yêu cầu hoặc chọn ít nhất 1 ảnh nhân vật tham chiếu!');
       return;
     }
     const apiKey = aiProvider === 'orimise' ? orimiseKey : geminiKey;
@@ -764,6 +849,7 @@ ${fullImagePromptEn || generatedData.imagePromptEn}
       const res = await regenerateImagePromptOnly({
         storySummary: generatedData.storySummary,
         customPrompt: imageIdeaPrompt,
+        characterReferences: characterRefImages,
         genre,
         contentType,
         aiProvider,
@@ -792,6 +878,7 @@ ${fullImagePromptEn || generatedData.imagePromptEn}
       setIsRegeneratingImagePrompt(false);
     }
   };
+
 
   // 🪄 4. Re-render Description & Tags according to prompt
   const handleRegenerateDesc = async () => {
@@ -1696,6 +1783,166 @@ ${fullImagePromptEn || generatedData.imagePromptEn}
                 </button>
               </div>
 
+              {/* 👥 Character Reference Images Panel for High-Accuracy AI Image Prompt */}
+              <div className="char-ref-panel mb-3 p-3 rounded" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(168, 85, 247, 0.3)', borderRadius: '10px' }}>
+                <div className="flex-between mb-2" style={{ flexWrap: 'wrap', gap: '8px' }}>
+                  <div className="flex-center gap-2">
+                    <span className="text-sm font-bold text-purple flex-center gap-1">
+                      <Users size={16} /> 👥 Ảnh Tham Chiếu Nhân Vật ({characterRefImages.length}):
+                    </span>
+                    <span className="text-xs text-muted">
+                      (AI sẽ soi ảnh để tạo Prompt Midjourney/Flux khớp 100% nhân vật trong phim)
+                    </span>
+                  </div>
+
+                  <div className="flex-center gap-2">
+                    <button
+                      type="button"
+                      className="btn btn-secondary btn-xs font-bold flex-center gap-1"
+                      onClick={() => charImageInputRef.current?.click()}
+                      title="Tải ảnh nhân vật/thần binh từ máy tính lên làm ảnh tham chiếu"
+                    >
+                      <Upload size={13} /> 📷 Up Ảnh Nhân Vật
+                    </button>
+                    <input
+                      type="file"
+                      ref={charImageInputRef}
+                      accept="image/*"
+                      multiple
+                      onChange={handleUploadCharacterImage}
+                      hidden
+                    />
+
+                    {characters && characters.length > 0 && (
+                      <button
+                        type="button"
+                        className="btn btn-purple btn-xs font-bold flex-center gap-1"
+                        onClick={() => setIsCharPickerOpen(!isCharPickerOpen)}
+                        title="Chọn từ danh sách nhân vật đã quét từ video"
+                      >
+                        <Sparkles size={13} /> 🎭 Chọn Từ DS Quét ({characters.length})
+                      </button>
+                    )}
+
+                    {characterRefImages.length > 0 && (
+                      <button
+                        type="button"
+                        className="btn btn-secondary btn-xs text-red font-bold"
+                        onClick={() => setCharacterRefImages([])}
+                        title="Xóa toàn bộ ảnh tham chiếu"
+                      >
+                        <Trash2 size={13} /> Xóa Hết
+                      </button>
+                    )}
+                  </div>
+                </div>
+
+                {/* Modal / Dropdown Picker for Scanned Characters */}
+                {isCharPickerOpen && characters && characters.length > 0 && (
+                  <div className="char-picker-dropdown mb-3 p-2 rounded" style={{ background: 'rgba(15, 23, 42, 0.95)', border: '1px solid #a855f7', maxHeight: '220px', overflowY: 'auto' }}>
+                    <div className="flex-between mb-2">
+                      <span className="text-xs font-bold text-cyan">Chọn nhân vật để nạp ảnh vào Prompt AI:</span>
+                      <button className="btn-icon btn-xs text-muted" onClick={() => setIsCharPickerOpen(false)}>✕</button>
+                    </div>
+                    <div className="flex-center gap-2" style={{ flexWrap: 'wrap', justifyContent: 'flex-start' }}>
+                      {characters.map(char => {
+                        const isSelected = characterRefImages.some(c => c.id === char.id || (c.name && c.name === char.name));
+                        return (
+                          <div
+                            key={char.id}
+                            onClick={() => handleToggleLoreCharacterRef(char)}
+                            className={`char-pick-chip flex-center gap-1 p-1 rounded cursor-pointer ${isSelected ? 'active' : ''}`}
+                            style={{
+                              background: isSelected ? 'rgba(168, 85, 247, 0.3)' : 'rgba(255,255,255,0.05)',
+                              border: isSelected ? '1px solid #a855f7' : '1px solid rgba(255,255,255,0.1)',
+                              padding: '4px 8px',
+                              fontSize: '12px'
+                            }}
+                          >
+                            {char.thumbnail && (
+                              <img src={char.thumbnail} alt={char.name} style={{ width: '24px', height: '24px', borderRadius: '4px', objectFit: 'cover' }} />
+                            )}
+                            <span className="font-bold">{char.name}</span>
+                            {isSelected && <Check size={12} className="text-emerald ml-1" />}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+
+                {/* Selected Character Reference Thumbnails Ribbon */}
+                {characterRefImages.length > 0 ? (
+                  <div className="char-refs-grid flex-center gap-2 mt-2" style={{ flexWrap: 'wrap', justifyContent: 'flex-start' }}>
+                    {characterRefImages.map((ref) => (
+                      <div
+                        key={ref.id}
+                        className="char-ref-card flex-center gap-2 p-1 rounded"
+                        style={{
+                          background: 'rgba(0,0,0,0.5)',
+                          border: '1px solid rgba(168, 85, 247, 0.4)',
+                          borderRadius: '6px',
+                          position: 'relative'
+                        }}
+                      >
+                        {ref.thumbnail && (
+                          <img src={ref.thumbnail} alt={ref.name} style={{ width: '48px', height: '48px', borderRadius: '4px', objectFit: 'cover' }} />
+                        )}
+                        <div className="char-ref-info" style={{ fontSize: '11px', minWidth: '90px', maxWidth: '160px' }}>
+                          <div className="font-bold text-cyan text-truncate">{ref.name}</div>
+                          <div className="text-muted text-truncate">{ref.role || 'Nhân vật phim'}</div>
+                        </div>
+                        <button
+                          type="button"
+                          className="btn-icon btn-xs text-red"
+                          onClick={() => handleRemoveCharacterRef(ref.id)}
+                          title="Bỏ ảnh này"
+                        >
+                          <Trash2 size={12} />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="text-xs text-muted text-center p-2">
+                    💡 Chưa chọn ảnh tham chiếu nào. Hãy tải ảnh lên hoặc chọn từ danh sách nhân vật đã quét để AI mô tả chính xác thần thái & trang phục của phim!
+                  </div>
+                )}
+
+                {/* Quick Character Prompt Action Presets */}
+                <div className="prompt-presets-chips flex-center gap-1 mt-2" style={{ flexWrap: 'wrap', justifyContent: 'flex-start' }}>
+                  <span className="text-xs text-muted mr-1">Mẫu nhanh:</span>
+                  <button
+                    type="button"
+                    className="btn btn-secondary btn-xs font-bold"
+                    onClick={() => setImageIdeaPrompt(`Hai nhân vật chính đối đầu đại chiến kịch tính trên không trung, kiếm khí rực lửa hoàng kim, ánh mắt rực sáng linh lực`)}
+                  >
+                    ⚔️ Đại Chiến Đối Đầu
+                  </button>
+                  <button
+                    type="button"
+                    className="btn btn-secondary btn-xs font-bold"
+                    onClick={() => setImageIdeaPrompt(`Cận cảnh nhân vật chính thức tỉnh thần thông, mắt phát sáng linh lực, linh kiếm hộ thể bao quanh bởi lôi điện tím`)}
+                  >
+                    ⚡ Thức Tỉnh Thần Thông
+                  </button>
+                  <button
+                    type="button"
+                    className="btn btn-secondary btn-xs font-bold"
+                    onClick={() => setImageIdeaPrompt(`Nhân vật chính đứng trên đỉnh núi mây mù, triệu hồi rồng thần hoàng kim khổng lồ uy phong lẫm liệt`)}
+                  >
+                    🐉 Triệu Hồi Linh Thú
+                  </button>
+                  <button
+                    type="button"
+                    className="btn btn-secondary btn-xs font-bold"
+                    onClick={() => setImageIdeaPrompt(`Nhân vật chính bị thương nhưng ánh mắt kiên định bộc phát sức mạnh cấm kỵ lật ngược tình thế`)}
+                  >
+                    🔥 Lật Ngược Tình Thế
+                  </button>
+                </div>
+              </div>
+
               {/* 💡 Inline Prompt Input for Re-rendering AI Image Prompts */}
               <div className="prompt-inline-action-bar purple mb-2">
                 <Sparkles size={15} className="text-purple" />
@@ -1712,13 +1959,14 @@ ${fullImagePromptEn || generatedData.imagePromptEn}
                   className="btn btn-purple-glow btn-sm font-bold flex-center gap-1"
                   style={{ whiteSpace: 'nowrap', padding: '5px 12px' }}
                   onClick={handleRegenerateImagePrompt}
-                  disabled={isRegeneratingImagePrompt || !imageIdeaPrompt.trim()}
-                  title="Tạo lại prompt vẽ ảnh tiếng Anh và mô tả tiếng Việt theo prompt riêng này"
+                  disabled={isRegeneratingImagePrompt || (!imageIdeaPrompt.trim() && characterRefImages.length === 0)}
+                  title="Tạo lại prompt vẽ ảnh tiếng Anh và mô tả tiếng Việt theo prompt riêng này cùng ảnh tham chiếu"
                 >
                   {isRegeneratingImagePrompt ? <RefreshCw size={14} className="spinner" /> : <Wand2 size={14} />}
                   <span>{isRegeneratingImagePrompt ? 'Đang tạo...' : 'Render Lại'}</span>
                 </button>
               </div>
+
 
               <textarea
                 className="input-field textarea-field font-mono text-cyan"
