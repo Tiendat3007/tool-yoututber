@@ -11,8 +11,10 @@ import {
   generateCharacterIntroASS, 
   stitchAllFilesToFullMovieSRT,
   cleanAndFormatIntroTag,
+  isInvalidLoreValue,
   msToSrtTime,
   srtTimeToMs,
+
   readMediaDuration,
   findFileOffset,
   computeFileOffsets,
@@ -1138,16 +1140,17 @@ export default function CharacterLoreStudio({
                     {char.type === 'location' && (
                       <span className="badge badge-cyan font-bold">🏛️ Địa Danh</span>
                     )}
-                    {char.role && !['chưa rõ', 'không xác định', 'nhân vật phụ', 'none', 'null', ''].includes(char.role.toLowerCase()) && (
+                    {!isInvalidLoreValue(char.role) && (
                       <span className="badge badge-role">👤 {char.role}</span>
                     )}
-                    {char.sect && !['chưa rõ', 'không xác định', 'vô môn phái', 'none', 'null', ''].includes(char.sect.toLowerCase()) && (
+                    {!isInvalidLoreValue(char.sect) && (
                       <span className="badge badge-sect">🏛️ {char.sect}</span>
                     )}
-                    {char.realm && !['chưa rõ', 'không xác định', 'none', 'null', ''].includes(char.realm.toLowerCase()) && (
+                    {!isInvalidLoreValue(char.realm) && (
                       <span className="badge badge-realm">⚡ {char.realm}</span>
                     )}
                     {char.source === 'vision_ocr' && (
+
                       <span className="badge badge-done" style={{ fontSize: '10px' }}>👁️ Thị Giác Video</span>
                     )}
                     {char.firstFileName && (

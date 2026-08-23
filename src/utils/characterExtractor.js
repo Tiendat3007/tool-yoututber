@@ -36,8 +36,10 @@ YÊU CẦU ĐẦU RA JSON ARRAY CHÍNH XÁC (Dịch sang âm Hán-Việt chuẩn
     "description": "Mô tả ngắn hình ảnh xuất hiện trên video"
   }
 ]
+LƯU Ý QUAN TRỌNG: Nếu trên khung hình không ghi Môn Phái hoặc Cảnh Giới, hãy để chuỗi rỗng "" (tuyệt đối KHÔNG ghi "N/A", "Unknown", "Chưa rõ" hay "Không").
 Nếu trong các khung hình không có thẻ đồ họa nào, trả về [].
 `;
+
 
 // Fast pixel difference metric (0.0 to 1.0) to filter out redundant static dialogue frames
 function computeFrameDifference(data1, data2) {
@@ -631,6 +633,17 @@ export function computeFileOffsets(files = [], fileDurations = {}, gapSeconds = 
   return { fileOffsets, totalMovieDurationMs: cumulativeOffsetMs };
 }
 
+// Filter out dummy, placeholder, or missing values (N/A, Unknown, Chưa rõ, None, etc.)
+export function isInvalidLoreValue(val) {
+  if (!val || typeof val !== 'string') return true;
+  const clean = val.trim().toLowerCase();
+  return [
+    'n/a', 'na', 'n\\a', 'n / a', 'n.a', 'none', 'null', 'unknown', 'undefined', 
+    'chưa rõ', 'không rõ', 'không xác định', 'vô môn phái', 'vô', 
+    'phàm nhân', '-', '--', '...', 'nhân vật', 'nhân vật phụ', 'ẩn danh', 'không'
+  ].includes(clean);
+}
+
 // Smart Clean & Format Character / Weapon Intro Tag (Deduplicates repetitive words and avoids text wrapping on CapCut)
 export function cleanAndFormatIntroTag(char, templateMode = 'clean_compact', customPattern = '') {
   if (!char) return '';
@@ -647,15 +660,11 @@ export function cleanAndFormatIntroTag(char, templateMode = 'clean_compact', cus
     type = 'TUYỆT KỸ';
   }
 
-  // Clean Sect/Role/Realm
-  let sect = (char.sect || '').trim();
-  if (['chưa rõ', 'vô môn phái', 'không rõ', 'none', 'null', 'unknown', ''].includes(sect.toLowerCase())) sect = '';
-  
-  let role = (char.role || '').trim();
-  if (['chưa rõ', 'nhân vật phụ', 'none', 'null', 'unknown', ''].includes(role.toLowerCase())) role = '';
-  
-  let realm = (char.realm || '').trim();
-  if (['chưa rõ', 'không rõ', 'none', 'null', 'unknown', ''].includes(realm.toLowerCase())) realm = '';
+  // Clean Sect/Role/Realm: Automatically strip N/A, None, Unknown, Chưa rõ
+  let sect = isInvalidLoreValue(char.sect) ? '' : char.sect.trim();
+  let role = isInvalidLoreValue(char.role) ? '' : char.role.trim();
+  let realm = isInvalidLoreValue(char.realm) ? '' : char.realm.trim();
+
 
   // Smart De-duplication: Remove repetitive words between Name and Realm / Sect
   // (e.g. Name: "HUYỀN THIỆN LINH BẢO", Realm: "CỰC PHẨM LINH BẢO" -> Realm becomes "CỰC PHẨM")
