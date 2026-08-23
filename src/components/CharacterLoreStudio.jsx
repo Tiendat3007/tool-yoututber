@@ -102,12 +102,13 @@ export default function CharacterLoreStudio({
   const [visionVideoFile, setVisionVideoFile] = useState(null);
   const [visionIntervalSec, setVisionIntervalSec] = useState(3);
   const [visionConcurrency, setVisionConcurrency] = useState(6); // 6 parallel threads by default
-  const [visionBatchSize, setVisionBatchSize] = useState(4); // Selectable: 2, 4, 6, 8, 10, 12, 15, 20
-  const [visionModel, setVisionModel] = useState(() => localStorage.getItem('tutien_vision_model') || 'gemini-2.5-flash-lite');
-
+  const [visionBatchSize, setVisionBatchSize] = useState(6); // Selectable: 2, 4, 6, 8, 10, 12, 15, 20
+  const [visionModel, setVisionModel] = useState(() => localStorage.getItem('tutien_vision_model') || 'claude-haiku-4-5-20251001');
   const [visionFlipHorizontal, setVisionFlipHorizontal] = useState(true);
+
   const [visionFilterStatic, setVisionFilterStatic] = useState(true); // Smart frame differencing to eliminate redundant static frames
   const [visionFilterNonBadge, setVisionFilterNonBadge] = useState(() => localStorage.getItem('tutien_vision_filter_non_badge') !== 'false'); // 🎯 ĐỀ XUẤT 2: Smart badge detector
+  const [visionScanZone, setVisionScanZone] = useState(() => localStorage.getItem('tutien_vision_scan_zone') || 'all'); // 🎯 Vùng nhận diện: all | left | right | center | bottom_center
   const [visionUseSRTContext, setVisionUseSRTContext] = useState(true); // 🧠 Feed selected SRT subtitles context into Vision AI
   const [isVisionScanning, setIsVisionScanning] = useState(false);
   const [visionProgress, setVisionProgress] = useState(null);
@@ -115,6 +116,7 @@ export default function CharacterLoreStudio({
   const [visionDetectedChars, setVisionDetectedChars] = useState([]);
   const visionInputRef = useRef(null);
   const [batchShiftSeconds, setBatchShiftSeconds] = useState(-2); // Default lead-in offset of -2.0s to sync tags with video appearance
+
 
 
 
@@ -465,6 +467,7 @@ export default function CharacterLoreStudio({
         flipHorizontal: Boolean(visionFlipHorizontal),
         filterStaticFrames: Boolean(visionFilterStatic),
         filterNonBadgeFrames: Boolean(visionFilterNonBadge),
+        scanZone: visionScanZone,
         onProgress: (p) => {
           const filterNote = p.filteredCount ? ` • ⚡ Đã lọc ${p.filteredCount} khung hình không có bảng tên` : '';
           setVisionProgress({
@@ -505,6 +508,7 @@ export default function CharacterLoreStudio({
         model: visionModel || 'gemini-2.5-flash-lite',
         batchSize: effectiveBatchSize, // User configurable: 12, 15, 20, 30, 40, 50, 60
         concurrency: Number(visionConcurrency) || 6,
+        scanZone: visionScanZone,
         srtSubtitles: srtSubtitlesToPass,
         glossary: glossary || [],
         onProgress: (p) => {
@@ -518,6 +522,7 @@ export default function CharacterLoreStudio({
           }
         }
       });
+
 
 
 
@@ -1431,10 +1436,28 @@ export default function CharacterLoreStudio({
                     </select>
                   </div>
 
-                  <div className="flex-center gap-1 text-sm text-green font-bold" style={{ background: 'rgba(16, 185, 129, 0.1)', padding: '6px 12px', borderRadius: '6px', border: '1px solid rgba(16, 185, 129, 0.2)' }}>
-                    <Layers size={15} />
-                    <span>Quét Toàn Bộ 100% Video</span>
+                  {/* 🎯 Vùng Nhận Diện Bảng Tên (ROI Zone Selector) */}
+                  <div className="flex-center gap-1 text-sm font-bold" style={{ background: 'rgba(59, 130, 246, 0.1)', padding: '6px 12px', borderRadius: '6px', border: '1px solid rgba(59, 130, 246, 0.3)' }}>
+                    <Shield size={15} className="text-blue" />
+                    <span>Vùng Nhận Diện Thẻ:</span>
+                    <select
+                      value={visionScanZone}
+                      onChange={(e) => {
+                        setVisionScanZone(e.target.value);
+                        localStorage.setItem('tutien_vision_scan_zone', e.target.value);
+                      }}
+                      className="input-field select-field input-xs font-bold text-cyan"
+                      style={{ background: 'rgba(0,0,0,0.5)', width: 'auto' }}
+                      title="Chọn vùng xuất hiện bảng tên nhân vật trên màn hình để AI tập trung soi kỹ và loại bỏ 100% chữ rác ở các vùng khác"
+                    >
+                      <option value="all">🌟 Toàn Màn Hình (Tự Động Bỏ Dải Sub Đáy)</option>
+                      <option value="left">👈 Cột Trái (⭐ Khuyên Dùng - 85% Phim 3D)</option>
+                      <option value="right">👉 Cột Phải (Phía Phải Màn Hình)</option>
+                      <option value="center">🎯 Chính Giữa (Bảng Tên Lớn / Tông Môn)</option>
+                      <option value="bottom_center">⬇️ Giữa Dưới (Trên Dòng Sub)</option>
+                    </select>
                   </div>
+
 
                   <div className="flex-center gap-1 text-sm font-bold" style={{ background: 'rgba(6, 182, 212, 0.1)', padding: '6px 12px', borderRadius: '6px', border: '1px solid rgba(6, 182, 212, 0.3)' }}>
                     <Sparkles size={15} className="text-cyan" />

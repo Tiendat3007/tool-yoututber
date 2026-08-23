@@ -89,15 +89,10 @@ function computeFrameDifference(data1, data2) {
   return samples > 0 ? diffSum / (samples * 255) : 1.0;
 }
 
-// 🎯 ĐỀ XUẤT 2: Detect if a frame contains potential high-contrast graphic badges / calligraphy text overlay
-export function computeGraphicBadgeScore(imageData, width, height) {
+// 🎯 ĐỀ XUẤT 2: Detect if a frame contains potential high-contrast graphic badges / calligraphy text overlay with selectable ROI Zone
+export function computeGraphicBadgeScore(imageData, width, height, zone = 'all') {
   if (!imageData || !imageData.data || width <= 0 || height <= 0) return 0;
   const data = imageData.data;
-
-  // Candidate zones where character/sect badges appear in 3D Donghua:
-  // 1. Left Third: x from 2% to 40%, y from 12% to 88%
-  // 2. Lower/Center Third: x from 20% to 80%, y from 40% to 88%
-  // 3. Right Third: x from 60% to 98%, y from 12% to 88%
 
   const checkZone = (startXRatio, endXRatio, startYRatio, endYRatio) => {
     const startX = Math.floor(width * startXRatio);
@@ -145,6 +140,19 @@ export function computeGraphicBadgeScore(imageData, width, height) {
 
     return highContrastEdges * 2.5 + edgeCount + colorBadgeTones * 3;
   };
+
+  if (zone === 'left') {
+    return checkZone(0.02, 0.45, 0.12, 0.88);
+  }
+  if (zone === 'right') {
+    return checkZone(0.55, 0.98, 0.12, 0.88);
+  }
+  if (zone === 'center') {
+    return checkZone(0.20, 0.80, 0.25, 0.85);
+  }
+  if (zone === 'bottom_center') {
+    return checkZone(0.15, 0.85, 0.45, 0.88);
+  }
 
   const leftZoneScore = checkZone(0.02, 0.40, 0.12, 0.88);
   const centerZoneScore = checkZone(0.20, 0.80, 0.40, 0.88);
@@ -237,7 +245,8 @@ export async function extractFramesFromVideo(videoFile, {
   intervalSec = 4,
   flipHorizontal = false,
   filterStaticFrames = true, // Smart filter to discard redundant static dialogue shots
-  filterNonBadgeFrames = true, // 🎯 ĐỀ XUẤT 2: Smart filter to discard frames without graphic badge candidates (saves ~60-70% requests)
+  filterNonBadgeFrames = true, // 🎯 ĐỀ XUẤT 2: Smart filter to discard frames without graphic badge candidates
+  scanZone = 'all', // 'all' | 'left' | 'right' | 'center' | 'bottom_center'
   minDiffRatio = 0.04, // 4% difference threshold
   onProgress = () => {},
   videoDuration = 0
@@ -302,9 +311,9 @@ export async function extractFramesFromVideo(videoFile, {
             const diff = prevImageData ? computeFrameDifference(prevImageData, currentImageData) : 1.0;
             const isSceneTransition = diff > 0.16; // Significant scene cut
 
-            // 🎯 ĐỀ XUẤT 2: Check graphic badge candidate score
-            const badgeScore = computeGraphicBadgeScore(currentImageDataObj, canvas.width, canvas.height);
-            const hasBadgeCandidate = badgeScore > 50 || isSceneTransition;
+            // 🎯 ĐỀ XUẤT 2: Check graphic badge candidate score in user selected ROI zone
+            const badgeScore = computeGraphicBadgeScore(currentImageDataObj, canvas.width, canvas.height, scanZone);
+            const hasBadgeCandidate = badgeScore > 48 || isSceneTransition;
 
             const shouldSkipStatic = filterStaticFrames && prevImageData && diff < minDiffRatio;
             const shouldSkipNoBadge = filterNonBadgeFrames && prevImageData && !hasBadgeCandidate && diff < 0.12;
@@ -348,7 +357,8 @@ export async function extractFramesFromVideo(videoFile, {
                 base64Full,
                 thumbnailCompact,
                 badgeScore,
-                isSceneTransition
+                isSceneTransition,
+                scanZone
               });
             }
             res();
@@ -376,6 +386,7 @@ export async function extractFramesFromVideo(videoFile, {
 
 
 
+
 // Scan video frames using Gemini Vision or Orimise Vision with Multi-threaded Concurrency & SRT Context Fusion
 export async function scanVideoFramesWithVisionAI({
   frames = [],
@@ -386,6 +397,7 @@ export async function scanVideoFramesWithVisionAI({
   model = 'gemini-2.5-flash-lite',
   batchSize = 12, // User selectable: 12, 15, 20, 30, 40, 50, 60
   concurrency = 5,
+  scanZone = 'all', // 'all' | 'left' | 'right' | 'center' | 'bottom_center'
   srtSubtitles = [],
   glossary = [],
   onProgress = () => {}
@@ -395,9 +407,18 @@ export async function scanVideoFramesWithVisionAI({
     throw new Error(`Vui lòng nhập ${aiProvider === 'orimise' ? 'Orimise' : 'Google Gemini'} API Key trong Cấu Hình AI!`);
   }
 
+  const zoneGuidanceMap = {
+    left: '👈 LƯU Ý VÙNG TRỌNG TÂM: Bảng tên nhân vật/thân phận nằm chủ yếu ở CỘT BÊN TRÁI của từng ô. Hãy tập trung soi kỹ góc trái và bỏ qua chữ ở góc phải/hậu cảnh.',
+    right: '👉 LƯU Ý VÙNG TRỌNG TÂM: Bảng tên nhân vật/thân phận nằm ở CỘT BÊN PHẢI của từng ô.',
+    center: '🎯 LƯU Ý VÙNG TRỌNG TÂM: Bảng tên nằm ở CHÍNH GIỮA màn hình.',
+    bottom_center: '⬇️ LƯU Ý VÙNG TRỌNG TÂM: Bảng tên nằm ở PHẦN GIỮA DƯỚI (ngay phía trên phụ đề đáy).',
+    all: '🌟 LƯU Ý: Quét toàn bộ ô nhưng bỏ qua dải phụ đề thoại ở sát đáy.'
+  };
+  const zoneNote = zoneGuidanceMap[scanZone] || zoneGuidanceMap.all;
+
   // 🧠 Build rich multimodal SRT subtitles context block
   const srtContextBlock = buildSRTContextSummary(srtSubtitles, glossary, 150);
-  const basePrompt = `${VISION_CHARACTER_PROMPT}${srtContextBlock}`;
+  const basePrompt = `${VISION_CHARACTER_PROMPT}\n${zoneNote}${srtContextBlock}`;
 
   // Split frames into batches
   const batches = [];
@@ -420,7 +441,8 @@ export async function scanVideoFramesWithVisionAI({
     // 🎯 ĐỀ XUẤT 3: Build Grid Contact Sheet (Single composite image for all frames in batch)
     const { gridBase64, frameMap } = await createGridContactSheet(batch);
 
-    const userPromptText = `${basePrompt}\n\nDưới đây là BỨC ẢNH MA TRẬN GHÉP ${batch.length} KHUNG HÌNH (Grid Contact Sheet: ${batchInfo}).\nMỗi ô khung hình đều có nhãn vàng in mốc thời gian góc trên bên trái dạng [#1] 00:00:15,000.\nHãy quan sát kỹ từng ô trong ma trận ảnh. Khi phát hiện bảng tên nhân vật hoặc tông môn xuất hiện ở ô nào, hãy đọc đúng số thứ tự "frameIndex" (1 đến ${batch.length}) và "timestamp" in trên ô đó!`;
+    const userPromptText = `${basePrompt}\n\nDưới đây là BỨC ẢNH MA TRẬN GHÉP ${batch.length} KHUNG HÌNH (Grid Contact Sheet: ${batchInfo}).\nMỗi ô khung hình đều có nhãn vàng in mốc thời gian góc trên bên trái dạng [#1] 00:00:15,000.\n${zoneNote}\nHãy quan sát kỹ từng ô trong ma trận ảnh. Khi phát hiện bảng tên nhân vật hoặc tông môn xuất hiện ở ô nào, hãy đọc đúng số thứ tự "frameIndex" (1 đến ${batch.length}) và "timestamp" in trên ô đó!`;
+
 
     let rawResult = '';
 
