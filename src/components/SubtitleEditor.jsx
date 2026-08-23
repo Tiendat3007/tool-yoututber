@@ -253,7 +253,7 @@ export default function SubtitleEditor({
         systemPrompt: customPrompt,
         glossary,
         model: aiModel,
-        batchSize: 25,
+        batchSize: 60, // 60 lines per request
         concurrency: concurrency,
         onProgress: (doneChunks, totalChunks, doneLines, total) => {
           setTranslationProgress(
@@ -261,6 +261,7 @@ export default function SubtitleEditor({
           );
         }
       });
+
 
       setSubtitles(subtitles.map(sub => {
         if (resultMap.has(sub.index)) {

@@ -87,6 +87,7 @@ export default function CharacterLoreStudio({
   const [visionVideoFile, setVisionVideoFile] = useState(null);
   const [visionIntervalSec, setVisionIntervalSec] = useState(3);
   const [visionConcurrency, setVisionConcurrency] = useState(6); // 6 parallel threads by default
+  const [visionBatchSize, setVisionBatchSize] = useState(12); // Optimized to 12 frames per request
   const [visionModel, setVisionModel] = useState(() => localStorage.getItem('tutien_vision_model') || 'gemini-2.5-flash-lite');
   const [visionFlipHorizontal, setVisionFlipHorizontal] = useState(true);
   const [visionFilterStatic, setVisionFilterStatic] = useState(true); // Smart frame differencing to eliminate redundant static frames
@@ -95,6 +96,7 @@ export default function CharacterLoreStudio({
   const [liveCurrentFrame, setLiveCurrentFrame] = useState(null);
   const [visionDetectedChars, setVisionDetectedChars] = useState([]);
   const visionInputRef = useRef(null);
+
 
 
   // 3. Scan History State
@@ -419,11 +421,14 @@ export default function CharacterLoreStudio({
         throw new Error('Không trích xuất được khung hình nào từ video.');
       }
 
-      // 2. Scan with Multi-threaded Vision AI (8 frames per batch to minimize request floor cost)
+      // 2. Scan with Multi-threaded Vision AI (Gom nhiều ảnh/request để giảm tối đa chi phí sàn $0.01)
+      const effectiveBatchSize = Number(visionBatchSize) || 12;
+      const totalEstimatedReqs = Math.ceil(frames.length / effectiveBatchSize);
+
       setVisionProgress({ 
         phase: 'ai_scanning', 
         percent: 0, 
-        message: `Bắt đầu phân tích ${frames.length} khung hình tối ưu (${Math.ceil(frames.length / 8)} requests, gom 8 ảnh/request, ${visionConcurrency} luồng song song)...` 
+        message: `Bắt đầu phân tích ${frames.length} khung hình tối ưu (${totalEstimatedReqs} requests, gom ${effectiveBatchSize} ảnh/request, ${visionConcurrency} luồng song song)...` 
       });
 
       const detected = await scanVideoFramesWithVisionAI({
@@ -433,7 +438,7 @@ export default function CharacterLoreStudio({
         aiProvider,
         baseUrl: orimiseBaseUrl,
         model: visionModel || 'gemini-2.5-flash-lite',
-        batchSize: 8, // Optimized 8 frames per request
+        batchSize: effectiveBatchSize, // User configurable (default 12 frames per request)
         concurrency: Number(visionConcurrency) || 6,
         onProgress: (p) => {
           setVisionProgress({
@@ -446,6 +451,7 @@ export default function CharacterLoreStudio({
           }
         }
       });
+
 
 
 
@@ -1298,10 +1304,23 @@ export default function CharacterLoreStudio({
                     <span>⚡ Lọc Cảnh Tĩnh (Tiết Kiệm 40% Token)</span>
                   </label>
 
-                  <div className="flex-center gap-1 text-xs font-bold px-2 py-1 rounded" style={{ background: 'rgba(16, 185, 129, 0.15)', color: '#34d399', border: '1px solid rgba(16, 185, 129, 0.3)' }}>
-                    <span>📦 Gom 8 Ảnh / Request (Giảm 50% Phí Sàn)</span>
+                  <div className="flex-center gap-1 text-sm font-bold" style={{ background: 'rgba(16, 185, 129, 0.1)', padding: '6px 12px', borderRadius: '6px', border: '1px solid rgba(16, 185, 129, 0.3)' }}>
+                    <span>📦 Gom Ảnh:</span>
+                    <select
+                      value={visionBatchSize}
+                      onChange={(e) => setVisionBatchSize(Number(e.target.value))}
+                      className="input-field select-field input-xs font-bold text-green"
+                      style={{ background: 'rgba(0,0,0,0.5)', width: 'auto' }}
+                      title="Số lượng ảnh gửi cùng lúc trong 1 request AI để tối ưu chi phí sàn $0.01"
+                    >
+                      <option value={8}>8 Ảnh / Request</option>
+                      <option value={12}>12 Ảnh / Request (Khuyên Dùng ⭐ Giảm 67% Request)</option>
+                      <option value={16}>16 Ảnh / Request (Siêu Gom 🚀 Giảm 75% Request)</option>
+                      <option value={20}>20 Ảnh / Request (Tối Đa 🔥)</option>
+                    </select>
                   </div>
                 </div>
+
 
 
                 <button

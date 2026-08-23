@@ -552,10 +552,11 @@ export async function translateSubtitlesWithThreadPool({
   systemPrompt,
   glossary,
   model,
-  batchSize = 25,
+  batchSize = 60, // Optimized to 60 subtitle lines per request to slash request counts by ~60%
   concurrency = 4,
   onProgress // (completedChunks, totalChunks, completedLines, totalLines, currentStatus) => void
 }) {
+
   if (!subtitles || subtitles.length === 0) return new Map();
 
   // 1. Break subtitles into chunks with their context lines

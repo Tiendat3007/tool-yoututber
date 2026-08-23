@@ -170,7 +170,7 @@ export async function scanVideoFramesWithVisionAI({
   aiProvider = 'orimise',
   baseUrl = 'https://api.orimise.com/v1',
   model = 'gemini-2.5-flash-lite',
-  batchSize = 8, // Optimized to 8 frames per request to minimize $0.01 per-request floor charge
+  batchSize = 12, // Optimized to 12 frames per request (drastically cuts API request count)
   concurrency = 5,
   onProgress = () => {}
 }) {
@@ -179,7 +179,7 @@ export async function scanVideoFramesWithVisionAI({
     throw new Error(`Vui lòng nhập ${aiProvider === 'orimise' ? 'Orimise' : 'Google Gemini'} API Key trong Cấu Hình AI!`);
   }
 
-  // Split frames into batches of 8 (Cuts API request count in HALF)
+  // Split frames into batches of 12 (Cuts API request count by ~67%)
   const batches = [];
   for (let i = 0; i < frames.length; i += batchSize) {
     batches.push({
@@ -187,6 +187,7 @@ export async function scanVideoFramesWithVisionAI({
       frames: frames.slice(i, i + batchSize)
     });
   }
+
 
   const allDetectedCharacters = [];
   const seenNames = new Set();

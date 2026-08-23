@@ -729,7 +729,7 @@ export default function App() {
           systemPrompt: customPrompt,
           glossary,
           model: aiModel,
-          batchSize: 25,
+          batchSize: 60, // 60 lines per request
           concurrency: concurrency,
           onProgress: (doneChunks, totalChunks, doneLines, total) => {
             setBatchProgressText(
@@ -737,6 +737,7 @@ export default function App() {
             );
           }
         });
+
 
         // Apply translated map to file in main list
         const targetIndex = updatedFiles.findIndex(f => f.id === fileObj.id);
