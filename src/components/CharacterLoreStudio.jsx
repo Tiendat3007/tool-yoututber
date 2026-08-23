@@ -1343,9 +1343,10 @@ export default function CharacterLoreStudio({
                       onChange={(e) => setVisionIntervalSec(Number(e.target.value))}
                       className="input-field select-field input-sm font-bold"
                     >
-                      <option value={2}>Mỗi 2 giây (Chắc chắn 100% không bỏ sót - Khuyên dùng)</option>
-                      <option value={3}>Mỗi 3 giây (Độ chính xác 99% - Rất chuẩn & Nhanh)</option>
-                      <option value={5}>Mỗi 5 giây (Độ chính xác ~95%)</option>
+                      <option value={2}>Mỗi 2 giây (Chắc chắn 100% không bỏ sót)</option>
+                      <option value={3}>Mỗi 3 giây (Rất chuẩn & Nhanh)</option>
+                      <option value={4}>Mỗi 4 giây (⭐ Khuyên Dùng - Tối Ưu Chi Phí & Bắt Trọn Thẻ)</option>
+                      <option value={5}>Mỗi 5 giây (Siêu Tiết Kiệm Token)</option>
                       <option value={10}>Mỗi 10 giây (Quét nhanh)</option>
                       <option value={15}>Mỗi 15 giây (Siêu tốc)</option>
                     </select>
@@ -1465,18 +1466,17 @@ export default function CharacterLoreStudio({
                       style={{ background: 'rgba(0,0,0,0.5)', width: 'auto' }}
                       title="Số lượng ảnh gửi cùng lúc trong 1 request AI để tối ưu chi phí và độ chính xác"
                     >
-                      <option value={2}>2 Ảnh / Request (Độ Chính Xác Tuyệt Đối 🎯)</option>
-                      <option value={4}>4 Ảnh / Request (Khuyên Dùng ⭐ Chuẩn Từng Giây)</option>
-                      <option value={6}>6 Ảnh / Request (Cân Bằng Tốc Độ & Độ Chuẩn)</option>
-                      <option value={8}>8 Ảnh / Request</option>
-                      <option value={10}>10 Ảnh / Request (Tiết Kiệm Request)</option>
+                      <option value={4}>4 Ảnh / Request (Rất Chuẩn)</option>
+                      <option value={6}>6 Ảnh / Request (⭐ KHUYÊN DÙNG - Tiết Kiệm 85% Tiền & Chuẩn Tuyệt Đối)</option>
+                      <option value={8}>8 Ảnh / Request (⭐ KHUYÊN DÙNG - Siêu Tiết Kiệm Request)</option>
+                      <option value={10}>10 Ảnh / Request</option>
                       <option value={12}>12 Ảnh / Request</option>
                       <option value={15}>15 Ảnh / Request</option>
                       <option value={20}>20 Ảnh / Request</option>
-                      <option value={30}>30 Ảnh / Request</option>
                     </select>
                   </div>
                 </div>
+
 
 
 
