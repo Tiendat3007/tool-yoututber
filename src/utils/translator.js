@@ -46,10 +46,57 @@ export function localTranslateLine(originalText, glossary, activePronounRules = 
   return text;
 }
 
+// 🎯 Auto-Corrector: Fix Inverted Honorifics ([Chức danh + Tên] -> [Tên + Chức danh])
+// Converts "Sư huynh Tô" -> "Tô sư huynh", "Sư đệ Tô" -> "Tô sư đệ", "Trưởng lão Trần" -> "Trần trưởng lão"
+export function fixInvertedHonorifics(text) {
+  if (!text || typeof text !== 'string') return text;
+  let result = text;
+
+  const honorificsList = [
+    'đại trưởng lão', 'nhị trưởng lão', 'tam trưởng lão', 'tứ trưởng lão', 'ngũ trưởng lão', 'lục trưởng lão', 'thất trưởng lão', 'bát trưởng lão', 'cửu trưởng lão', 'thập trưởng lão',
+    'chấp pháp trưởng lão', 'hình phạt trưởng lão', 'truyền công trưởng lão', 'hộ pháp trưởng lão', 'trưởng lão',
+    'đại sư huynh', 'nhị sư huynh', 'tam sư huynh', 'tứ sư huynh', 'ngũ sư huynh', 'tiểu sư huynh',
+    'đại sư tỷ', 'nhị sư tỷ', 'tam sư tỷ', 'tứ sư tỷ', 'tiểu sư tỷ',
+    'đại sư đệ', 'nhị sư đệ', 'tiểu sư đệ', 'đại sư muội', 'tiểu sư muội',
+    'sư huynh', 'sư đệ', 'sư tỷ', 'sư muội', 'sư thúc', 'sư bá', 'sư cô', 'sư điệt', 'sư tôn', 'sư phụ', 'đồ nhi',
+    'chưởng môn', 'tông chủ', 'môn chủ', 'viện chủ', 'điện chủ', 'cung chủ', 'các chủ', 'sơn chủ', 'trang chủ', 'cốc chủ',
+    'thành chủ', 'gia chủ', 'bang chủ', 'đảo chủ', 'phủ chủ', 'trại chủ', 'hội chủ', 'động chủ',
+    'tiền bối', 'hậu bối', 'vãn bối', 'đạo hữu',
+    'thánh nữ', 'thánh tử', 'thần tử', 'thiếu chủ', 'thiếu gia', 'công tử', 'tiểu thư',
+    'ma tôn', 'yêu vương', 'quỷ vương', 'thần vương', 'tiên vương', 'ma hoàng', 'tiên đế', 'kiếm thánh', 'kiếm tiên',
+    'đan sư', 'trận sư', 'pháp sư', 'luyện khí sư', 'khôi lỗi sư'
+  ];
+
+  const nonNameWords = new Set([
+    'Này', 'Kia', 'Đó', 'Ai', 'Nào', 'Gì', 'Đâu', 'Sao', 'Xin', 'Hãy', 'Đừng', 'Chớ', 'Không', 'Chưa',
+    'Có', 'Đi', 'Lại', 'Ta', 'Ngươi', 'Hắn', 'Nàng', 'Chúng', 'Các', 'Người', 'Kẻ', 'Đây', 'Bọn', 'Mau',
+    'Cứ', 'Vừa', 'Đang', 'Sẽ', 'Đã', 'Rất', 'Quá', 'Lắm', 'Thật', 'Tất', 'Cả', 'Mọi', 'Một', 'Hai', 'Ba'
+  ]);
+
+  honorificsList.forEach(hon => {
+    // Regex matching: (Boundary/Punctuation) + (Honorific) + Space + (Capitalized Name 1 to 2 words)
+    const regex = new RegExp(`(?<=^|[\\s,.:;!?"'(\\[{])(${hon})\\s+([A-ZÀ-Ỹ][a-zà-ỹ0-9]*(?:\\s+[A-ZÀ-Ỹ][a-zà-ỹ0-9]*)?)(?=$|[\\s,.:;!?"')\\]}])`, 'gui');
+
+    result = result.replace(regex, (match, h, name) => {
+      const words = name.trim().split(/\s+/);
+      if (words.length > 0 && nonNameWords.has(words[0])) {
+        return match;
+      }
+      const cleanHon = h.toLowerCase();
+      return `${name} ${cleanHon}`;
+    });
+  });
+
+  return result;
+}
+
 // Post-Translation Vietnamese Text Polisher & Sanitizer
 export function cleanAndPolishVietnamese(text) {
   if (!text || typeof text !== 'string') return '';
   let cleaned = text.trim();
+
+  // 0. Auto-fix inverted honorifics: "Sư huynh Tô" -> "Tô sư huynh", "Sư đệ Tô" -> "Tô sư đệ"
+  cleaned = fixInvertedHonorifics(cleaned);
 
   // 1. Remove unnecessary spaces before punctuation: "xin chào !" -> "xin chào!"
   cleaned = cleaned.replace(/\s+([,.:!?;…])/g, '$1');
@@ -135,11 +182,13 @@ QUY TẮC DỊCH THUẬT BẬC THẦY (CHUYÊN NGHIỆP - TỰ NHIÊN - CHUẨN 
    - Duy trì ĐẠI TỪ XƯNG HÔ (ta - ngươi, hắn - nàng, bổn tọa, tiền bối, sư tôn, đồ nhi) ĐỒNG NHẤT 100% xuyên suốt các khối thoại.
    - CHỈ DỊCH các câu trong "DANH SÁCH PHỤ ĐỀ MỤC TIÊU CẦN DỊCH", TUYỆT ĐỐI KHÔNG dịch lại phần ngữ cảnh liền trước.
 
-3. QUY CHUẨN XƯNG HÔ & DANH XƯNG CỔ TRANG:
-   - Đặt theo vị trí: [Tên + Danh xưng] (VD: 苏师兄 -> Tô sư huynh, 林师姐 -> Lâm sư tỷ, 叶前辈 -> Diệp tiền bối, 陈长老 -> Trần trưởng lão, 王宗主 -> Vương tông chủ). CẤM đảo thành "Sư huynh Tô", "Sư tỷ Lâm".
+3. ⚠️ QUY TẮC BẮT BUỘC VỀ VỊ TRÍ DANH XƯNG [TÊN + DANH XƯNG] (CẤM ĐỂ DANH XƯNG TRƯỚC TÊN):
+   - BẮT BUỘC ĐẶT THEO THỨ TỰ: [Tên + Chức danh / Danh xưng] (VD: 苏师兄 -> Tô sư huynh, 苏师弟 -> Tô sư đệ, 林师姐 -> Lâm sư tỷ, 林师妹 -> Lâm sư muội, 叶前辈 -> Diệp tiền bối, 陈长老 -> Trần trưởng lão, 王宗主 -> Vương tông chủ, 萧阁主 -> Tiêu các chủ, 顾道友 -> Cố đạo hữu).
+   - ❌ TUYỆT ĐỐI CẤM DỊCH ĐẢO THÀNH: "Sư huynh Tô", "Sư đệ Tô", "Sư tỷ Lâm", "Sư muội Lâm", "Trưởng lão Trần", "Tông chủ Vương", "Tiền bối Diệp", "Đạo hữu Cố". ĐÂY LÀ LỖI DỊCH NẶNG PHẢI TRÁNH 100%!
    - 师尊 -> sư tôn, 师父 -> sư phụ, 前辈 -> tiền bối, 晚辈 -> vãn bối, 道友 -> đạo hữu, 阁下 -> các hạ, 弟子 -> đệ tử, 徒儿 -> đồ nhi.
    - Đại từ quyền uy: 本座 -> bổn tọa, 本尊 -> bổn tôn, 本帝 -> bổn đế, 本王 -> bổn vương. CẤM dịch thành "tôi".
    - Nam nhân BẮT BUỘC dùng "hắn" (TUYỆT ĐỐI KHÔNG DÙNG "y", KHÔNG dịch 他 thành "anh ấy"), nữ nhân dùng "nàng" trong bối cảnh cổ trang Tu Tiên.
+
 
 4. BẢNG THÀNH NGỮ 4 CHỮ & KHẨU KHÍ GIAO CHIẾN (BATTLE CRY & IDIOMS):
    - 放肆 / 狂妄 -> "Càn rỡ!" / "Cuồng vọng!"

@@ -5,8 +5,9 @@ import {
 } from 'lucide-react';
 
 import { parseSRT, generateSRT, generateVTT, shiftSubtitlesTime } from '../utils/srtParser';
-import { localTranslateLine, translateBatchWithGemini, translateBatchWithOrimise, translateSubtitlesWithThreadPool } from '../utils/translator';
+import { localTranslateLine, translateBatchWithGemini, translateBatchWithOrimise, translateSubtitlesWithThreadPool, fixInvertedHonorifics } from '../utils/translator';
 import { PRONOUN_PRESETS } from '../data/defaultGlossary';
+
 import DiffViewer from './DiffViewer';
 
 export default function SubtitleEditor({
@@ -287,8 +288,42 @@ export default function SubtitleEditor({
     }
   };
 
+  // 🎯 1-Click Auto-Fix Inverted Honorifics Order (e.g. "Sư huynh Tô" -> "Tô sư huynh", "Sư đệ Tô" -> "Tô sư đệ")
+  const handleFixHonorificsOrderAll = () => {
+    if (!subtitles || subtitles.length === 0) {
+      alert('Chưa có phụ đề nào để chuẩn hóa!');
+      return;
+    }
+
+    let modifiedCount = 0;
+    const updated = subtitles.map(sub => {
+      const originalTextVi = sub.translatedText || '';
+      const fixedTextVi = fixInvertedHonorifics(originalTextVi);
+      if (fixedTextVi !== originalTextVi) {
+        modifiedCount++;
+        return {
+          ...sub,
+          previousText: sub.translatedText,
+          translatedText: fixedTextVi,
+          status: 'translated'
+        };
+      }
+      return sub;
+    });
+
+    if (modifiedCount === 0) {
+      alert('✅ Toàn bộ danh xưng trong file phụ đề này đã chuẩn xác 100%! Không phát hiện lỗi đảo từ nào (như Sư huynh Tô).');
+      return;
+    }
+
+    setSubtitles(updated);
+    setTranslationProgress(`🎉 Đã tự động chuẩn hóa thành công ${modifiedCount} câu danh xưng (Ví dụ: "Sư huynh Tô" ➔ "Tô sư huynh")!`);
+    setTimeout(() => setTranslationProgress(''), 5000);
+  };
+
   // Search & Replace
   const handleSearchAndReplace = () => {
+
     if (!findText) return;
 
     try {
@@ -652,10 +687,22 @@ export default function SubtitleEditor({
                 <span>{showDiffLog ? 'Ẩn Diff Đỏ/Xanh' : 'Xem Diff Đỏ/Xanh'}</span>
               </button>
 
+              {/* 🎯 Auto-Fix Inverted Honorifics Button */}
+              <button
+                className="btn btn-sm font-bold flex-center gap-1"
+                onClick={handleFixHonorificsOrderAll}
+                style={{ background: 'rgba(234, 179, 8, 0.15)', border: '1px solid #eab308', color: '#facc15' }}
+                title="Tự động quét và chuẩn hóa trật tự danh xưng cổ trang cho toàn bộ file: 'Sư huynh Tô' -> 'Tô sư huynh', 'Trưởng lão Trần' -> 'Trần trưởng lão' trong 1 click!"
+              >
+                <Sparkles size={15} className="text-yellow" />
+                <span>✨ Chuẩn Hóa Danh Xưng (Tô Sư Huynh)</span>
+              </button>
+
               <button
                 className="btn btn-secondary btn-sm"
                 onClick={() => setShowReplaceTool(!showReplaceTool)}
               >
+
                 <Replace size={16} /> Tìm & Thay Thế
               </button>
 
