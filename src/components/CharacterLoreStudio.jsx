@@ -1240,14 +1240,15 @@ export default function CharacterLoreStudio({
                     <span className="highlight-cyan font-mono font-bold text-sm">⏱️ {fullMovieTime}</span>
                   </div>
 
-                  {/* Intro Tag Preview Banner */}
+                  {/* Intro Tag Preview Banner (Always dynamically cleaned & formatted) */}
                   <div className="char-tag-preview mt-2">
                     <span className="tag-preview-label">Thẻ chú thích trên video:</span>
-                    <div className="tag-preview-box">
-                      {char.introTag || `【 NHÂN VẬT: ${char.name.toUpperCase()} | ${char.sect} | ${char.realm} 】`}
+                    <div className="tag-preview-box font-bold text-cyan">
+                      {cleanAndFormatIntroTag(char, tagFormatTemplate, customTagPattern) || char.introTag || `【 NHÂN VẬT: ${char.name.toUpperCase()} 】`}
                     </div>
                   </div>
                 </div>
+
               );
             })}
           </div>
