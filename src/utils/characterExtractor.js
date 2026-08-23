@@ -1,38 +1,42 @@
-import { parseSRT, generateSRT } from './srtParser';
-
-// Vision Character & Weapon/Lore Detection Prompt for Chinese 3D Donghua / Xianxia Videos
+// Vision Character, Weapon, Skill, Location, Realm, System Lore Detection Prompt for Chinese 3D Donghua / Xianxia Videos
 export const VISION_CHARACTER_PROMPT = `
-Bạn là Chuyên gia Thị giác AI & OCR Phim Hoạt Hình 3D Trung Quốc / Tu Tiên / Kiếm Hiệp (Tencent, Bilibili, Youku, iQiyi).
-Nhiệm vụ của bạn là soi kỹ các khung hình video (đã được lật thuận chiều xuôi chuẩn) để tìm và đọc TẤT CẢ CÁC BẢNG TÊN / THẺ CHÚ THÍCH ĐỒ HỌA xuất hiện trên màn hình.
+Bạn là Chuyên gia Thị giác AI & OCR Phim Hoạt Hình 3D Trung Quốc / Tu Tiên / Huyền Huyễn (Tencent, Bilibili, Youku, iQiyi).
+Nhiệm vụ của bạn là soi kỹ các khung hình video (đã được lật thuận chiều xuôi chuẩn) để tìm và đọc TẤT CẢ CÁC BẢNG TÊN / THẺ CHÚ THÍCH ĐỒ HỌA xuất hiện trên màn hình, đồng thời đối chiếu với NGỮ CẢNH PHỤ ĐỀ SRT (nếu có) để dịch âm Hán-Việt chuẩn xác 100%.
 
 CÁC LOẠI THẺ ĐỒ HỌA TRÊN PHIM HOẠT HÌNH 3D TRUNG QUỐC:
-1. 👤 BẢNG TÊN NHÂN VẬT (Character Card):
-   - Chữ Hán thư pháp tên nhân vật (VD: 欧阳青 [Âu Dương Thanh], 赵昀 [Triệu Quân], 萧炎 [Tiêu Viêm], 陆阳 [Lục Dương], 慕容复...).
+1. 👤 BẢNG TÊN NHÂN VẬT ("type": "character"):
+   - Chữ Hán thư pháp tên nhân vật (VD: 欧阳青 [Âu Dương Thanh], 顾辰 [Cố Thần], 萧炎 [Tiêu Viêm], 陆阳 [Lục Dương], 慕容复...).
    - Nhãn đỏ / Khung đỏ chứa thân phận: 主角 (Chủ Giác = Nhân vật chính), 反派 (Phản Diện), 宗主 (Tông Chủ), 大师兄 (Đại Sư Huynh), 圣女 (Thánh Nữ), 长老 (Trưởng Lão), 门主 (Môn Chủ)...
    - Tông môn / Cảnh giới (VD: 玄天宗, 青云门, 洞虚境, 七境, 金丹, 斗王...).
-   - Tag mẫu: 【 NHÂN VẬT: ÂU DƯƠNG THANH | HUYỀN THIÊN TÔNG | ĐẠI SƯ HUYNH 】
 
-2. ⚔️ THẦN BINH / BẢO VẬT / VŨ KHÍ (Weapon / Artifact):
-   - Chữ thư pháp lớn giới thiệu kiếm, bảo kiếm, thần binh, pháp bảo (VD: 镇宅神剑 [Trấn Trạch Thần Kiếm], 八荒剑阁 [Bát Hoang Kiếm Các], 诛仙剑 [Tru Tiên Kiếm], 焚寂剑...).
-   - Tag mẫu: 【 THẦN BINH: TRẤN TRẠCH THẦN KIẾM | BÁT HOANG KIẾM CÁC 】
+2. ⚔️ THẦN BINH / PHÁP BẢO / VŨ KHÍ ("type": "weapon"):
+   - Chữ thư pháp giới thiệu kiếm, đao, tháp, gương, kích, bảo vật (VD: 镇宅神剑 [Trấn Trạch Thần Kiếm], 诛仙剑 [Tru Tiên Kiếm], 昊天锤 [Hạo Thiên Chuỳ], 翻天印 [Phiên Thiên Ấn]...).
 
-3. 🏛️ ĐỊA DANH / TÔNG MÔN / CHIÊU THỨC (Location / Martial Art):
-   - Tên môn phái, thắng cảnh, tuyệt kỹ, trận pháp.
-   - Tag mẫu: 【 ĐỊA DANH: BÁT HOANG KIẾM CÁC 】 hoặc 【 TUYỆT KỸ: BÁT HOANG KIẾM QUYẾT 】
+3. 📜 CÔNG PHÁP / TUYỆT KỸ / THẦN THÔNG / TRẬN PHÁP ("type": "skill"):
+   - Giới thiệu chiêu thức võ công, công pháp tu luyện (VD: 八荒剑决 [Bát Hoang Kiếm Quyết], 焚决 [Phần Quyết], Đại Hoang Tù Thiên Chỉ, Cửu Trọng Lôi Đao...).
+
+4. 🏛️ ĐỊA DANH / TÔNG MÔN / SƠN MẠCH ("type": "location"):
+   - Tên môn phái, thánh địa, cấm địa, thành trì (VD: 八荒剑阁 [Bát Hoang Kiếm Các], Huyền Thiên Tông, Ma Thú Sơn Mạch, Vạn Kiếm Trũng...).
+
+5. ⚡ CẢNH GIỚI TU VI ("type": "realm"):
+   - Thẻ hiển thị cấp độ đột phá cảnh giới (VD: Động Hư Cảnh, Nguyên Anh Kỳ, Luyện Khí Cửu Tầng, Đấu Tôn...).
+
+6. 🤖 HỆ THỐNG / BẢNG THUỘC TÍNH ("type": "system"):
+   - Bảng trạng thái nhiệm vụ hệ thống, điểm thưởng, thuộc tính nhân vật (VD: Vạn Giới Đăng Nhập Hệ Thống, Bảng Trạng Thái, Nhiệm Vụ Tông Môn...).
 
 YÊU CẦU ĐẦU RA JSON ARRAY CHÍNH XÁC (Dịch sang âm Hán-Việt chuẩn xác, KHÔNG thêm markdown ngoài JSON):
 [
   {
     "hasTag": true,
-    "type": "character",
+    "type": "character", // 'character' | 'weapon' | 'skill' | 'location' | 'realm' | 'system'
     "frameIndex": 1,
     "timestamp": "00:00:18,200",
-    "name": "Tên Hán-Việt chuẩn xác (VD: Âu Dương Thanh, Trấn Trạch Thần Kiếm, Triệu Quân)",
-    "originalName": "Chữ Hán gốc trên màn hình (VD: 欧阳青, 镇宅神剑, 赵昀)",
-    "role": "Thân phận / Loại thẻ (VD: Nhân vật chính / 主角, Đại sư huynh, Thần binh bảo kiếm, Tông chủ)",
-    "sect": "Tông môn / Nơi xuất xứ nếu có (VD: Huyền Thiên Tông, Bát Hoang Kiếm Các)",
-    "realm": "Cảnh giới / Cấp bậc nếu có (VD: Thất Cảnh, Động Hư Cảnh, Cực phẩm Linh bảo)",
-    "introTag": "【 NHÂN VẬT: ÂU DƯƠNG THANH | HUYỀN THIÊN TÔNG | ĐẠI SƯ HUYNH 】",
+    "name": "Tên Hán-Việt chuẩn xác (VD: Cố Thần, Bát Hoang Kiếm Quyết, Trấn Trạch Thần Kiếm, Bát Hoang Kiếm Các)",
+    "originalName": "Chữ Hán gốc trên màn hình (VD: 顾辰, 八荒剑决, 镇宅神剑, 八荒剑阁)",
+    "role": "Thân phận / Loại thẻ nếu có (VD: Nhân vật chính, Tông chủ, Thần kiếm, Tuyệt kỹ trấn phái, nếu không có để \"\")",
+    "sect": "Tông môn / Xuất xứ nếu có (VD: Bát Hoang Kiếm Các, nếu không có để \"\")",
+    "realm": "Cảnh giới / Cấp bậc nếu có (VD: Cực phẩm Linh bảo, Động Hư Cảnh, nếu không có để \"\")",
+    "introTag": "【 NHÂN VẬT: CỐ THẦN | BÁT HOANG KIẾM CÁC 】",
     "description": "Mô tả ngắn hình ảnh xuất hiện trên video"
   }
 ]
@@ -40,8 +44,34 @@ LƯU Ý QUAN TRỌNG: Nếu trên khung hình không ghi Môn Phái hoặc Cản
 Nếu trong các khung hình không có thẻ đồ họa nào, trả về [].
 `;
 
+// Helper: Summarize SRT Subtitles context to inject into Vision AI
+export function buildSRTContextSummary(subtitles = [], glossary = [], maxLines = 150) {
+  if (!Array.isArray(subtitles) || subtitles.length === 0) return '';
+
+  // Extract non-empty text lines (sample evenly across the episode/movie)
+  const step = Math.max(1, Math.floor(subtitles.length / maxLines));
+  const sampled = [];
+  for (let i = 0; i < subtitles.length; i += step) {
+    const sub = subtitles[i];
+    const text = (sub.translatedText || sub.text || '').replace(/\r?\n/g, ' ').trim();
+    if (text && text.length > 2) {
+      sampled.push(`[${sub.startTime}] ${text}`);
+    }
+    if (sampled.length >= maxLines) break;
+  }
+
+  // Extract glossary terms summary if available
+  let glossarySummary = '';
+  if (Array.isArray(glossary) && glossary.length > 0) {
+    const topTerms = glossary.slice(0, 50).map(g => `${g.zh} -> ${g.vi}`).join('; ');
+    glossarySummary = `\n- TỪ ĐIỂN THUẬT NGỮ BẮT BUỘC: ${topTerms}`;
+  }
+
+  return `\n=== 🧠 NGỮ CẢNH PHỤ ĐỀ SRT CỦA PHIM (ĐỐI CHIẾU VỚI KHUNG HÌNH ĐỂ DỊCH CHUẨN XÁC) ===${glossarySummary}\n- MỘT SỐ HỘI THOẠI & THUẬT NGỮ TRONG PHỤ ĐỀ:\n${sampled.join('\n')}\n=== HẾT NGỮ CẢNH SRT ===\n`;
+}
 
 // Fast pixel difference metric (0.0 to 1.0) to filter out redundant static dialogue frames
+
 function computeFrameDifference(data1, data2) {
 
   if (!data1 || !data2 || data1.length !== data2.length) return 1.0;
@@ -175,7 +205,7 @@ export async function extractFramesFromVideo(videoFile, {
 }
 
 
-// Scan video frames using Gemini Vision or Orimise Vision with Multi-threaded Concurrency
+// Scan video frames using Gemini Vision or Orimise Vision with Multi-threaded Concurrency & SRT Context Fusion
 export async function scanVideoFramesWithVisionAI({
   frames = [],
   videoFileName = 'video.mp4',
@@ -183,8 +213,10 @@ export async function scanVideoFramesWithVisionAI({
   aiProvider = 'orimise',
   baseUrl = 'https://api.orimise.com/v1',
   model = 'gemini-2.5-flash-lite',
-  batchSize = 12, // Optimized to 12 frames per request (drastically cuts API request count)
+  batchSize = 12, // User selectable: 12, 15, 20, 30, 40, 50, 60
   concurrency = 5,
+  srtSubtitles = [],
+  glossary = [],
   onProgress = () => {}
 }) {
   if (!frames || frames.length === 0) return [];
@@ -192,7 +224,11 @@ export async function scanVideoFramesWithVisionAI({
     throw new Error(`Vui lòng nhập ${aiProvider === 'orimise' ? 'Orimise' : 'Google Gemini'} API Key trong Cấu Hình AI!`);
   }
 
-  // Split frames into batches of 12 (Cuts API request count by ~67%)
+  // 🧠 Build rich multimodal SRT subtitles context block
+  const srtContextBlock = buildSRTContextSummary(srtSubtitles, glossary, 150);
+  const basePrompt = `${VISION_CHARACTER_PROMPT}${srtContextBlock}`;
+
+  // Split frames into batches
   const batches = [];
   for (let i = 0; i < frames.length; i += batchSize) {
     batches.push({
@@ -200,7 +236,6 @@ export async function scanVideoFramesWithVisionAI({
       frames: frames.slice(i, i + batchSize)
     });
   }
-
 
   const allDetectedCharacters = [];
   const seenNames = new Set();
@@ -210,7 +245,8 @@ export async function scanVideoFramesWithVisionAI({
   const processBatch = async (batchItem) => {
     const batch = batchItem.frames;
     const batchInfo = batch.map((f, idx) => `[Ảnh ${idx + 1} lúc ${f.timestampFormatted}]`).join(', ');
-    const userPromptText = `${VISION_CHARACTER_PROMPT}\n\nDưới đây là ${batch.length} khung hình chụp từ video: ${batchInfo}. Hãy kiểm tra xem có bảng tên nhân vật nào xuất hiện không!`;
+    const userPromptText = `${basePrompt}\n\nDưới đây là ${batch.length} khung hình chụp từ video (${batchInfo}). Hãy đối chiếu với Phụ Đề SRT và kiểm tra xem có bảng tên nhân vật, công pháp, thần binh, địa danh, cảnh giới, hệ thống nào xuất hiện không!`;
+
 
     let rawResult = '';
 
@@ -654,16 +690,21 @@ export function cleanAndFormatIntroTag(char, templateMode = 'clean_compact', cus
   let type = 'NHÂN VẬT';
   if (rawType === 'weapon' || name.toLowerCase().includes('kiếm') || name.toLowerCase().includes('bảo') || name.toLowerCase().includes('đao') || name.toLowerCase().includes('chuỳ') || name.toLowerCase().includes('tháp') || name.toLowerCase().includes('kính') || name.toLowerCase().includes('kích') || name.toLowerCase().includes('thương') || name.toLowerCase().includes('trượng') || name.toLowerCase().includes('phiên')) {
     type = 'THẦN BINH';
-  } else if (rawType === 'location') {
+  } else if (rawType === 'skill' || rawType === 'cong_phap' || name.toLowerCase().includes('quyết') || name.toLowerCase().includes('công') || name.toLowerCase().includes('pháp') || name.toLowerCase().includes('quyền') || name.toLowerCase().includes('chưởng') || name.toLowerCase().includes('trận') || name.toLowerCase().includes('chỉ')) {
+    type = 'CÔNG PHÁP';
+  } else if (rawType === 'realm' || name.toLowerCase().includes('cảnh') || name.toLowerCase().includes('kỳ') || name.toLowerCase().includes('tầng')) {
+    type = 'CẢNH GIỚI';
+  } else if (rawType === 'system' || name.toLowerCase().includes('hệ thống') || name.toLowerCase().includes('bảng')) {
+    type = 'HỆ THỐNG';
+  } else if (rawType === 'location' || name.toLowerCase().includes('tông') || name.toLowerCase().includes('môn') || name.toLowerCase().includes('phái') || name.toLowerCase().includes('sơn') || name.toLowerCase().includes('điện') || name.toLowerCase().includes('thành') || name.toLowerCase().includes('đảo')) {
     type = 'ĐỊA DANH';
-  } else if (rawType === 'skill') {
-    type = 'TUYỆT KỸ';
   }
 
   // Clean Sect/Role/Realm: Automatically strip N/A, None, Unknown, Chưa rõ
   let sect = isInvalidLoreValue(char.sect) ? '' : char.sect.trim();
   let role = isInvalidLoreValue(char.role) ? '' : char.role.trim();
   let realm = isInvalidLoreValue(char.realm) ? '' : char.realm.trim();
+
 
 
   // Smart De-duplication: Remove repetitive words between Name and Realm / Sect

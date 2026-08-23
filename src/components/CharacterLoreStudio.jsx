@@ -78,6 +78,7 @@ function matchVideoToFile(videoName, fileList) {
 
 export default function CharacterLoreStudio({ 
   files = [], 
+  glossary = [],
   aiProvider = 'orimise',
   orimiseKey = '',
   orimiseBaseUrl = 'https://api.orimise.com/v1',
@@ -99,15 +100,17 @@ export default function CharacterLoreStudio({
   const [visionVideoFile, setVisionVideoFile] = useState(null);
   const [visionIntervalSec, setVisionIntervalSec] = useState(3);
   const [visionConcurrency, setVisionConcurrency] = useState(6); // 6 parallel threads by default
-  const [visionBatchSize, setVisionBatchSize] = useState(12); // Optimized to 12 frames per request
+  const [visionBatchSize, setVisionBatchSize] = useState(12); // Optimized to 12 frames per request (options: 12, 15, 20, 30, 40, 50, 60)
   const [visionModel, setVisionModel] = useState(() => localStorage.getItem('tutien_vision_model') || 'gemini-2.5-flash-lite');
   const [visionFlipHorizontal, setVisionFlipHorizontal] = useState(true);
   const [visionFilterStatic, setVisionFilterStatic] = useState(true); // Smart frame differencing to eliminate redundant static frames
+  const [visionUseSRTContext, setVisionUseSRTContext] = useState(true); // 🧠 Feed selected SRT subtitles context into Vision AI
   const [isVisionScanning, setIsVisionScanning] = useState(false);
   const [visionProgress, setVisionProgress] = useState(null);
   const [liveCurrentFrame, setLiveCurrentFrame] = useState(null);
   const [visionDetectedChars, setVisionDetectedChars] = useState([]);
   const visionInputRef = useRef(null);
+
 
 
 
@@ -473,10 +476,16 @@ export default function CharacterLoreStudio({
       const effectiveBatchSize = Number(visionBatchSize) || 12;
       const totalEstimatedReqs = Math.ceil(frames.length / effectiveBatchSize);
 
+      const srtSubtitlesToPass = visionUseSRTContext
+        ? (effectiveTargetFiles.length > 0 ? effectiveTargetFiles : files).flatMap(f => f.subtitles)
+        : [];
+
+      const srtNote = srtSubtitlesToPass.length > 0 ? ` + 🧠 Nạp ${srtSubtitlesToPass.length} dòng SRT` : '';
+
       setVisionProgress({ 
         phase: 'ai_scanning', 
         percent: 0, 
-        message: `Bắt đầu phân tích ${frames.length} khung hình tối ưu (${totalEstimatedReqs} requests, gom ${effectiveBatchSize} ảnh/request, ${visionConcurrency} luồng song song)...` 
+        message: `Bắt đầu phân tích ${frames.length} khung hình tối ưu (${totalEstimatedReqs} requests, gom ${effectiveBatchSize} ảnh/request, ${visionConcurrency} luồng song song${srtNote})...` 
       });
 
       const detected = await scanVideoFramesWithVisionAI({
@@ -486,8 +495,10 @@ export default function CharacterLoreStudio({
         aiProvider,
         baseUrl: orimiseBaseUrl,
         model: visionModel || 'gemini-2.5-flash-lite',
-        batchSize: effectiveBatchSize, // User configurable (default 12 frames per request)
+        batchSize: effectiveBatchSize, // User configurable: 12, 15, 20, 30, 40, 50, 60
         concurrency: Number(visionConcurrency) || 6,
+        srtSubtitles: srtSubtitlesToPass,
+        glossary: glossary || [],
         onProgress: (p) => {
           setVisionProgress({
             phase: 'ai_scanning',
@@ -499,6 +510,7 @@ export default function CharacterLoreStudio({
           }
         }
       });
+
 
 
 
@@ -773,15 +785,22 @@ export default function CharacterLoreStudio({
       }
       const matchesSearch = c.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
         (c.sect && c.sect.toLowerCase().includes(searchQuery.toLowerCase())) ||
-        (c.realm && c.realm.toLowerCase().includes(searchQuery.toLowerCase()));
+        (c.realm && c.realm.toLowerCase().includes(searchQuery.toLowerCase())) ||
+        (c.role && c.role.toLowerCase().includes(searchQuery.toLowerCase()));
       
       if (filterRole === 'all') return matchesSearch;
+      if (filterRole === 'character') return matchesSearch && (c.type === 'character' || !c.type);
+      if (filterRole === 'weapon') return matchesSearch && (c.type === 'weapon');
+      if (filterRole === 'skill') return matchesSearch && (c.type === 'skill' || c.type === 'cong_phap');
+      if (filterRole === 'location') return matchesSearch && (c.type === 'location');
+      if (filterRole === 'realm') return matchesSearch && (c.type === 'realm');
+      if (filterRole === 'system') return matchesSearch && (c.type === 'system');
       if (filterRole === 'main') return matchesSearch && (c.role.toLowerCase().includes('chính') || c.role.toLowerCase().includes('nữ chính'));
       if (filterRole === 'antagonist') return matchesSearch && (c.role.toLowerCase().includes('phản') || c.role.toLowerCase().includes('ma'));
-      if (filterRole === 'weapon') return matchesSearch && (c.type === 'weapon');
       return matchesSearch;
     })
     .sort((a, b) => getFullMovieStartMs(a) - getFullMovieStartMs(b));
+
 
 
 
@@ -1070,14 +1089,19 @@ export default function CharacterLoreStudio({
                 onChange={e => setFilterRole(e.target.value)}
                 className="input-field select-field input-sm"
               >
-                <option value="all">Tất cả vai trò ({activeMovieCharacters.length})</option>
+                <option value="all">Tất cả thực thể & vai trò ({activeMovieCharacters.length})</option>
+                <option value="character">👤 Nhân Vật</option>
+                <option value="weapon">⚔️ Thần Binh / Pháp Bảo</option>
+                <option value="skill">📜 Công Pháp / Tuyệt Kỹ</option>
+                <option value="location">🏛️ Địa Danh / Tông Môn</option>
+                <option value="realm">⚡ Cảnh Giới Tu Vi</option>
+                <option value="system">🤖 Hệ Thống</option>
                 <option value="main">Nhân vật chính / Nữ chính</option>
                 <option value="antagonist">Phản diện / Ma đạo</option>
-                <option value="weapon">⚔️ Thần Binh / Pháp Bảo</option>
               </select>
 
               <span className="text-muted text-sm">
-                Đang hiển thị: <strong className="highlight-cyan">{filteredCharacters.length}</strong> nhân vật
+                Đang hiển thị: <strong className="highlight-cyan">{filteredCharacters.length}</strong> thực thể
               </span>
             </div>
           </div>
@@ -1116,7 +1140,7 @@ export default function CharacterLoreStudio({
                       <button
                         className="btn-icon text-red"
                         onClick={() => deleteCharacter(char.id)}
-                        title="Xóa nhân vật này"
+                        title="Xóa thẻ này"
                       >
                         <Trash2 size={14} />
                       </button>
@@ -1137,8 +1161,17 @@ export default function CharacterLoreStudio({
                     {char.type === 'weapon' && (
                       <span className="badge badge-purple font-bold">⚔️ Thần Binh</span>
                     )}
+                    {(char.type === 'skill' || char.type === 'cong_phap') && (
+                      <span className="badge font-bold" style={{ background: 'rgba(234, 179, 8, 0.2)', color: '#facc15', border: '1px solid #eab308' }}>📜 Công Pháp / Kỹ Năng</span>
+                    )}
                     {char.type === 'location' && (
                       <span className="badge badge-cyan font-bold">🏛️ Địa Danh</span>
+                    )}
+                    {char.type === 'realm' && (
+                      <span className="badge font-bold" style={{ background: 'rgba(59, 130, 246, 0.2)', color: '#60a5fa', border: '1px solid #3b82f6' }}>⚡ Cảnh Giới</span>
+                    )}
+                    {char.type === 'system' && (
+                      <span className="badge font-bold" style={{ background: 'rgba(236, 72, 153, 0.2)', color: '#f472b6', border: '1px solid #ec4899' }}>🤖 Hệ Thống</span>
                     )}
                     {!isInvalidLoreValue(char.role) && (
                       <span className="badge badge-role">👤 {char.role}</span>
@@ -1150,10 +1183,10 @@ export default function CharacterLoreStudio({
                       <span className="badge badge-realm">⚡ {char.realm}</span>
                     )}
                     {char.source === 'vision_ocr' && (
-
                       <span className="badge badge-done" style={{ fontSize: '10px' }}>👁️ Thị Giác Video</span>
                     )}
                     {char.firstFileName && (
+
                       <span className="badge" style={{ background: 'rgba(255,255,255,0.06)', color: '#94a3b8', fontSize: '10px' }}>
                         🎬 {char.firstFileName}
                       </span>
@@ -1374,6 +1407,26 @@ export default function CharacterLoreStudio({
                     <span>⚡ Lọc Cảnh Tĩnh (Tiết Kiệm 40% Token)</span>
                   </label>
 
+                  <label 
+                    className="flex-center gap-2 text-sm font-bold cursor-pointer"
+                    style={{ 
+                      background: visionUseSRTContext ? 'rgba(6, 182, 212, 0.2)' : 'rgba(255,255,255,0.05)', 
+                      padding: '6px 12px', 
+                      borderRadius: '6px', 
+                      border: visionUseSRTContext ? '1px solid #06b6d4' : '1px solid rgba(255,255,255,0.1)',
+                      color: visionUseSRTContext ? '#67e8f9' : 'inherit'
+                    }}
+                    title="AI tự động đọc toàn bộ file phụ đề SRT đã chọn để hiểu nhân vật, công pháp, thần binh, môn phái trước khi quét ảnh"
+                  >
+                    <input
+                      type="checkbox"
+                      checked={visionUseSRTContext}
+                      onChange={(e) => setVisionUseSRTContext(e.target.checked)}
+                      className="custom-checkbox"
+                    />
+                    <span>🧠 Nạp Ngữ Cảnh SRT ({effectiveTargetFiles.length > 0 ? effectiveTargetFiles.length : files.length} Tập)</span>
+                  </label>
+
                   <div className="flex-center gap-1 text-sm font-bold" style={{ background: 'rgba(16, 185, 129, 0.1)', padding: '6px 12px', borderRadius: '6px', border: '1px solid rgba(16, 185, 129, 0.3)' }}>
                     <span>📦 Gom Ảnh:</span>
                     <select
@@ -1383,13 +1436,17 @@ export default function CharacterLoreStudio({
                       style={{ background: 'rgba(0,0,0,0.5)', width: 'auto' }}
                       title="Số lượng ảnh gửi cùng lúc trong 1 request AI để tối ưu chi phí sàn $0.01"
                     >
-                      <option value={8}>8 Ảnh / Request</option>
-                      <option value={12}>12 Ảnh / Request (Khuyên Dùng ⭐ Giảm 67% Request)</option>
-                      <option value={16}>16 Ảnh / Request (Siêu Gom 🚀 Giảm 75% Request)</option>
-                      <option value={20}>20 Ảnh / Request (Tối Đa 🔥)</option>
+                      <option value={12}>12 Ảnh / Request (Khuyên Dùng ⭐)</option>
+                      <option value={15}>15 Ảnh / Request</option>
+                      <option value={20}>20 Ảnh / Request</option>
+                      <option value={30}>30 Ảnh / Request (Siêu Gom 🚀 Giảm 80% Reqs)</option>
+                      <option value={40}>40 Ảnh / Request (Siêu Gom 🚀 Giảm 85% Reqs)</option>
+                      <option value={50}>50 Ảnh / Request (Cực Đại 🔥 Giảm 95% Reqs)</option>
+                      <option value={60}>60 Ảnh / Request (Tối Đa ⚡ Giảm 98% Reqs)</option>
                     </select>
                   </div>
                 </div>
+
 
 
 

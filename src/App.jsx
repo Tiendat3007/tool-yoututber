@@ -1068,6 +1068,7 @@ export default function App() {
         <div className="tab-pane-container" style={{ display: activeTab === 'lore' ? 'block' : 'none' }}>
           <CharacterLoreStudio
             files={files}
+            glossary={glossary}
             aiProvider={aiProvider}
             orimiseKey={orimiseKey}
             orimiseBaseUrl={orimiseBaseUrl}
@@ -1077,6 +1078,7 @@ export default function App() {
             setCharacters={setCharacters}
             onScanningStateChange={setIsLoreScanning}
           />
+
         </div>
       </main>
 
