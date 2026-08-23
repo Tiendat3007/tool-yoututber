@@ -28,21 +28,22 @@ YÊU CẦU ĐẦU RA JSON ARRAY CHÍNH XÁC (Dịch sang âm Hán-Việt chuẩn
   }
 ]
 
-LƯU Ý ĐẶC BIỆT QUAN TRỌNG VỀ RÀNG BUỘC (CHỈ LẤY NHÂN VẬT & ĐỊA DANH):
+LƯU Ý ĐẶC BIỆT QUAN TRỌNG VỀ RÀNG BUỘC (CHỈ LẤY GIỚI THIỆU QUAN TRỌNG, BỎ 100% TEXT RÁC):
 1. ĐỌC MỐC THỜI GIAN CHÍNH XÁC: Ở góc trên bên trái của MỖI khung hình đều có nhãn vàng nổi bật ghi rõ số thứ tự và mốc thời gian dạng [#1] 00:00:15,000. Khi phát hiện thẻ ở ảnh nào, HÃY ĐIỀN ĐÚNG "frameIndex" VÀ "timestamp" IN TRÊN ẢNH ĐÓ!
-2. CHỈ LẤY DUY NHẤT 2 LOẠI:
-   - 👤 Tên Nhân Vật (2–4 từ, VD: Cố Thần, Tiêu Viêm, Lục Dương, Âu Dương Thanh).
-   - 🏛️ Tên Địa Danh / Tông Môn / Sơn Mạch / Thành Trì (2–4 từ, VD: Bát Hoang Kiếm Các, Huyền Thiên Tông, Ma Thú Sơn Mạch).
-3. TUYỆT ĐỐI BỎ QUA VÀ KHÔNG LẤY:
-   - ❌ KHÔNG LẤY: Vũ khí / thần binh / pháp bảo (kiếm, đao, tháp, chuỳ, kính...).
-   - ❌ KHÔNG LẤY: Công pháp / thần thông / chiêu thức võ công (quyết, chưởng, quyền, chỉ...).
-   - ❌ KHÔNG LẤY: Cảnh giới tu vi (đỉnh phong, kim đan, động hư...).
-   - ❌ KHÔNG LẤY: Thông báo hệ thống, bảng nhiệm vụ, bảng thuộc tính.
-   - ❌ KHÔNG LẤY: Phụ đề hội thoại, câu thoại dài, logo watermark kênh (Bilibili, Tencent...).
+2. CHỈ LẤY DUY NHẤT CÁC BẢNG GIỚI THIỆU ĐỒ HỌA CHÍNH THỨC (QUAN TRỌNG):
+   - 👤 Bảng Tên Nhân Vật: Bảng đồ họa 2D/3D chuyên biệt do studio hoạt hình bung ra giữa màn hình hoặc cạnh nhân vật (kèm thân phận: Chủ Giác, Phản Diện, Tông Chủ, Sư Huynh, Thánh Nữ, Trưởng Lão, Môn Chủ... VD: Cố Thần, Tiêu Viêm, Lục Dương, Âu Dương Thanh).
+   - 🏛️ Bảng Đại Địa Danh / Tông Môn Lớn: Bảng giới thiệu môn phái, thánh địa, cấm địa lớn khi chuyển phân cảnh (VD: Huyền Thiên Tông, Bát Hoang Kiếm Các, Thanh Vân Môn, Ma Thú Sơn Mạch).
+
+3. TUYỆT ĐỐI BỎ QUA VÀ LOẠI BỎ 100% CÁC TEXT RÁC:
+   - ❌ BIỂN HIỆU QUÁN XÁ / PHỐ XÁ HẬU CẢNH: Biển hiệu quán ăn, tửu lâu, trà quán, quán trọ, tiệm thuốc, cửa hiệu ven đường, chữ trên đèn lồng phố xá (VD: 玉玉楼 [Ngọc Ngọc Lâu], 酒楼 [Tửu Lâu], 客栈 [Khách Sạn], 药铺 [Dược Phường], 茶馆 [Trà Quán], 正正...). Đây chỉ là vật thể trang trí bối cảnh phố phường, TUYỆT ĐỐI KHÔNG LẤY!
+   - ❌ PHỤ ĐỀ HỘI THOẠI & LỜI THOẠI Ở ĐÁY MÀN HÌNH (VD: "Hãy nhớ kỹ cái tên này", "Ngươi muốn làm gì", "Chúng ta đi thôi", "Không thể nào", "Đứng lại cho ta").
+   - ❌ LOGO WATERMARK KÊNH / NHÀ ĐÀI (VD: Tiểu Hổ, Bilibili, Tencent, Youku, iQiyi, Tập sau, Đón xem).
+   - ❌ THÔNG BÁO HỆ THỐNG / NHIỆM VỤ / THUỘC TÍNH.
+   - ❌ VŨ KHÍ, CÔNG PHÁP, CẢNH GIỚI TU VI.
+
 4. Tên ("name") BẮT BUỘC NGẮN GỌN (từ 2 đến 4 từ, độ dài < 22 ký tự, TUYỆT ĐỐI KHÔNG chứa dấu câu . , ! ? : ;).
 5. Nếu trên khung hình không ghi Môn Phái, hãy để chuỗi rỗng "" (tuyệt đối KHÔNG ghi "N/A", "Unknown", "Chưa rõ" hay "Không").
-Nếu trong các khung hình không có thẻ nhân vật hay địa danh nào, trả về [].
-Nếu trong các khung hình không có thẻ đồ họa nào, trả về [].
+Nếu trong các khung hình không có thẻ giới thiệu nhân vật hay tông môn chính thức nào, trả về [].
 `;
 
 // Helper: Summarize SRT Subtitles context to inject into Vision AI
@@ -791,10 +792,15 @@ export function isValidLoreEntity(char) {
     'hóa ra là', 'nói rằng', 'thế nhưng', 'rốt cuộc', 'chết tiệt', 'chạy mau', 'được rồi',
     'đi thôi', 'lên cho ta', 'giết hắn', 'đứng lại', 'ta không', 'ngươi không',
 
-    // Watermarks & media credits
+    // Watermarks, channel logos & media credits
     'bilibili', 'tencent', 'iqiyi', 'youku', 'tập sau', 'đón xem', 'phụ đề', 'vietsub',
     'thuyết minh', 'kính mời', 'chúc các bạn', 'like và subscribe', 'đăng ký kênh',
-    'cảm ơn đã xem', 'hẹn gặp lại', 'video preview', 'trailer', 'quảng cáo'
+    'cảm ơn đã xem', 'hẹn gặp lại', 'video preview', 'trailer', 'quảng cáo', 'tiểu hồ', 'tieu ho',
+
+    // Background street shop / tavern / inn props (scenery text rác)
+    'ngọc ngọc lâu', 'ngoc ngoc lau', 'tửu lâu', 'tieu lau', 'trà quán', 'tra quan',
+    'khách sạn', 'khach san', 'dược phường', 'quán xá', 'quán rượu', 'quán trọ',
+    'biển hiệu', 'đèn lồng', 'hãy nhớ', 'cái tên'
   ];
 
   if (systemAndGarbagePhrases.some(phrase => nameLower.includes(phrase))) {
@@ -807,10 +813,11 @@ export function isValidLoreEntity(char) {
     const rawZh = char.originalName.trim();
     if (rawZh.length > 8) return false; // Chinese entity names are usually 2-5 chars
     if (/[，。！？、…；：“”‘’]/u.test(rawZh)) return false;
-    if (rawZh.includes('系统') || rawZh.includes('任务') || rawZh.includes('属性') || rawZh.includes('提示') || rawZh.includes('获得')) {
+    if (rawZh.includes('系统') || rawZh.includes('任务') || rawZh.includes('属性') || rawZh.includes('提示') || rawZh.includes('获得') || rawZh.includes('酒楼') || rawZh.includes('客栈') || rawZh.includes('药铺') || rawZh.includes('茶馆') || rawZh.includes('玉玉楼')) {
       return false;
     }
   }
+
 
   return true;
 }
