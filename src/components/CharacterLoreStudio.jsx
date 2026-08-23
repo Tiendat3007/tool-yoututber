@@ -113,6 +113,7 @@ export default function CharacterLoreStudio({
   const [liveCurrentFrame, setLiveCurrentFrame] = useState(null);
   const [visionDetectedChars, setVisionDetectedChars] = useState([]);
   const visionInputRef = useRef(null);
+  const [batchShiftSeconds, setBatchShiftSeconds] = useState(-2); // Default lead-in offset of -2.0s to sync tags with video appearance
 
 
 
@@ -698,6 +699,38 @@ export default function CharacterLoreStudio({
     }
   };
 
+  // ⏱️ Fine-tune / Adjust timestamp of a single character card (by +/- milliseconds)
+  const adjustCharacterTime = (id, offsetMs) => {
+    setCharacters(prev => prev.map(c => {
+      if (c.id !== id) return c;
+      const currentMs = srtTimeToMs(c.firstTimestamp || '00:00:00,000');
+      const newMs = Math.max(0, currentMs + offsetMs);
+      return {
+        ...c,
+        firstTimestamp: msToSrtTime(newMs)
+      };
+    }));
+  };
+
+  // ⚡ Batch Time Shift: Offset all cards in the active movie (or all) by X seconds
+  const handleApplyBatchTimeShift = () => {
+    const shiftMs = Math.round(batchShiftSeconds * 1000);
+    if (shiftMs === 0) return;
+    setCharacters(prev => prev.map(c => {
+      if (activeMovieFilter !== 'all' && (c.movieName || c.firstFileName || 'Mặc định') !== activeMovieFilter) {
+        return c;
+      }
+      const currentMs = srtTimeToMs(c.firstTimestamp || '00:00:00,000');
+      const newMs = Math.max(0, currentMs + shiftMs);
+      return {
+        ...c,
+        firstTimestamp: msToSrtTime(newMs)
+      };
+    }));
+    setScanProgress(`⏱️ Đã dịch mốc thời gian ${batchShiftSeconds > 0 ? '+' : ''}${batchShiftSeconds}s cho ${activeMovieCharacters.length} thẻ!`);
+    setTimeout(() => setScanProgress(''), 4000);
+  };
+
 
   // List of all unique movies in characters
   const availableMovies = Array.from(
@@ -1055,9 +1088,44 @@ export default function CharacterLoreStudio({
             </div>
           </div>
 
+          {/* ⏱️ Batch Time Shift Toolbar (Offset all cards to fix timing delay) */}
+          <div className="batch-time-shift-bar card-panel p-2 mb-3 flex-between" style={{ background: 'rgba(234, 179, 8, 0.06)', border: '1px solid rgba(234, 179, 8, 0.3)', flexWrap: 'wrap', gap: '10px' }}>
+            <div className="flex-center gap-2" style={{ flexWrap: 'wrap' }}>
+              <Clock size={16} className="text-yellow" />
+              <span className="text-xs font-bold text-yellow">⏱️ Bù Lệch Thời Gian (Sửa Thẻ Chậm/Nhanh):</span>
+              <select
+                value={batchShiftSeconds}
+                onChange={(e) => setBatchShiftSeconds(Number(e.target.value))}
+                className="input-field select-field input-xs font-bold text-yellow"
+                style={{ background: 'rgba(0,0,0,0.6)', width: 'auto', border: '1px solid #eab308' }}
+              >
+                <option value={-3}>Đẩy sớm -3.0 giây</option>
+                <option value={-2.5}>Đẩy sớm -2.5 giây</option>
+                <option value={-2}>Đẩy sớm -2.0 giây (Khuyên Dùng ⭐ Khớp Đầu Thẻ)</option>
+                <option value={-1.5}>Đẩy sớm -1.5 giây</option>
+                <option value={-1}>Đẩy sớm -1.0 giây</option>
+                <option value={-0.5}>Đẩy sớm -0.5 giây</option>
+                <option value={0.5}>Lùi lại +0.5 giây</option>
+                <option value={1}>Lùi lại +1.0 giây</option>
+                <option value={2}>Lùi lại +2.0 giây</option>
+                <option value={3}>Lùi lại +3.0 giây</option>
+              </select>
+              <button
+                className="btn btn-warning btn-xs font-bold flex-center gap-1"
+                onClick={handleApplyBatchTimeShift}
+                title="Dịch mốc thời gian của toàn bộ thẻ nhân vật trong phim này sớm lên hoặc lùi lại"
+              >
+                <Zap size={13} /> ⚡ Dịch Toàn Bộ ({activeMovieCharacters.length} Thẻ)
+              </button>
+            </div>
+            <span className="text-xs text-muted" style={{ fontSize: '11px' }}>
+              💡 Giúp thẻ hiện lên khớp 100% ngay từ giây đầu tiên bảng tên xuất hiện trên phim
+            </span>
+          </div>
 
           {/* Movie Profiles Bar (Each movie has its own isolated character list) */}
           <div className="movie-profiles-bar card-panel p-2 mb-3 flex-between" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.1)', flexWrap: 'wrap', gap: '8px' }}>
+
             <div className="flex-center gap-2" style={{ flexWrap: 'wrap' }}>
               <span className="text-xs font-bold text-muted flex-center gap-1">
                 <Film size={14} className="text-cyan" /> PHIM:
@@ -1231,12 +1299,19 @@ export default function CharacterLoreStudio({
                   {/* Dual Timestamps: Local Episode & Full MP4 Video Timeline */}
                   <div className="char-timestamp-row mt-2 pt-2 border-top flex-between text-xs text-muted">
                     <span>📍 Tập: <strong>{char.firstFileName || 'Tập 1'}</strong></span>
-                    <span className="font-mono text-muted">⏱️ Trong tập: {char.firstTimestamp}</span>
+                    <div className="flex-center gap-1">
+                      <span className="font-mono text-muted">⏱️ {char.firstTimestamp}</span>
+                      <button className="btn btn-secondary btn-xs px-1 py-0" style={{ fontSize: '10px', height: '20px' }} onClick={() => adjustCharacterTime(char.id, -1000)} title="Đẩy sớm 1.0 giây">⏪ -1s</button>
+                      <button className="btn btn-secondary btn-xs px-1 py-0" style={{ fontSize: '10px', height: '20px' }} onClick={() => adjustCharacterTime(char.id, -500)} title="Đẩy sớm 0.5 giây">-0.5s</button>
+                      <button className="btn btn-secondary btn-xs px-1 py-0" style={{ fontSize: '10px', height: '20px' }} onClick={() => adjustCharacterTime(char.id, 500)} title="Lùi lại 0.5 giây">+0.5s</button>
+                      <button className="btn btn-secondary btn-xs px-1 py-0" style={{ fontSize: '10px', height: '20px' }} onClick={() => adjustCharacterTime(char.id, 1000)} title="Lùi lại 1.0 giây">⏩ +1s</button>
+                    </div>
                   </div>
                   <div className="char-timestamp-row mt-1 flex-between text-xs">
                     <span className="text-cyan font-bold">🎬 Mốc trong Video MP4 Dài:</span>
                     <span className="highlight-cyan font-mono font-bold text-sm">⏱️ {fullMovieTime}</span>
                   </div>
+
 
                   {/* Intro Tag Preview Banner (Always dynamically cleaned & formatted) */}
                   <div className="char-tag-preview mt-2">
