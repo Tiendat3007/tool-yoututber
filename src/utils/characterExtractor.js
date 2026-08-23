@@ -1,56 +1,47 @@
-// Vision Character, Weapon, Skill, Location, Realm Lore Detection Prompt for Chinese 3D Donghua / Xianxia Videos
+// Vision Character & Location Lore Detection Prompt for Chinese 3D Donghua / Xianxia Videos
 export const VISION_CHARACTER_PROMPT = `
 Bạn là Chuyên gia Thị giác AI & OCR Phim Hoạt Hình 3D Trung Quốc / Tu Tiên / Huyền Huyễn (Tencent, Bilibili, Youku, iQiyi).
-Nhiệm vụ của bạn là soi kỹ các khung hình video (đã được lật thuận chiều xuôi chuẩn) để tìm và đọc TẤT CẢ CÁC BẢNG TÊN / THẺ CHÚ THÍCH ĐỒ HỌA xuất hiện trên màn hình, đồng thời đối chiếu với NGỮ CẢNH PHỤ ĐỀ SRT (nếu có) để dịch âm Hán-Việt chuẩn xác 100%.
+Nhiệm vụ của bạn là soi kỹ các khung hình video (đã được lật thuận chiều xuôi chuẩn) để tìm và đọc DUY NHẤT 2 LOẠI BẢNG TÊN / THẺ ĐỒ HỌA:
 
-CÁC LOẠI THẺ ĐỒ HỌA TRÊN PHIM HOẠT HÌNH 3D TRUNG QUỐC:
 1. 👤 BẢNG TÊN NHÂN VẬT ("type": "character"):
    - Chữ Hán thư pháp tên nhân vật (VD: 欧阳青 [Âu Dương Thanh], 顾辰 [Cố Thần], 萧炎 [Tiêu Viêm], 陆阳 [Lục Dương], 慕容复...).
    - Nhãn đỏ / Khung đỏ chứa thân phận: 主角 (Chủ Giác = Nhân vật chính), 反派 (Phản Diện), 宗主 (Tông Chủ), 大师兄 (Đại Sư Huynh), 圣女 (Thánh Nữ), 长老 (Trưởng Lão), 门主 (Môn Chủ)...
-   - Tông môn / Cảnh giới (VD: 玄天宗, 青云门, 洞虚境, 七境, 金丹, 斗王...).
+   - Tông môn / Xuất xứ (VD: 玄天宗, 青云门...).
 
-2. ⚔️ THẦN BINH / PHÁP BẢO / VŨ KHÍ ("type": "weapon"):
-   - Chữ thư pháp giới thiệu kiếm, đao, tháp, gương, kích, bảo vật (VD: 镇宅神剑 [Trấn Trạch Thần Kiếm], 诛仙剑 [Tru Tiên Kiếm], 昊天锤 [Hạo Thiên Chuỳ], 翻天印 [Phiên Thiên Ấn]...).
-
-3. 📜 CÔNG PHÁP / TUYỆT KỸ / THẦN THÔNG / TRẬN PHÁP ("type": "skill"):
-   - Giới thiệu chiêu thức võ công, công pháp tu luyện (VD: 八荒剑决 [Bát Hoang Kiếm Quyết], 焚决 [Phần Quyết], Đại Hoang Tù Thiên Chỉ, Cửu Trọng Lôi Đao...).
-
-4. 🏛️ ĐỊA DANH / TÔNG MÔN / SƠN MẠCH ("type": "location"):
-   - Tên môn phái, thánh địa, cấm địa, thành trì (VD: 八荒剑阁 [Bát Hoang Kiếm Các], Huyền Thiên Tông, Ma Thú Sơn Mạch, Vạn Kiếm Trũng...).
-
-5. ⚡ CẢNH GIỚI TU VI ("type": "realm"):
-   - Thẻ hiển thị cấp độ đột phá cảnh giới (VD: Động Hư Cảnh, Nguyên Anh Kỳ, Luyện Khí Cửu Tầng, Đấu Tôn...).
+2. 🏛️ ĐỊA DANH / TÔNG MÔN / SƠN MẠCH / THÀNH TRÌ ("type": "location"):
+   - Tên môn phái, thánh địa, cấm địa, thành trì, sơn mạch (VD: 八荒剑阁 [Bát Hoang Kiếm Các], 玄天宗 [Huyền Thiên Tông], Ma Thú Sơn Mạch, Vạn Kiếm Trũng...).
 
 YÊU CẦU ĐẦU RA JSON ARRAY CHÍNH XÁC (Dịch sang âm Hán-Việt chuẩn xác, KHÔNG thêm markdown ngoài JSON):
 [
   {
     "hasTag": true,
-    "type": "character", // 'character' | 'weapon' | 'skill' | 'location' | 'realm'
+    "type": "character", // 'character' | 'location'
     "frameIndex": 1,
     "timestamp": "00:00:18,200",
-    "name": "Tên Hán-Việt chuẩn xác (VD: Cố Thần, Bát Hoang Kiếm Quyết, Trấn Trạch Thần Kiếm, Bát Hoang Kiếm Các)",
-    "originalName": "Chữ Hán gốc trên màn hình (VD: 顾辰, 八荒剑决, 镇宅神剑, 八荒剑阁)",
-    "role": "Thân phận / Loại thẻ nếu có (VD: Nhân vật chính, Tông chủ, Thần kiếm, Tuyệt kỹ trấn phái, nếu không có để \"\")",
+    "name": "Tên Hán-Việt chuẩn xác (VD: Cố Thần, Âu Dương Thanh, Bát Hoang Kiếm Các, Huyền Thiên Tông)",
+    "originalName": "Chữ Hán gốc trên màn hình (VD: 顾辰, 欧阳青, 八荒剑阁, 玄天宗)",
+    "role": "Thân phận nếu có (VD: Nhân vật chính, Tông chủ, Trưởng lão, nếu không có để \"\")",
     "sect": "Tông môn / Xuất xứ nếu có (VD: Bát Hoang Kiếm Các, nếu không có để \"\")",
-    "realm": "Cảnh giới / Cấp bậc nếu có (VD: Cực phẩm Linh bảo, Động Hư Cảnh, nếu không có để \"\")",
+    "realm": "",
     "introTag": "【 CỐ THẦN | BÁT HOANG KIẾM CÁC 】",
     "description": "Mô tả ngắn hình ảnh xuất hiện trên video"
   }
 ]
-LƯU Ý ĐẶC BIỆT QUAN TRỌNG VỀ LỌC THÔNG BÁO HỆ THỐNG & DỊCH NGẮN GỌN:
-1. ĐỌC MỐC THỜI GIAN CHÍNH XÁC: Ở góc trên bên trái của MỖI khung hình đều có nhãn vàng nổi bật ghi rõ số thứ tự và mốc thời gian dạng [#1] 00:00:15,000. Khi phát hiện thẻ đồ họa ở ảnh nào, HÃY ĐIỀN ĐÚNG "frameIndex" VÀ "timestamp" IN TRÊN ẢNH ĐÓ!
-2. CHỈ LẤY CÁC THỰC THỂ THỰC SỰ (TỐI ƯU DỊCH NGẮN GỌN HÁN-VIỆT TỪ 2 ĐẾN 5 TỪ):
-   - Nhân vật: 2–4 từ (VD: Cố Thần, Tiêu Viêm, Lục Dương, Âu Dương Thanh).
-   - Thần binh / Chí bảo: 3–5 từ (VD: Trấn Trạch Thần Kiếm, Tru Tiên Kiếm, Hạo Thiên Chuỳ).
-   - Công pháp / Thần thông: 3–5 từ (VD: Bát Hoang Kiếm Quyết, Đại Hoang Tù Thiên Chỉ).
-   - Cảnh giới: 2–5 từ (VD: Kim Đan Tam Trọng Đỉnh Phong, Động Hư Cảnh).
-   - Địa danh / Tông môn: 2–4 từ (VD: Bát Hoang Kiếm Các, Huyền Thiên Tông).
-3. TUYỆT ĐỐI KHÔNG LẤY (LOẠI BỎ 100%):
-   - BẢNG THÔNG BÁO HỆ THỐNG / NHIỆM VỤ / THUỘC TÍNH (VD: "Đinh! Hệ thống nhắc nhở...", "Ký chủ hoàn thành nhiệm vụ...", "Kinh nghiệm +1000...", "Mở khóa thuộc tính...", "Bảng trạng thái...", "Chúc mừng túc chủ...").
-   - LỜI THOẠI HỘI THOẠI chạy ở đáy màn hình hoặc phụ đề câu dài (VD: "Ngươi muốn làm gì", "Chúng ta đi thôi", "Không thể nào", "Đứng lại cho ta").
-   - Logo watermark kênh/nhà đài (Bilibili, Tencent, Youku, iQiyi), quảng cáo, credit tập sau.
-4. Tên ("name") BẮT BUỘC NGẮN GỌN (từ 2 đến 5 từ, độ dài < 26 ký tự, TUYỆT ĐỐI KHÔNG chứa dấu câu . , ! ? : ;).
-5. Nếu trên khung hình không ghi Môn Phái hoặc Cảnh Giới, hãy để chuỗi rỗng "" (tuyệt đối KHÔNG ghi "N/A", "Unknown", "Chưa rõ" hay "Không").
+
+LƯU Ý ĐẶC BIỆT QUAN TRỌNG VỀ RÀNG BUỘC (CHỈ LẤY NHÂN VẬT & ĐỊA DANH):
+1. ĐỌC MỐC THỜI GIAN CHÍNH XÁC: Ở góc trên bên trái của MỖI khung hình đều có nhãn vàng nổi bật ghi rõ số thứ tự và mốc thời gian dạng [#1] 00:00:15,000. Khi phát hiện thẻ ở ảnh nào, HÃY ĐIỀN ĐÚNG "frameIndex" VÀ "timestamp" IN TRÊN ẢNH ĐÓ!
+2. CHỈ LẤY DUY NHẤT 2 LOẠI:
+   - 👤 Tên Nhân Vật (2–4 từ, VD: Cố Thần, Tiêu Viêm, Lục Dương, Âu Dương Thanh).
+   - 🏛️ Tên Địa Danh / Tông Môn / Sơn Mạch / Thành Trì (2–4 từ, VD: Bát Hoang Kiếm Các, Huyền Thiên Tông, Ma Thú Sơn Mạch).
+3. TUYỆT ĐỐI BỎ QUA VÀ KHÔNG LẤY:
+   - ❌ KHÔNG LẤY: Vũ khí / thần binh / pháp bảo (kiếm, đao, tháp, chuỳ, kính...).
+   - ❌ KHÔNG LẤY: Công pháp / thần thông / chiêu thức võ công (quyết, chưởng, quyền, chỉ...).
+   - ❌ KHÔNG LẤY: Cảnh giới tu vi (đỉnh phong, kim đan, động hư...).
+   - ❌ KHÔNG LẤY: Thông báo hệ thống, bảng nhiệm vụ, bảng thuộc tính.
+   - ❌ KHÔNG LẤY: Phụ đề hội thoại, câu thoại dài, logo watermark kênh (Bilibili, Tencent...).
+4. Tên ("name") BẮT BUỘC NGẮN GỌN (từ 2 đến 4 từ, độ dài < 22 ký tự, TUYỆT ĐỐI KHÔNG chứa dấu câu . , ! ? : ;).
+5. Nếu trên khung hình không ghi Môn Phái, hãy để chuỗi rỗng "" (tuyệt đối KHÔNG ghi "N/A", "Unknown", "Chưa rõ" hay "Không").
+Nếu trong các khung hình không có thẻ nhân vật hay địa danh nào, trả về [].
 Nếu trong các khung hình không có thẻ đồ họa nào, trả về [].
 `;
 
@@ -766,7 +757,22 @@ export function isValidLoreEntity(char) {
   const rawRole = (char.role || '').toLowerCase();
   const rawType = (char.type || '').toLowerCase();
 
-  if (rawType === 'system' || rawRole.includes('hệ thống') || rawRole.includes('thuộc tính') || rawRole.includes('nhiệm vụ')) {
+  // 🎯 STRICT CONSTRAINT: ONLY ALLOW CHARACTERS & LOCATIONS (Strictly exclude weapons, skills, realms, systems)
+  if (['weapon', 'skill', 'realm', 'system', 'cong_phap', 'than_binh', 'canh_gioi', 'phap_bao'].includes(rawType)) {
+    return false;
+  }
+  if (rawRole.includes('hệ thống') || rawRole.includes('thuộc tính') || rawRole.includes('nhiệm vụ') || rawRole.includes('công pháp') || rawRole.includes('thần binh') || rawRole.includes('cảnh giới')) {
+    return false;
+  }
+
+  // Reject martial arts, weapons, realms keywords
+  const excludedKeywords = [
+    'kiếm quyết', 'công pháp', 'thần kiếm', 'đao pháp', 'quyền pháp', 'chưởng pháp',
+    'thần thông', 'tuyệt kỹ', 'trận pháp', 'tâm pháp', 'bí kíp', 'hộ thể',
+    'kim đan', 'nguyên anh', 'luyện khí', 'trúc cơ', 'hóa thần', 'động hư', 'đại thừa',
+    'độ kiếp', 'đỉnh phong', 'đột phá', 'cảnh giới', 'hệ thống', 'bảng trạng thái'
+  ];
+  if (excludedKeywords.some(kw => nameLower.includes(kw))) {
     return false;
   }
 
@@ -794,6 +800,7 @@ export function isValidLoreEntity(char) {
   if (systemAndGarbagePhrases.some(phrase => nameLower.includes(phrase))) {
     return false;
   }
+
 
   // 6. Check if originalName (Chinese characters) contains system notices or sentence punctuation
   if (char.originalName && typeof char.originalName === 'string') {
