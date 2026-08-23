@@ -37,11 +37,12 @@ YÊU CẦU ĐẦU RA JSON ARRAY CHÍNH XÁC (Dịch sang âm Hán-Việt chuẩn
     "description": "Mô tả ngắn hình ảnh xuất hiện trên video"
   }
 ]
-LƯU Ý QUAN TRỌNG VỀ LỌC RÁC:
-1. CHỈ LẤY: Bảng tên nhân vật, thần binh, chí bảo, pháp bảo, tuyệt kỹ công pháp, môn phái/địa danh xuất hiện dưới dạng thẻ đồ họa đồ sộ.
-2. TUYỆT ĐỐI KHÔNG LẤY: Phụ đề hội thoại chạy ở đáy màn hình, câu thoại dài của nhân vật (VD: "Ngươi muốn làm gì", "Chúng ta đi thôi", "Không thể nào"), logo watermark kênh/nhà đài (Bilibili, Tencent, Youku, iQiyi), bảng nhiệm vụ hệ thống/thuộc tính, chữ quảng cáo hoặc credit.
-3. Tên ("name") BẮT BUỘC NGẮN GỌN (từ 2 đến 6 từ, không chứa dấu câu . , ! ? : ;).
-4. Nếu trên khung hình không ghi Môn Phái hoặc Cảnh Giới, hãy để chuỗi rỗng "" (tuyệt đối KHÔNG ghi "N/A", "Unknown", "Chưa rõ" hay "Không").
+LƯU Ý QUAN TRỌNG VỀ ĐỌC KHUNG HÌNH & LỌC RÁC:
+1. ĐỌC MỐC THỜI GIAN CHÍNH XÁC: Ở góc trên bên trái của MỖI khung hình đều có nhãn vàng nổi bật ghi rõ số thứ tự và mốc thời gian dạng [#1] 00:00:15,000. Khi phát hiện thẻ đồ họa ở ảnh nào, HÃY ĐIỀN ĐÚNG "frameIndex" VÀ "timestamp" IN TRÊN ẢNH ĐÓ!
+2. CHỈ LẤY: Bảng tên nhân vật, thần binh, chí bảo, pháp bảo, tuyệt kỹ công pháp, môn phái/địa danh xuất hiện dưới dạng thẻ đồ họa đồ sộ.
+3. TUYỆT ĐỐI KHÔNG LẤY: Phụ đề hội thoại chạy ở đáy màn hình, câu thoại dài của nhân vật (VD: "Ngươi muốn làm gì", "Chúng ta đi thôi", "Không thể nào"), logo watermark kênh/nhà đài (Bilibili, Tencent, Youku, iQiyi), bảng nhiệm vụ hệ thống/thuộc tính, chữ quảng cáo hoặc credit.
+4. Tên ("name") BẮT BUỘC NGẮN GỌN (từ 2 đến 6 từ, không chứa dấu câu . , ! ? : ;).
+5. Nếu trên khung hình không ghi Môn Phái hoặc Cảnh Giới, hãy để chuỗi rỗng "" (tuyệt đối KHÔNG ghi "N/A", "Unknown", "Chưa rõ" hay "Không").
 Nếu trong các khung hình không có thẻ đồ họa nào, trả về [].
 `;
 
@@ -162,10 +163,8 @@ export async function extractFramesFromVideo(videoFile, {
               skippedCount++;
             } else {
               prevImageData = currentImageData;
-              const base64Full = canvas.toDataURL('image/jpeg', 0.65);
-              const base64Data = base64Full.split(',')[1];
 
-              // Generate lightweight compact thumbnail (160x90, ~2KB) for safe localStorage & UI card display
+              // Generate lightweight clean compact thumbnail for UI card display
               const thumbCanvas = document.createElement('canvas');
               thumbCanvas.width = 160;
               thumbCanvas.height = 90;
@@ -173,16 +172,35 @@ export async function extractFramesFromVideo(videoFile, {
               thumbCtx.drawImage(canvas, 0, 0, 160, 90);
               const thumbnailCompact = thumbCanvas.toDataURL('image/jpeg', 0.5);
 
+              // 🎯 Burn-in high contrast visual timestamp & index label so AI ALWAYS matches exact time even in large batches
+              const frameIdx = frames.length + 1;
+              const timeFormatted = msToSrtTime(time * 1000);
+
+              ctx.save();
+              ctx.fillStyle = 'rgba(0, 0, 0, 0.85)';
+              ctx.fillRect(6, 6, 210, 26);
+              ctx.strokeStyle = '#facc15';
+              ctx.lineWidth = 1.5;
+              ctx.strokeRect(6, 6, 210, 26);
+              ctx.fillStyle = '#facc15'; // Bright yellow high-contrast text
+              ctx.font = 'bold 14px monospace';
+              ctx.fillText(`[#${frameIdx}] ${timeFormatted}`, 12, 24);
+              ctx.restore();
+
+              const base64Full = canvas.toDataURL('image/jpeg', 0.65);
+              const base64Data = base64Full.split(',')[1];
+
               frames.push({
-                frameIndex: frames.length + 1,
+                frameIndex: frameIdx,
                 timestampSec: time,
-                timestampFormatted: msToSrtTime(time * 1000),
+                timestampFormatted: timeFormatted,
                 base64Data,
                 base64Full,
                 thumbnailCompact
               });
             }
             res();
+
 
           };
           timeoutTimer = setTimeout(() => {
