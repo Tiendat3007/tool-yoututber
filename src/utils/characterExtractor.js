@@ -764,10 +764,10 @@ export function isValidLoreEntity(char) {
 }
 
 
-// Smart Clean & Format Character / Weapon Intro Tag (Deduplicates repetitive words and avoids text wrapping on CapCut)
+// Smart Clean & Format Character / Weapon / Realm / Skill Intro Tag (Deduplicates repetitive words and guarantees single-line display)
 export function cleanAndFormatIntroTag(char, templateMode = 'clean_compact', customPattern = '') {
   if (!char) return '';
-  const name = (char.name || '').trim();
+  let name = (char.name || '').trim();
   if (!name) return '';
 
   const rawType = (char.type || '').toLowerCase();
@@ -789,38 +789,61 @@ export function cleanAndFormatIntroTag(char, templateMode = 'clean_compact', cus
   let role = isInvalidLoreValue(char.role) ? '' : char.role.trim();
   let realm = isInvalidLoreValue(char.realm) ? '' : char.realm.trim();
 
+  // Strip redundant leading type prefix words from name
+  if (type === 'CẢNH GIỚI') {
+    name = name.replace(/^cảnh\s*giới\s*/i, '').trim();
+  } else if (type === 'HỆ THỐNG') {
+    name = name.replace(/^hệ\s*thống\s*/i, '').trim();
+  } else if (type === 'THẦN BINH') {
+    name = name.replace(/^thần\s*binh\s*/i, '').trim();
+  } else if (type === 'CÔNG PHÁP') {
+    name = name.replace(/^công\s*pháp\s*/i, '').trim();
+  }
 
+  const nameLower = name.toLowerCase();
 
-  // Smart De-duplication: Remove repetitive words between Name and Realm / Sect
-  // (e.g. Name: "HUYỀN THIỆN LINH BẢO", Realm: "CỰC PHẨM LINH BẢO" -> Realm becomes "CỰC PHẨM")
+  // 🎯 STRICT DEDUPLICATION: If Realm / Sect / Role is a substring of Name or vice-versa, eliminate it!
   if (realm) {
-    const nameLower = name.toLowerCase();
     const realmLower = realm.toLowerCase();
-    if (nameLower.includes('linh bảo') && realmLower.includes('linh bảo')) {
-      realm = realm.replace(/linh\s*bảo/gi, '').trim();
-    }
-    if (nameLower.includes('thần kiếm') && realmLower.includes('thần kiếm')) {
-      realm = realm.replace(/thần\s*kiếm/gi, '').trim();
-    }
-    if (nameLower.includes('pháp bảo') && realmLower.includes('pháp bảo')) {
-      realm = realm.replace(/pháp\s*bảo/gi, '').trim();
-    }
-    if (nameLower.includes('thần binh') && realmLower.includes('thần binh')) {
-      realm = realm.replace(/thần\s*binh/gi, '').trim();
-    }
-    if (nameLower.includes('tiên kiếm') && realmLower.includes('tiên kiếm')) {
-      realm = realm.replace(/tiên\s*kiếm/gi, '').trim();
+    if (nameLower === realmLower || nameLower.includes(realmLower) || realmLower.includes(nameLower)) {
+      realm = '';
+    } else {
+      if (nameLower.includes('linh bảo') && realmLower.includes('linh bảo')) realm = realm.replace(/linh\s*bảo/gi, '').trim();
+      if (nameLower.includes('thần kiếm') && realmLower.includes('thần kiếm')) realm = realm.replace(/thần\s*kiếm/gi, '').trim();
+      if (nameLower.includes('pháp bảo') && realmLower.includes('pháp bảo')) realm = realm.replace(/pháp\s*bảo/gi, '').trim();
+      if (nameLower.includes('thần binh') && realmLower.includes('thần binh')) realm = realm.replace(/thần\s*binh/gi, '').trim();
+      if (nameLower.includes('tiên kiếm') && realmLower.includes('tiên kiếm')) realm = realm.replace(/tiên\s*kiếm/gi, '').trim();
     }
   }
 
-  if (sect && name.toLowerCase().includes(sect.toLowerCase())) {
-    sect = '';
+  if (sect) {
+    const sectLower = sect.toLowerCase();
+    if (nameLower === sectLower || nameLower.includes(sectLower) || sectLower.includes(nameLower)) {
+      sect = '';
+    }
+  }
+
+  if (role) {
+    const roleLower = role.toLowerCase();
+    if (nameLower === roleLower || nameLower.includes(roleLower) || roleLower.includes(nameLower)) {
+      role = '';
+    }
+  }
+
+  // Entities of type CẢNH GIỚI, HỆ THỐNG, ĐỊA DANH should default to 1 concise part
+  if (['CẢNH GIỚI', 'HỆ THỐNG', 'ĐỊA DANH'].includes(type)) {
+    if (realm && (nameLower.includes(realm.toLowerCase()) || realm.toLowerCase().includes(nameLower))) realm = '';
+    if (sect && (nameLower.includes(sect.toLowerCase()) || sect.toLowerCase().includes(nameLower))) sect = '';
+    if (role && (nameLower.includes(role.toLowerCase()) || role.toLowerCase().includes(nameLower))) role = '';
   }
 
   if (templateMode === 'clean_compact') {
     // 1-2 parts max: Guarantees single-line display on CapCut without line breaks
+    if (['CẢNH GIỚI', 'HỆ THỐNG'].includes(type) && !sect) {
+      return `【 ${type}: ${name.toUpperCase()} 】`;
+    }
     const secondPart = sect || realm || role;
-    if (secondPart) {
+    if (secondPart && secondPart.toUpperCase() !== name.toUpperCase()) {
       return `【 ${type}: ${name.toUpperCase()} | ${secondPart.toUpperCase()} 】`;
     }
     return `【 ${type}: ${name.toUpperCase()} 】`;
@@ -828,25 +851,26 @@ export function cleanAndFormatIntroTag(char, templateMode = 'clean_compact', cus
 
   if (templateMode === 'full_3part') {
     const parts = [name.toUpperCase()];
-    if (sect) parts.push(sect.toUpperCase());
-    if (realm) parts.push(realm.toUpperCase());
-    else if (role) parts.push(role.toUpperCase());
+    if (sect && !parts.includes(sect.toUpperCase())) parts.push(sect.toUpperCase());
+    if (realm && !parts.includes(realm.toUpperCase())) parts.push(realm.toUpperCase());
+    else if (role && !parts.includes(role.toUpperCase())) parts.push(role.toUpperCase());
     return `【 ${type}: ${parts.join(' | ')} 】`;
   }
 
   if (templateMode === 'modern_badge') {
-    const icon = type === 'THẦN BINH' ? '⚔️' : (type === 'ĐỊA DANH' ? '🏛️' : (type === 'TUYỆT KỸ' ? '⚡' : '⭐'));
-    const extra = [sect, realm || role].filter(Boolean).join(' • ');
+    const icon = type === 'THẦN BINH' ? '⚔️' : (type === 'ĐỊA DANH' ? '🏛️' : (type === 'CẢNH GIỚI' ? '⚡' : (type === 'CÔNG PHÁP' ? '📜' : (type === 'HỆ THỐNG' ? '🤖' : '⭐'))));
+    const extra = [sect, realm || role].filter(Boolean).filter(x => x.toLowerCase() !== nameLower).join(' • ');
     return `${icon} [ ${name.toUpperCase()} ]${extra ? ` • ${extra}` : ''}`;
   }
 
   if (templateMode === 'name_only_bracket') {
     const secondPart = sect || realm || role;
-    if (secondPart) {
+    if (secondPart && secondPart.toUpperCase() !== name.toUpperCase()) {
       return `【 ${name.toUpperCase()} • ${secondPart.toUpperCase()} 】`;
     }
     return `【 ${name.toUpperCase()} 】`;
   }
+
 
   if (templateMode === 'custom' && customPattern) {
     let result = customPattern
