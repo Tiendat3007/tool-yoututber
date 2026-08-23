@@ -12,7 +12,9 @@ import {
   stitchAllFilesToFullMovieSRT,
   cleanAndFormatIntroTag,
   isInvalidLoreValue,
+  isValidLoreEntity,
   msToSrtTime,
+
   srtTimeToMs,
 
   readMediaDuration,
@@ -677,6 +679,26 @@ export default function CharacterLoreStudio({
     setTimeout(() => setScanProgress(''), 4000);
   };
 
+  // 🧹 Smart Clean & Discard Meaningless / Dialogue / Long Garbage Cards
+  const handleCleanJunkCards = () => {
+    if (characters.length === 0) {
+      alert('Chưa có thẻ nhân vật nào trong danh sách!');
+      return;
+    }
+    const cleanList = characters.filter(c => isValidLoreEntity(c));
+    const removedCount = characters.length - cleanList.length;
+    if (removedCount === 0) {
+      alert('✅ Danh sách thẻ hiện tại rất sạch! Không có text rác hay câu thoại dài nào.');
+      return;
+    }
+    if (window.confirm(`Hệ thống tìm thấy ${removedCount} thẻ text rác / câu thoại dài / logo rác. Bạn có muốn xóa tự động không?`)) {
+      setCharacters(cleanList);
+      setScanProgress(`🧹 Đã quét và loại bỏ thành công ${removedCount} thẻ text rác / câu thoại dài!`);
+      setTimeout(() => setScanProgress(''), 4000);
+    }
+  };
+
+
   // List of all unique movies in characters
   const availableMovies = Array.from(
 
@@ -1013,14 +1035,26 @@ export default function CharacterLoreStudio({
               </div>
             </div>
 
-            <button
-              className="btn btn-cyan btn-sm font-bold flex-center gap-1"
-              onClick={handleApplyFormatToAll}
-              title="Chuẩn hóa lại định dạng thẻ chú thích cho toàn bộ danh sách nhân vật và loại bỏ lặp từ"
-            >
-              <Sparkles size={14} /> ✨ Áp Dụng Mẫu Này Cho Tất Cả ({characters.length} Thẻ)
-            </button>
+            <div className="flex-center gap-2">
+              <button
+                className="btn btn-cyan btn-sm font-bold flex-center gap-1"
+                onClick={handleApplyFormatToAll}
+                title="Chuẩn hóa lại định dạng thẻ chú thích cho toàn bộ danh sách nhân vật và loại bỏ lặp từ"
+              >
+                <Sparkles size={14} /> ✨ Áp Dụng Mẫu Này Cho Tất Cả ({characters.length} Thẻ)
+              </button>
+
+              <button
+                className="btn btn-secondary btn-sm font-bold flex-center gap-1"
+                onClick={handleCleanJunkCards}
+                style={{ borderColor: '#f59e0b', color: '#fbbf24' }}
+                title="Tự động phát hiện và xóa bỏ các thẻ chứa câu thoại dài, phụ đề rác, logo watermark"
+              >
+                <Trash2 size={14} className="text-amber" /> 🧹 Lọc & Bỏ Text Rác / Câu Dài
+              </button>
+            </div>
           </div>
+
 
           {/* Movie Profiles Bar (Each movie has its own isolated character list) */}
           <div className="movie-profiles-bar card-panel p-2 mb-3 flex-between" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.1)', flexWrap: 'wrap', gap: '8px' }}>

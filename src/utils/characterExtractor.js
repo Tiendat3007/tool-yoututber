@@ -40,9 +40,14 @@ YÊU CẦU ĐẦU RA JSON ARRAY CHÍNH XÁC (Dịch sang âm Hán-Việt chuẩn
     "description": "Mô tả ngắn hình ảnh xuất hiện trên video"
   }
 ]
-LƯU Ý QUAN TRỌNG: Nếu trên khung hình không ghi Môn Phái hoặc Cảnh Giới, hãy để chuỗi rỗng "" (tuyệt đối KHÔNG ghi "N/A", "Unknown", "Chưa rõ" hay "Không").
+LƯU Ý QUAN TRỌNG VỀ LỌC RÁC:
+1. CHỈ LẤY: Bảng tên nhân vật, thần binh, chí bảo, pháp bảo, tuyệt kỹ công pháp, môn phái/địa danh xuất hiện dưới dạng thẻ đồ họa đồ sộ.
+2. TUYỆT ĐỐI KHÔNG LẤY: Phụ đề hội thoại chạy ở đáy màn hình, câu thoại dài của nhân vật (VD: "Ngươi muốn làm gì", "Chúng ta đi thôi", "Không thể nào"), logo watermark kênh/nhà đài (Bilibili, Tencent, Youku, iQiyi), chữ quảng cáo hoặc credit.
+3. Tên ("name") BẮT BUỘC NGẮN GỌN (từ 2 đến 6 từ, không chứa dấu câu . , ! ? : ;).
+4. Nếu trên khung hình không ghi Môn Phái hoặc Cảnh Giới, hãy để chuỗi rỗng "" (tuyệt đối KHÔNG ghi "N/A", "Unknown", "Chưa rõ" hay "Không").
 Nếu trong các khung hình không có thẻ đồ họa nào, trả về [].
 `;
+
 
 // Helper: Summarize SRT Subtitles context to inject into Vision AI
 export function buildSRTContextSummary(subtitles = [], glossary = [], maxLines = 150) {
@@ -330,9 +335,13 @@ export async function scanVideoFramesWithVisionAI({
         const detectedList = JSON.parse(jsonStr);
         if (Array.isArray(detectedList)) {
           detectedList.forEach((char) => {
+            // 🛡️ Strict filter: Only keep real character names, supreme artifacts (chí bảo), skills, sects
+            if (!isValidLoreEntity(char)) return;
+
             const cleanName = (char.name || '').trim().toLowerCase();
             if (cleanName && !seenNames.has(cleanName)) {
               seenNames.add(cleanName);
+
 
               // 🎯 Smart & Accurate Frame Resolution: Match to exact video seek timestamp
               let matchedFrame = batch[0];
@@ -568,8 +577,11 @@ HÃY TRẢ VỀ DUY NHẤT 1 MẢNG JSON CÁC NHÂN VẬT THEO ĐÚNG CẤU TRÚ
 
     const characters = JSON.parse(jsonStr);
     if (Array.isArray(characters)) {
-      return characters.map((char, idx) => {
+      return characters
+        .filter(c => isValidLoreEntity(c))
+        .map((char, idx) => {
         // Match character to real file in files array
+
         let matchedFile = files[0] || null;
         if (char.firstFileId) {
           const directMatch = files.find(f => f.id === char.firstFileId);
@@ -705,6 +717,52 @@ export function isInvalidLoreValue(val) {
     'phàm nhân', '-', '--', '...', 'nhân vật', 'nhân vật phụ', 'ẩn danh', 'không'
   ].includes(clean);
 }
+
+// 🛡️ Strict Validator: Only keep genuine character names, supreme artifacts (chí bảo), skills, sects, realms
+// Automatically rejects long meaningless text, full narrative sentences, dialogue lines, subtitles, and watermarks
+export function isValidLoreEntity(char) {
+  if (!char) return false;
+  const name = (char.name || '').trim();
+  if (!name) return false;
+
+  // 1. Must not be a placeholder / invalid name
+  if (isInvalidLoreValue(name)) return false;
+
+  // 2. Length check: Proper entity names (characters, supreme artifacts, sects, martial arts) are 2 to 30 characters
+  if (name.length < 2 || name.length > 32) return false;
+
+  // 3. Word count check: Real entity names rarely exceed 6 words (e.g. "Thái Thượng Bát Quái Lô" = 5 words)
+  const words = name.split(/\s+/).filter(Boolean);
+  if (words.length > 6) return false;
+
+  // 4. Punctuation check: Real entity names do NOT contain sentence endings / dialogue punctuation
+  if (/[.!?,;:，。！？…—~`"'“”‘’(){}[\]\\]/.test(name)) return false;
+
+  // 5. Dialogue / narrative pronouns & verbs filter (Conversational garbage detection)
+  const nameLower = name.toLowerCase();
+  const garbagePhrases = [
+    'chúng ta', 'các ngươi', 'ngươi là', 'ta là', 'hắn là', 'nàng là', 'của ta', 'của ngươi',
+    'tại sao', 'làm sao', 'thế nào', 'như thế nào', 'vì sao', 'ngươi dám', 'không thể nào',
+    'hóa ra là', 'nói rằng', 'thế nhưng', 'rốt cuộc', 'chết tiệt', 'chạy mau', 'được rồi',
+    'đi thôi', 'lên cho ta', 'giết hắn', 'đứng lại', 'ta không', 'ngươi không',
+    'bilibili', 'tencent', 'iqiyi', 'youku', 'tập sau', 'đón xem', 'phụ đề', 'vietsub',
+    'thuyết minh', 'kính mời', 'chúc các bạn', 'like và subscribe', 'đăng ký kênh',
+    'cảm ơn đã xem', 'hẹn gặp lại', 'video preview', 'trailer', 'quảng cáo', 'thông báo'
+  ];
+  if (garbagePhrases.some(phrase => nameLower.includes(phrase))) {
+    return false;
+  }
+
+  // 6. If originalName (Chinese characters) is given, ensure it's not a full sentence
+  if (char.originalName && typeof char.originalName === 'string') {
+    const rawZh = char.originalName.trim();
+    if (rawZh.length > 10) return false; // Chinese entity names are usually 2-5 chars, max 8
+    if (/[，。！？、…；：“”‘’]/u.test(rawZh)) return false;
+  }
+
+  return true;
+}
+
 
 // Smart Clean & Format Character / Weapon Intro Tag (Deduplicates repetitive words and avoids text wrapping on CapCut)
 export function cleanAndFormatIntroTag(char, templateMode = 'clean_compact', customPattern = '') {
