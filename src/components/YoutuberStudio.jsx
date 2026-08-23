@@ -1951,38 +1951,51 @@ ${fullImagePromptEn || generatedData.imagePromptEn}
                   </div>
                 )}
 
-                {/* Quick Character Prompt Action Presets */}
+                {/* Quick Character Prompt Action Presets (Multi-character Hero Composition) */}
                 <div className="prompt-presets-chips flex-center gap-1 mt-2" style={{ flexWrap: 'wrap', justifyContent: 'flex-start' }}>
-                  <span className="text-xs text-muted mr-1">Mẫu nhanh:</span>
+                  <span className="text-xs text-muted mr-1 font-bold">Mẫu bối cảnh nhiều nhân vật:</span>
                   <button
                     type="button"
                     className="btn btn-secondary btn-xs font-bold"
-                    onClick={() => setImageIdeaPrompt(`Hai nhân vật chính đối đầu đại chiến kịch tính trên không trung, kiếm khí rực lửa hoàng kim, ánh mắt rực sáng linh lực`)}
+                    onClick={() => setImageIdeaPrompt(`Bố cục đa nhân vật: Nhân vật chính to lớn nổi bật ở cận cảnh tiền cảnh quỳ kiên cường giữa đại điện, tu vi bị phế xiềng xích vỡ vụn, mắt rực sáng thức tỉnh thần thông bí mật, hậu cảnh chưởng môn và hàng trăm trưởng lão môn phái bao vây nhìn xuống cười nhạo khinh bỉ`)}
+                    title="Cảnh nhân vật chính bị phế tu vi / trục xuất khỏi tông môn, nổi bật ở tiền cảnh"
                   >
-                    ⚔️ Đại Chiến Đối Đầu
+                    💔 Bị Phế Tu Vi / Trục Xuất
                   </button>
                   <button
                     type="button"
                     className="btn btn-secondary btn-xs font-bold"
-                    onClick={() => setImageIdeaPrompt(`Cận cảnh nhân vật chính thức tỉnh thần thông, mắt phát sáng linh lực, linh kiếm hộ thể bao quanh bởi lôi điện tím`)}
+                    onClick={() => setImageIdeaPrompt(`Bố cục đa nhân vật: Nhân vật chính khổng lồ chiếm 70% tiền cảnh vung thần kiếm hoàng kim kiếm khí rực lửa, hậu cảnh hàng vạn đệ tử tông môn và ma thú hắc ám bao vây dày đặc trong tuyệt vọng`)}
+                    title="Cảnh nhân vật chính 1 mình đại chiến vạn quân"
                   >
-                    ⚡ Thức Tỉnh Thần Thông
+                    ⚔️ Đại Chiến Vạn Quân
                   </button>
                   <button
                     type="button"
                     className="btn btn-secondary btn-xs font-bold"
-                    onClick={() => setImageIdeaPrompt(`Nhân vật chính đứng trên đỉnh núi mây mù, triệu hồi rồng thần hoàng kim khổng lồ uy phong lẫm liệt`)}
+                    onClick={() => setImageIdeaPrompt(`Bố cục đa nhân vật: Nhân vật chính ở trung tâm tiền cảnh bộc phát linh lực kinh thiên động địa thức tỉnh cảnh giới tối thượng, trung cảnh và hậu cảnh kẻ thù phản diện hoảng sợ bay dạt ra xa`)}
+                    title="Cảnh đột phá sức mạnh vả mặt kẻ thù"
                   >
-                    🐉 Triệu Hồi Linh Thú
+                    💥 Vả Mặt Phản Diện
                   </button>
                   <button
                     type="button"
                     className="btn btn-secondary btn-xs font-bold"
-                    onClick={() => setImageIdeaPrompt(`Nhân vật chính bị thương nhưng ánh mắt kiên định bộc phát sức mạnh cấm kỵ lật ngược tình thế`)}
+                    onClick={() => setImageIdeaPrompt(`Bố cục đa nhân vật: Nhân vật chính ở cận cảnh tỏa ánh sáng linh lực uy phong, phía sau là hư ảnh rồng thần hoàng kim khổng lồ cuồn cuộn mây trời che lấp cả chiến trường`)}
+                    title="Cảnh triệu hồi linh thú thần long"
                   >
-                    🔥 Lật Ngược Tình Thế
+                    🐉 Triệu Hồi Thần Long
+                  </button>
+                  <button
+                    type="button"
+                    className="btn btn-secondary btn-xs font-bold"
+                    onClick={() => setImageIdeaPrompt(`Bố cục đa nhân vật: Nhân vật chính ở tiền cảnh hóa thân Ma Thần mắt đỏ kiếm đen sát khí ngút trời, hậu cảnh liên minh chính đạo khiếp sợ kinh hoàng lùi bước`)}
+                    title="Cảnh nhập ma / tu la cuồng nộ"
+                  >
+                    🖤 Ma Thần Giáng Thế
                   </button>
                 </div>
+
               </div>
 
               {/* 💡 Inline Prompt Input for Re-rendering AI Image Prompts */}
