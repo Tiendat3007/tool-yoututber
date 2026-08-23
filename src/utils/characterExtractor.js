@@ -37,11 +37,19 @@ YÊU CẦU ĐẦU RA JSON ARRAY CHÍNH XÁC (Dịch sang âm Hán-Việt chuẩn
     "description": "Mô tả ngắn hình ảnh xuất hiện trên video"
   }
 ]
-LƯU Ý QUAN TRỌNG VỀ ĐỌC KHUNG HÌNH & LỌC RÁC:
+LƯU Ý ĐẶC BIỆT QUAN TRỌNG VỀ LỌC THÔNG BÁO HỆ THỐNG & DỊCH NGẮN GỌN:
 1. ĐỌC MỐC THỜI GIAN CHÍNH XÁC: Ở góc trên bên trái của MỖI khung hình đều có nhãn vàng nổi bật ghi rõ số thứ tự và mốc thời gian dạng [#1] 00:00:15,000. Khi phát hiện thẻ đồ họa ở ảnh nào, HÃY ĐIỀN ĐÚNG "frameIndex" VÀ "timestamp" IN TRÊN ẢNH ĐÓ!
-2. CHỈ LẤY: Bảng tên nhân vật, thần binh, chí bảo, pháp bảo, tuyệt kỹ công pháp, môn phái/địa danh xuất hiện dưới dạng thẻ đồ họa đồ sộ.
-3. TUYỆT ĐỐI KHÔNG LẤY: Phụ đề hội thoại chạy ở đáy màn hình, câu thoại dài của nhân vật (VD: "Ngươi muốn làm gì", "Chúng ta đi thôi", "Không thể nào"), logo watermark kênh/nhà đài (Bilibili, Tencent, Youku, iQiyi), bảng nhiệm vụ hệ thống/thuộc tính, chữ quảng cáo hoặc credit.
-4. Tên ("name") BẮT BUỘC NGẮN GỌN (từ 2 đến 6 từ, không chứa dấu câu . , ! ? : ;).
+2. CHỈ LẤY CÁC THỰC THỂ THỰC SỰ (TỐI ƯU DỊCH NGẮN GỌN HÁN-VIỆT TỪ 2 ĐẾN 5 TỪ):
+   - Nhân vật: 2–4 từ (VD: Cố Thần, Tiêu Viêm, Lục Dương, Âu Dương Thanh).
+   - Thần binh / Chí bảo: 3–5 từ (VD: Trấn Trạch Thần Kiếm, Tru Tiên Kiếm, Hạo Thiên Chuỳ).
+   - Công pháp / Thần thông: 3–5 từ (VD: Bát Hoang Kiếm Quyết, Đại Hoang Tù Thiên Chỉ).
+   - Cảnh giới: 2–5 từ (VD: Kim Đan Tam Trọng Đỉnh Phong, Động Hư Cảnh).
+   - Địa danh / Tông môn: 2–4 từ (VD: Bát Hoang Kiếm Các, Huyền Thiên Tông).
+3. TUYỆT ĐỐI KHÔNG LẤY (LOẠI BỎ 100%):
+   - BẢNG THÔNG BÁO HỆ THỐNG / NHIỆM VỤ / THUỘC TÍNH (VD: "Đinh! Hệ thống nhắc nhở...", "Ký chủ hoàn thành nhiệm vụ...", "Kinh nghiệm +1000...", "Mở khóa thuộc tính...", "Bảng trạng thái...", "Chúc mừng túc chủ...").
+   - LỜI THOẠI HỘI THOẠI chạy ở đáy màn hình hoặc phụ đề câu dài (VD: "Ngươi muốn làm gì", "Chúng ta đi thôi", "Không thể nào", "Đứng lại cho ta").
+   - Logo watermark kênh/nhà đài (Bilibili, Tencent, Youku, iQiyi), quảng cáo, credit tập sau.
+4. Tên ("name") BẮT BUỘC NGẮN GỌN (từ 2 đến 5 từ, độ dài < 26 ký tự, TUYỆT ĐỐI KHÔNG chứa dấu câu . , ! ? : ;).
 5. Nếu trên khung hình không ghi Môn Phái hoặc Cảnh Giới, hãy để chuỗi rỗng "" (tuyệt đối KHÔNG ghi "N/A", "Unknown", "Chưa rõ" hay "Không").
 Nếu trong các khung hình không có thẻ đồ họa nào, trả về [].
 `;
@@ -734,7 +742,7 @@ export function isInvalidLoreValue(val) {
 }
 
 // 🛡️ Strict Validator: Only keep genuine character names, supreme artifacts (chí bảo), skills, sects, realms
-// Automatically rejects long meaningless text, full narrative sentences, dialogue lines, subtitles, and watermarks
+// Automatically rejects long meaningless text, system notifications, quest logs, dialogue lines, subtitles, and watermarks
 export function isValidLoreEntity(char) {
   if (!char) return false;
   const name = (char.name || '').trim();
@@ -743,45 +751,63 @@ export function isValidLoreEntity(char) {
   // 1. Must not be a placeholder / invalid name
   if (isInvalidLoreValue(name)) return false;
 
-  // 2. Length check: Proper entity names (characters, supreme artifacts, sects, martial arts) are 2 to 30 characters
-  if (name.length < 2 || name.length > 32) return false;
+  // 2. Length check: Genuine entity names are 2 to 26 characters (strict concise limit)
+  if (name.length < 2 || name.length > 26) return false;
 
-  // 3. Word count check: Real entity names rarely exceed 6 words (e.g. "Thái Thượng Bát Quái Lô" = 5 words)
+  // 3. Word count check: Real entity names never exceed 5 words (e.g. "Trấn Trạch Thần Kiếm" = 4 words)
   const words = name.split(/\s+/).filter(Boolean);
-  if (words.length > 6) return false;
+  if (words.length > 5) return false;
 
   // 4. Punctuation check: Real entity names do NOT contain sentence endings / dialogue punctuation
-  if (/[.!?,;:，。！？…—~`"'“”‘’(){}[\]\\]/.test(name)) return false;
+  if (/[.!?,;:，。！？…—~`"'“”‘’(){}[\]\\/]/.test(name)) return false;
 
-  // 5. Dialogue / narrative pronouns, system boards & verbs filter (Conversational garbage detection)
+  // 5. System notices, game status logs, quest notifications & dialogue filter
   const nameLower = name.toLowerCase();
-  if (char.type === 'system' || nameLower.includes('hệ thống') || nameLower.includes('bảng thuộc tính') || nameLower.includes('nhiệm vụ')) {
+  const rawRole = (char.role || '').toLowerCase();
+  const rawType = (char.type || '').toLowerCase();
+
+  if (rawType === 'system' || rawRole.includes('hệ thống') || rawRole.includes('thuộc tính') || rawRole.includes('nhiệm vụ')) {
     return false;
   }
 
-  const garbagePhrases = [
+  const systemAndGarbagePhrases = [
+    // System notifications & game status
+    'hệ thống', 'he thong', 'ký chủ', 'ky chu', 'túc chủ', 'tuc chu', 'nhắc nhở', 'nhac nho',
+    'nhiệm vụ', 'nhiem vu', 'thuộc tính', 'thuoc tinh', 'trạng thái', 'trang thai',
+    'kinh nghiệm', 'kinh nghiem', 'điểm thưởng', 'phần thưởng', 'phan thuong',
+    'mở khóa', 'mo khoa', 'kích hoạt', 'kich hoat', 'chúc mừng', 'chuc mung',
+    'cảnh báo', 'canh bao', 'thành công', 'thanh cong', 'thất bại', 'that bai',
+    'thông báo', 'thong bao', 'đinh!', 'đinh', 'dinh!', 'level', 'hp:', 'mp:', 'exp:',
+
+    // Dialogue & narrative pronouns
     'chúng ta', 'các ngươi', 'ngươi là', 'ta là', 'hắn là', 'nàng là', 'của ta', 'của ngươi',
     'tại sao', 'làm sao', 'thế nào', 'như thế nào', 'vì sao', 'ngươi dám', 'không thể nào',
     'hóa ra là', 'nói rằng', 'thế nhưng', 'rốt cuộc', 'chết tiệt', 'chạy mau', 'được rồi',
     'đi thôi', 'lên cho ta', 'giết hắn', 'đứng lại', 'ta không', 'ngươi không',
+
+    // Watermarks & media credits
     'bilibili', 'tencent', 'iqiyi', 'youku', 'tập sau', 'đón xem', 'phụ đề', 'vietsub',
     'thuyết minh', 'kính mời', 'chúc các bạn', 'like và subscribe', 'đăng ký kênh',
-    'cảm ơn đã xem', 'hẹn gặp lại', 'video preview', 'trailer', 'quảng cáo', 'thông báo',
-    'hệ thống', 'bảng trạng thái'
+    'cảm ơn đã xem', 'hẹn gặp lại', 'video preview', 'trailer', 'quảng cáo'
   ];
-  if (garbagePhrases.some(phrase => nameLower.includes(phrase))) {
+
+  if (systemAndGarbagePhrases.some(phrase => nameLower.includes(phrase))) {
     return false;
   }
 
-  // 6. If originalName (Chinese characters) is given, ensure it's not a full sentence
+  // 6. Check if originalName (Chinese characters) contains system notices or sentence punctuation
   if (char.originalName && typeof char.originalName === 'string') {
     const rawZh = char.originalName.trim();
-    if (rawZh.length > 10) return false; // Chinese entity names are usually 2-5 chars, max 8
+    if (rawZh.length > 8) return false; // Chinese entity names are usually 2-5 chars
     if (/[，。！？、…；：“”‘’]/u.test(rawZh)) return false;
+    if (rawZh.includes('系统') || rawZh.includes('任务') || rawZh.includes('属性') || rawZh.includes('提示') || rawZh.includes('获得')) {
+      return false;
+    }
   }
 
   return true;
 }
+
 
 
 // Smart Clean & Format Character / Weapon / Realm / Skill Intro Tag (Deduplicates repetitive words and guarantees single-line display)
