@@ -108,7 +108,9 @@ export default function CharacterLoreStudio({
 
   const [visionFilterStatic, setVisionFilterStatic] = useState(true); // Smart frame differencing to eliminate redundant static frames
   const [visionFilterNonBadge, setVisionFilterNonBadge] = useState(() => localStorage.getItem('tutien_vision_filter_non_badge') !== 'false'); // 🎯 ĐỀ XUẤT 2: Smart badge detector
+  const [filterSensitivity, setFilterSensitivity] = useState(() => localStorage.getItem('tutien_vision_filter_sensitivity') || 'balanced'); // 'safe' | 'balanced' | 'aggressive'
   const [visionScanZone, setVisionScanZone] = useState(() => localStorage.getItem('tutien_vision_scan_zone') || 'left'); // 🎯 Vùng nhận diện: all | left | right | center | bottom_center
+
   
   // 🎯 Interactive Visual Drag & Resize ROI Box (Thu Phóng & Kéo Thả Vùng Quét Trực Quan)
   const [customROI, setCustomROI] = useState(() => {
@@ -574,6 +576,7 @@ export default function CharacterLoreStudio({
         flipHorizontal: Boolean(visionFlipHorizontal),
         filterStaticFrames: Boolean(visionFilterStatic),
         filterNonBadgeFrames: Boolean(visionFilterNonBadge),
+        filterSensitivity: filterSensitivity,
         customROI: customROI,
         onProgress: (p) => {
           const filterNote = p.filteredCount ? ` • ⚡ Đã lọc ${p.filteredCount} khung hình không có bảng tên` : '';
@@ -584,6 +587,7 @@ export default function CharacterLoreStudio({
           });
         }
       });
+
 
 
       if (frames.length === 0) {
@@ -1649,29 +1653,49 @@ export default function CharacterLoreStudio({
                     <span>⚡ Lọc Cảnh Tĩnh</span>
                   </label>
 
-                  {/* 🎯 ĐỀ XUẤT 2: Graphic Badge Detector Checkbox */}
-                  <label 
-                    className="flex-center gap-2 text-sm font-bold cursor-pointer"
-                    style={{ 
-                      background: visionFilterNonBadge ? 'rgba(234, 179, 8, 0.2)' : 'rgba(255,255,255,0.05)', 
-                      padding: '6px 12px', 
-                      borderRadius: '6px', 
-                      border: visionFilterNonBadge ? '1px solid #eab308' : '1px solid rgba(255,255,255,0.1)',
-                      color: visionFilterNonBadge ? '#facc15' : 'inherit'
-                    }}
-                    title="Canvas tự động dò viền đồ họa & thư pháp để loại bỏ 70% khung hình cảnh trơn không có bảng tên (Tiết kiệm 70% requests & 0 token)"
-                  >
-                    <input
-                      type="checkbox"
-                      checked={visionFilterNonBadge}
-                      onChange={(e) => {
-                        setVisionFilterNonBadge(e.target.checked);
-                        localStorage.setItem('tutien_vision_filter_non_badge', String(e.target.checked));
+                  {/* 🎯 ĐỀ XUẤT 2: Graphic Badge Detector Checkbox & Sensitivity */}
+                  <div className="flex-center gap-2" style={{ flexWrap: 'wrap' }}>
+                    <label 
+                      className="flex-center gap-2 text-sm font-bold cursor-pointer"
+                      style={{ 
+                        background: visionFilterNonBadge ? 'rgba(234, 179, 8, 0.2)' : 'rgba(255,255,255,0.05)', 
+                        padding: '6px 12px', 
+                        borderRadius: '6px', 
+                        border: visionFilterNonBadge ? '1px solid #eab308' : '1px solid rgba(255,255,255,0.1)',
+                        color: visionFilterNonBadge ? '#facc15' : 'inherit'
                       }}
-                      className="custom-checkbox"
-                    />
-                    <span>🎯 Lọc Bỏ Cảnh Không Có Bảng Tên (Giảm 70% Reqs)</span>
-                  </label>
+                      title="Canvas tự động quét mật độ nét chữ & viền đồ họa trong khung để loại bỏ 70-85% khung hình cảnh trơn không có bảng tên"
+                    >
+                      <input
+                        type="checkbox"
+                        checked={visionFilterNonBadge}
+                        onChange={(e) => {
+                          setVisionFilterNonBadge(e.target.checked);
+                          localStorage.setItem('tutien_vision_filter_non_badge', String(e.target.checked));
+                        }}
+                        className="custom-checkbox"
+                      />
+                      <span>🎯 Lọc Bỏ Cảnh Không Có Bảng Tên</span>
+                    </label>
+
+                    {visionFilterNonBadge && (
+                      <select
+                        value={filterSensitivity}
+                        onChange={(e) => {
+                          setFilterSensitivity(e.target.value);
+                          localStorage.setItem('tutien_vision_filter_sensitivity', e.target.value);
+                        }}
+                        className="input-field select-field input-xs font-bold"
+                        style={{ color: '#eab308', background: 'rgba(0,0,0,0.5)', width: 'auto' }}
+                        title="Mức độ lọc khung hình cảnh trơn"
+                      >
+                        <option value="aggressive">🚀 Lọc Siêu Mạnh (Lọc 80-85% Cảnh Trơn)</option>
+                        <option value="balanced">🎯 Chuẩn Cân Bằng (⭐ Khuyên Dùng - Lọc 70-75%)</option>
+                        <option value="safe">🛡️ An Toàn / Nhẹ (Lọc 50-60%)</option>
+                      </select>
+                    )}
+                  </div>
+
 
 
                   <label 

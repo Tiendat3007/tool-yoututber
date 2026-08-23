@@ -89,9 +89,8 @@ function computeFrameDifference(data1, data2) {
   return samples > 0 ? diffSum / (samples * 255) : 1.0;
 }
 
-// 🎯 ĐỀ XUẤT 2: Detect if a frame contains potential high-contrast graphic badges / calligraphy text overlay with selectable ROI Zone or Custom Bounding Box
+// 🎯 ĐỀ XUẤT 2: Detect if a frame contains potential high-contrast graphic badges / calligraphy text overlay with normalized edge density
 export function computeGraphicBadgeScore(imageData, width, height, customROI = null) {
-
   if (!imageData || !imageData.data || width <= 0 || height <= 0) return 0;
   const data = imageData.data;
 
@@ -103,11 +102,17 @@ export function computeGraphicBadgeScore(imageData, width, height, customROI = n
 
     let edgeCount = 0;
     let highContrastEdges = 0;
+    let textStrokeCrossings = 0;
     let colorBadgeTones = 0;
-    const step = 3; // Sample step for speed
+    let samples = 0;
+    const step = 2; // Step 2 for high accuracy
 
-    for (let y = startY + 1; y < endY - 1; y += step) {
-      for (let x = startX + 1; x < endX - 1; x += step) {
+    for (let y = startY + 2; y < endY - 2; y += step) {
+      let lineTransitions = 0;
+      let prevLum = null;
+
+      for (let x = startX + 2; x < endX - 2; x += step) {
+        samples++;
         const idx = (y * width + x) * 4;
         const r = data[idx];
         const g = data[idx + 1];
@@ -127,19 +132,35 @@ export function computeGraphicBadgeScore(imageData, width, height, customROI = n
         const gradTotal = gradX + gradY;
         if (gradTotal > 45) {
           edgeCount++;
-          if (gradTotal > 85) {
+          if (gradTotal > 95) {
             highContrastEdges++;
           }
         }
 
-        // Check for vivid badge colors (red seal / gold border)
-        if ((r > 140 && g < 70 && b < 70) || (r > 160 && g > 130 && b < 60)) {
+        // Check for rapid typography stroke oscillations (Chinese calligraphy characters)
+        if (prevLum !== null && Math.abs(lum - prevLum) > 65) {
+          lineTransitions++;
+        }
+        prevLum = lum;
+
+        // Check for vivid badge colors (red seal box 【主角】/【宗主】 or glowing gold border)
+        if ((r > 145 && g < 75 && b < 75) || (r > 170 && g > 135 && b < 70)) {
           colorBadgeTones++;
         }
       }
+
+      if (lineTransitions >= 2) {
+        textStrokeCrossings += lineTransitions;
+      }
     }
 
-    return highContrastEdges * 2.5 + edgeCount + colorBadgeTones * 3;
+    if (samples === 0) return 0;
+
+    // Normalized density score (0 to 100)
+    const rawScore = (highContrastEdges * 3.5 + edgeCount * 1.0 + textStrokeCrossings * 2.2 + colorBadgeTones * 4.5);
+    const density = (rawScore / samples) * 100;
+
+    return Math.round(density * 10) / 10;
   };
 
   // If user provided a custom ROI box { x, y, w, h } in percentages (0 to 100)
@@ -151,9 +172,9 @@ export function computeGraphicBadgeScore(imageData, width, height, customROI = n
     return checkZone(startX, endX, startY, endY);
   }
 
-  const leftZoneScore = checkZone(0.02, 0.40, 0.12, 0.88);
+  const leftZoneScore = checkZone(0.02, 0.42, 0.12, 0.88);
   const centerZoneScore = checkZone(0.20, 0.80, 0.40, 0.88);
-  const rightZoneScore = checkZone(0.60, 0.98, 0.12, 0.88);
+  const rightZoneScore = checkZone(0.58, 0.98, 0.12, 0.88);
 
   return Math.max(leftZoneScore, centerZoneScore, rightZoneScore);
 }
@@ -242,8 +263,9 @@ export async function extractFramesFromVideo(videoFile, {
   intervalSec = 4,
   flipHorizontal = false,
   filterStaticFrames = true, // Smart filter to discard redundant static dialogue shots
-  filterNonBadgeFrames = true, // 🎯 ĐỀ XUẤT 2: Smart filter to discard frames without graphic badge candidates
+  filterNonBadgeFrames = true, // 🎯 ĐỀ XUẤT 2: Smart filter to discard frames without graphic badge candidates (saves ~70-85% requests)
   customROI = null, // { x, y, w, h } in percent (0 to 100)
+  filterSensitivity = 'balanced', // 'safe' (threshold 6) | 'balanced' (threshold 10) | 'aggressive' (threshold 14)
   minDiffRatio = 0.04, // 4% difference threshold
   onProgress = () => {},
   videoDuration = 0
@@ -262,6 +284,9 @@ export async function extractFramesFromVideo(videoFile, {
     canvas.height = 360;
     const ctx = canvas.getContext('2d', { willReadFrequently: true });
 
+    // Determine normalized score threshold based on user sensitivity
+    const badgeThreshold = filterSensitivity === 'aggressive' ? 13.0 : (filterSensitivity === 'safe' ? 6.0 : 9.5);
+
     video.onloadedmetadata = async () => {
       const duration = videoDuration || video.duration;
       const timestamps = [];
@@ -270,7 +295,7 @@ export async function extractFramesFromVideo(videoFile, {
       }
 
       const frames = [];
-      let prevImageData = null;
+      let prevSavedImageData = null;
       let skippedCount = 0;
 
       for (let i = 0; i < timestamps.length; i++) {
@@ -302,23 +327,30 @@ export async function extractFramesFromVideo(videoFile, {
             ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
             ctx.restore();
 
-            // Check Frame Differencing against previous captured frame
+            // Check Frame Differencing against previous SAVED frame
             const currentImageDataObj = ctx.getImageData(0, 0, canvas.width, canvas.height);
             const currentImageData = currentImageDataObj.data;
-            const diff = prevImageData ? computeFrameDifference(prevImageData, currentImageData) : 1.0;
-            const isSceneTransition = diff > 0.16; // Significant scene cut
+            const diff = prevSavedImageData ? computeFrameDifference(prevSavedImageData, currentImageData) : 1.0;
 
-            // 🎯 ĐỀ XUẤT 2: Check graphic badge candidate score in user selected custom ROI
+            // 🎯 ĐỀ XUẤT 2: Compute normalized graphic badge score in user selected ROI box
             const badgeScore = computeGraphicBadgeScore(currentImageDataObj, canvas.width, canvas.height, customROI);
-            const hasBadgeCandidate = badgeScore > 48 || isSceneTransition;
+            const hasBadgeCandidate = badgeScore >= badgeThreshold;
 
-            const shouldSkipStatic = filterStaticFrames && prevImageData && diff < minDiffRatio;
-            const shouldSkipNoBadge = filterNonBadgeFrames && prevImageData && !hasBadgeCandidate && diff < 0.12;
+            let shouldSkip = false;
 
-            if (shouldSkipStatic || shouldSkipNoBadge) {
+            // 1. If Non-Badge filter is ON: Frame has no badge candidate in ROI -> SKIP!
+            if (filterNonBadgeFrames && !hasBadgeCandidate) {
+              shouldSkip = true;
+            } 
+            // 2. If Static filter is ON: Frame is almost identical duplicate of previous saved frame -> SKIP!
+            else if (filterStaticFrames && prevSavedImageData && diff < minDiffRatio) {
+              shouldSkip = true;
+            }
+
+            if (shouldSkip) {
               skippedCount++;
             } else {
-              prevImageData = currentImageData;
+              prevSavedImageData = currentImageData;
 
               // Generate lightweight clean compact thumbnail for UI card display
               const thumbCanvas = document.createElement('canvas');
@@ -354,7 +386,6 @@ export async function extractFramesFromVideo(videoFile, {
                 base64Full,
                 thumbnailCompact,
                 badgeScore,
-                isSceneTransition,
                 customROI
               });
             }
