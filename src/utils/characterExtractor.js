@@ -89,16 +89,17 @@ function computeFrameDifference(data1, data2) {
   return samples > 0 ? diffSum / (samples * 255) : 1.0;
 }
 
-// 🎯 ĐỀ XUẤT 2: Detect if a frame contains potential high-contrast graphic badges / calligraphy text overlay with selectable ROI Zone
-export function computeGraphicBadgeScore(imageData, width, height, zone = 'all') {
+// 🎯 ĐỀ XUẤT 2: Detect if a frame contains potential high-contrast graphic badges / calligraphy text overlay with selectable ROI Zone or Custom Bounding Box
+export function computeGraphicBadgeScore(imageData, width, height, customROI = null) {
+
   if (!imageData || !imageData.data || width <= 0 || height <= 0) return 0;
   const data = imageData.data;
 
   const checkZone = (startXRatio, endXRatio, startYRatio, endYRatio) => {
-    const startX = Math.floor(width * startXRatio);
-    const endX = Math.floor(width * endXRatio);
-    const startY = Math.floor(height * startYRatio);
-    const endY = Math.floor(height * endYRatio);
+    const startX = Math.floor(width * Math.max(0, startXRatio));
+    const endX = Math.floor(width * Math.min(1, endXRatio));
+    const startY = Math.floor(height * Math.max(0, startYRatio));
+    const endY = Math.floor(height * Math.min(1, endYRatio));
 
     let edgeCount = 0;
     let highContrastEdges = 0;
@@ -141,17 +142,13 @@ export function computeGraphicBadgeScore(imageData, width, height, zone = 'all')
     return highContrastEdges * 2.5 + edgeCount + colorBadgeTones * 3;
   };
 
-  if (zone === 'left') {
-    return checkZone(0.02, 0.45, 0.12, 0.88);
-  }
-  if (zone === 'right') {
-    return checkZone(0.55, 0.98, 0.12, 0.88);
-  }
-  if (zone === 'center') {
-    return checkZone(0.20, 0.80, 0.25, 0.85);
-  }
-  if (zone === 'bottom_center') {
-    return checkZone(0.15, 0.85, 0.45, 0.88);
+  // If user provided a custom ROI box { x, y, w, h } in percentages (0 to 100)
+  if (customROI && typeof customROI === 'object' && customROI.w > 0 && customROI.h > 0) {
+    const startX = customROI.x / 100;
+    const endX = (customROI.x + customROI.w) / 100;
+    const startY = customROI.y / 100;
+    const endY = (customROI.y + customROI.h) / 100;
+    return checkZone(startX, endX, startY, endY);
   }
 
   const leftZoneScore = checkZone(0.02, 0.40, 0.12, 0.88);
@@ -246,7 +243,7 @@ export async function extractFramesFromVideo(videoFile, {
   flipHorizontal = false,
   filterStaticFrames = true, // Smart filter to discard redundant static dialogue shots
   filterNonBadgeFrames = true, // 🎯 ĐỀ XUẤT 2: Smart filter to discard frames without graphic badge candidates
-  scanZone = 'all', // 'all' | 'left' | 'right' | 'center' | 'bottom_center'
+  customROI = null, // { x, y, w, h } in percent (0 to 100)
   minDiffRatio = 0.04, // 4% difference threshold
   onProgress = () => {},
   videoDuration = 0
@@ -311,8 +308,8 @@ export async function extractFramesFromVideo(videoFile, {
             const diff = prevImageData ? computeFrameDifference(prevImageData, currentImageData) : 1.0;
             const isSceneTransition = diff > 0.16; // Significant scene cut
 
-            // 🎯 ĐỀ XUẤT 2: Check graphic badge candidate score in user selected ROI zone
-            const badgeScore = computeGraphicBadgeScore(currentImageDataObj, canvas.width, canvas.height, scanZone);
+            // 🎯 ĐỀ XUẤT 2: Check graphic badge candidate score in user selected custom ROI
+            const badgeScore = computeGraphicBadgeScore(currentImageDataObj, canvas.width, canvas.height, customROI);
             const hasBadgeCandidate = badgeScore > 48 || isSceneTransition;
 
             const shouldSkipStatic = filterStaticFrames && prevImageData && diff < minDiffRatio;
@@ -358,7 +355,7 @@ export async function extractFramesFromVideo(videoFile, {
                 thumbnailCompact,
                 badgeScore,
                 isSceneTransition,
-                scanZone
+                customROI
               });
             }
             res();
@@ -384,9 +381,6 @@ export async function extractFramesFromVideo(videoFile, {
   });
 }
 
-
-
-
 // Scan video frames using Gemini Vision or Orimise Vision with Multi-threaded Concurrency & SRT Context Fusion
 export async function scanVideoFramesWithVisionAI({
   frames = [],
@@ -397,7 +391,7 @@ export async function scanVideoFramesWithVisionAI({
   model = 'gemini-2.5-flash-lite',
   batchSize = 12, // User selectable: 12, 15, 20, 30, 40, 50, 60
   concurrency = 5,
-  scanZone = 'all', // 'all' | 'left' | 'right' | 'center' | 'bottom_center'
+  customROI = null, // { x, y, w, h }
   srtSubtitles = [],
   glossary = [],
   onProgress = () => {}
@@ -407,14 +401,10 @@ export async function scanVideoFramesWithVisionAI({
     throw new Error(`Vui lòng nhập ${aiProvider === 'orimise' ? 'Orimise' : 'Google Gemini'} API Key trong Cấu Hình AI!`);
   }
 
-  const zoneGuidanceMap = {
-    left: '👈 LƯU Ý VÙNG TRỌNG TÂM: Bảng tên nhân vật/thân phận nằm chủ yếu ở CỘT BÊN TRÁI của từng ô. Hãy tập trung soi kỹ góc trái và bỏ qua chữ ở góc phải/hậu cảnh.',
-    right: '👉 LƯU Ý VÙNG TRỌNG TÂM: Bảng tên nhân vật/thân phận nằm ở CỘT BÊN PHẢI của từng ô.',
-    center: '🎯 LƯU Ý VÙNG TRỌNG TÂM: Bảng tên nằm ở CHÍNH GIỮA màn hình.',
-    bottom_center: '⬇️ LƯU Ý VÙNG TRỌNG TÂM: Bảng tên nằm ở PHẦN GIỮA DƯỚI (ngay phía trên phụ đề đáy).',
-    all: '🌟 LƯU Ý: Quét toàn bộ ô nhưng bỏ qua dải phụ đề thoại ở sát đáy.'
-  };
-  const zoneNote = zoneGuidanceMap[scanZone] || zoneGuidanceMap.all;
+  let zoneNote = '🌟 LƯU Ý VÙNG QUÉT: Quét toàn bộ khung hình nhưng bỏ qua dải phụ đề thoại ở sát đáy.';
+  if (customROI && customROI.w > 0 && customROI.h > 0) {
+    zoneNote = `📍 TỌA ĐỘ VÙNG QUÉT ĐƯỢC CHỈ ĐỊNH: X từ ${customROI.x}% đến ${Math.round(customROI.x + customROI.w)}%, Y từ ${customROI.y}% đến ${Math.round(customROI.y + customROI.h)}%. Bảng tên nhân vật/thân phận nằm chính xác trong khung này, hãy soi kỹ vùng này và bỏ qua các chữ ở ngoài khung!`;
+  }
 
   // 🧠 Build rich multimodal SRT subtitles context block
   const srtContextBlock = buildSRTContextSummary(srtSubtitles, glossary, 150);
@@ -428,6 +418,7 @@ export async function scanVideoFramesWithVisionAI({
       frames: frames.slice(i, i + batchSize)
     });
   }
+
 
   const allDetectedCharacters = [];
   const seenNames = new Set();

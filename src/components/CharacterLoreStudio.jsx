@@ -108,7 +108,20 @@ export default function CharacterLoreStudio({
 
   const [visionFilterStatic, setVisionFilterStatic] = useState(true); // Smart frame differencing to eliminate redundant static frames
   const [visionFilterNonBadge, setVisionFilterNonBadge] = useState(() => localStorage.getItem('tutien_vision_filter_non_badge') !== 'false'); // 🎯 ĐỀ XUẤT 2: Smart badge detector
-  const [visionScanZone, setVisionScanZone] = useState(() => localStorage.getItem('tutien_vision_scan_zone') || 'all'); // 🎯 Vùng nhận diện: all | left | right | center | bottom_center
+  const [visionScanZone, setVisionScanZone] = useState(() => localStorage.getItem('tutien_vision_scan_zone') || 'left'); // 🎯 Vùng nhận diện: all | left | right | center | bottom_center
+  
+  // 🎯 Interactive Visual Drag & Resize ROI Box (Thu Phóng & Kéo Thả Vùng Quét Trực Quan)
+  const [customROI, setCustomROI] = useState(() => {
+    const saved = localStorage.getItem('tutien_custom_roi');
+    return saved ? JSON.parse(saved) : { x: 2, y: 12, w: 42, h: 74 }; // percentage 0 to 100 (Default: Left Column)
+  });
+  const [showROIEditor, setShowROIEditor] = useState(true);
+  const [isDraggingROI, setIsDraggingROI] = useState(false);
+  const [isResizingROI, setIsResizingROI] = useState(null); // 'tl', 'tr', 'bl', 'br'
+  const roiDragStart = useRef({ mouseX: 0, mouseY: 0, startROI: { ...customROI } });
+  const roiContainerRef = useRef(null);
+  const [sampleVideoFrame, setSampleVideoFrame] = useState(null);
+
   const [visionUseSRTContext, setVisionUseSRTContext] = useState(true); // 🧠 Feed selected SRT subtitles context into Vision AI
   const [isVisionScanning, setIsVisionScanning] = useState(false);
   const [visionProgress, setVisionProgress] = useState(null);
@@ -116,6 +129,100 @@ export default function CharacterLoreStudio({
   const [visionDetectedChars, setVisionDetectedChars] = useState([]);
   const visionInputRef = useRef(null);
   const [batchShiftSeconds, setBatchShiftSeconds] = useState(-2); // Default lead-in offset of -2.0s to sync tags with video appearance
+
+  // Extract a preview frame from the uploaded video for the interactive ROI overlay
+  useEffect(() => {
+    if (!visionVideoFile) {
+      setSampleVideoFrame(null);
+      return;
+    }
+    const video = document.createElement('video');
+    video.preload = 'auto';
+    video.muted = true;
+    video.playsInline = true;
+    const url = URL.createObjectURL(visionVideoFile);
+    video.src = url;
+    video.onloadeddata = () => {
+      video.currentTime = Math.min(8, (video.duration || 10) / 2);
+    };
+    video.onseeked = () => {
+      const canvas = document.createElement('canvas');
+      canvas.width = 640;
+      canvas.height = 360;
+      const ctx = canvas.getContext('2d');
+      if (visionFlipHorizontal) {
+        ctx.translate(canvas.width, 0);
+        ctx.scale(-1, 1);
+      }
+      ctx.drawImage(video, 0, 0, 640, 360);
+      setSampleVideoFrame(canvas.toDataURL('image/jpeg', 0.65));
+      URL.revokeObjectURL(url);
+    };
+  }, [visionVideoFile, visionFlipHorizontal]);
+
+  // Handle Interactive Mouse Drag and Resize for ROI Box
+  useEffect(() => {
+    const handleMouseMove = (e) => {
+      if (!isDraggingROI && !isResizingROI) return;
+      if (!roiContainerRef.current) return;
+      const rect = roiContainerRef.current.getBoundingClientRect();
+      const { mouseX, mouseY, startROI } = roiDragStart.current;
+      const deltaXPercent = ((e.clientX - mouseX) / rect.width) * 100;
+      const deltaYPercent = ((e.clientY - mouseY) / rect.height) * 100;
+
+      let newROI = { ...startROI };
+
+      if (isDraggingROI) {
+        newROI.x = Math.max(0, Math.min(100 - startROI.w, startROI.x + deltaXPercent));
+        newROI.y = Math.max(0, Math.min(100 - startROI.h, startROI.y + deltaYPercent));
+      } else if (isResizingROI === 'br') {
+        newROI.w = Math.max(8, Math.min(100 - startROI.x, startROI.w + deltaXPercent));
+        newROI.h = Math.max(8, Math.min(100 - startROI.y, startROI.h + deltaYPercent));
+      } else if (isResizingROI === 'bl') {
+        const newX = Math.max(0, Math.min(startROI.x + startROI.w - 8, startROI.x + deltaXPercent));
+        newROI.w = startROI.w + (startROI.x - newX);
+        newROI.x = newX;
+        newROI.h = Math.max(8, Math.min(100 - startROI.y, startROI.h + deltaYPercent));
+      } else if (isResizingROI === 'tr') {
+        const newY = Math.max(0, Math.min(startROI.y + startROI.h - 8, startROI.y + deltaYPercent));
+        newROI.h = startROI.h + (startROI.y - newY);
+        newROI.y = newY;
+        newROI.w = Math.max(8, Math.min(100 - startROI.x, startROI.w + deltaXPercent));
+      } else if (isResizingROI === 'tl') {
+        const newX = Math.max(0, Math.min(startROI.x + startROI.w - 8, startROI.x + deltaXPercent));
+        const newY = Math.max(0, Math.min(startROI.y + startROI.h - 8, startROI.y + deltaYPercent));
+        newROI.w = startROI.w + (startROI.x - newX);
+        newROI.x = newX;
+        newROI.h = startROI.h + (startROI.y - newY);
+        newROI.y = newY;
+      }
+
+      newROI = {
+        x: Math.round(newROI.x * 10) / 10,
+        y: Math.round(newROI.y * 10) / 10,
+        w: Math.round(newROI.w * 10) / 10,
+        h: Math.round(newROI.h * 10) / 10
+      };
+
+      setCustomROI(newROI);
+      localStorage.setItem('tutien_custom_roi', JSON.stringify(newROI));
+    };
+
+    const handleMouseUp = () => {
+      setIsDraggingROI(false);
+      setIsResizingROI(null);
+    };
+
+    if (isDraggingROI || isResizingROI) {
+      window.addEventListener('mousemove', handleMouseMove);
+      window.addEventListener('mouseup', handleMouseUp);
+    }
+    return () => {
+      window.removeEventListener('mousemove', handleMouseMove);
+      window.removeEventListener('mouseup', handleMouseUp);
+    };
+  }, [isDraggingROI, isResizingROI]);
+
 
 
 
@@ -467,7 +574,7 @@ export default function CharacterLoreStudio({
         flipHorizontal: Boolean(visionFlipHorizontal),
         filterStaticFrames: Boolean(visionFilterStatic),
         filterNonBadgeFrames: Boolean(visionFilterNonBadge),
-        scanZone: visionScanZone,
+        customROI: customROI,
         onProgress: (p) => {
           const filterNote = p.filteredCount ? ` • ⚡ Đã lọc ${p.filteredCount} khung hình không có bảng tên` : '';
           setVisionProgress({
@@ -508,7 +615,7 @@ export default function CharacterLoreStudio({
         model: visionModel || 'gemini-2.5-flash-lite',
         batchSize: effectiveBatchSize, // User configurable: 12, 15, 20, 30, 40, 50, 60
         concurrency: Number(visionConcurrency) || 6,
-        scanZone: visionScanZone,
+        customROI: customROI,
         srtSubtitles: srtSubtitlesToPass,
         glossary: glossary || [],
         onProgress: (p) => {
@@ -522,6 +629,7 @@ export default function CharacterLoreStudio({
           }
         }
       });
+
 
 
 
@@ -1622,7 +1730,303 @@ export default function CharacterLoreStudio({
                 </button>
               </div>
             )}
+
+            {/* 🎯 BỘ ĐIỀU CHỈNH & KÉO THẢ THU PHÓNG VÙNG QUÉT TRỰC QUAN (INTERACTIVE VISUAL ROI EDITOR) */}
+            {visionVideoFile && (
+              <div className="roi-visual-editor-container mt-4 pt-3 border-top" style={{ background: 'rgba(0,0,0,0.3)', padding: '16px', borderRadius: '10px', border: '1px solid rgba(6, 182, 212, 0.25)' }}>
+                <div className="flex-between mb-3" style={{ flexWrap: 'wrap', gap: '10px' }}>
+                  <div className="flex-center gap-2">
+                    <Shield size={18} className="text-cyan" />
+                    <strong className="text-cyan font-bold" style={{ fontSize: '15px' }}>
+                      🎯 Điều Chỉnh Vùng Nhận Diện Bảng Tên (Kéo Thả & Thu Phóng Tùy Ý)
+                    </strong>
+                    <span className="badge badge-primary font-mono text-xs">
+                      X: {customROI.x}% | Y: {customROI.y}% | Rộng: {customROI.w}% | Cao: {customROI.h}%
+                    </span>
+                  </div>
+
+                  {/* Preset Buttons */}
+                  <div className="flex-center gap-1" style={{ flexWrap: 'wrap' }}>
+                    <span className="text-xs text-muted font-bold mr-1">Vùng mẫu:</span>
+                    <button
+                      type="button"
+                      className="btn btn-xs btn-secondary font-bold"
+                      style={{ background: customROI.x <= 5 && customROI.w < 50 ? 'rgba(6, 182, 212, 0.3)' : undefined, borderColor: customROI.x <= 5 && customROI.w < 50 ? '#06b6d4' : undefined }}
+                      onClick={() => setCustomROI({ x: 2, y: 12, w: 42, h: 74 })}
+                      title="Phù hợp 85% phim 3D (Bảng tên xuất hiện ở cột bên trái)"
+                    >
+                      👈 Cột Trái (Phim 3D)
+                    </button>
+                    <button
+                      type="button"
+                      className="btn btn-xs btn-secondary font-bold"
+                      style={{ background: customROI.x >= 15 && customROI.x <= 25 && customROI.w >= 55 ? 'rgba(6, 182, 212, 0.3)' : undefined, borderColor: customROI.x >= 15 && customROI.x <= 25 && customROI.w >= 55 ? '#06b6d4' : undefined }}
+                      onClick={() => setCustomROI({ x: 20, y: 22, w: 60, h: 62 })}
+                      title="Phù hợp bảng tên môn phái/thánh địa to ở chính giữa"
+                    >
+                      🎯 Chính Giữa
+                    </button>
+                    <button
+                      type="button"
+                      className="btn btn-xs btn-secondary font-bold"
+                      style={{ background: customROI.x >= 50 ? 'rgba(6, 182, 212, 0.3)' : undefined, borderColor: customROI.x >= 50 ? '#06b6d4' : undefined }}
+                      onClick={() => setCustomROI({ x: 56, y: 12, w: 42, h: 74 })}
+                      title="Bảng tên ở cột bên phải"
+                    >
+                      👉 Cột Phải
+                    </button>
+                    <button
+                      type="button"
+                      className="btn btn-xs btn-secondary font-bold"
+                      onClick={() => setCustomROI({ x: 15, y: 45, w: 70, h: 42 })}
+                      title="Bảng tên nằm ở nửa dưới nhưng trên dòng phụ đề"
+                    >
+                      ⬇️ Giữa Dưới
+                    </button>
+                    <button
+                      type="button"
+                      className="btn btn-xs btn-secondary font-bold"
+                      onClick={() => setCustomROI({ x: 2, y: 5, w: 96, h: 82 })}
+                      title="Quét toàn bộ khung hình nhưng tự động trừ dòng sub đáy"
+                    >
+                      🌟 Toàn Màn Hình
+                    </button>
+                    <button
+                      type="button"
+                      className="btn btn-xs btn-outline text-muted"
+                      onClick={() => setShowROIEditor(!showROIEditor)}
+                    >
+                      {showROIEditor ? 'Thu Gọn 🔼' : 'Mở Rộng 🔽'}
+                    </button>
+                  </div>
+                </div>
+
+                {showROIEditor && (
+                  <div>
+                    {/* Interactive Frame Canvas Preview with Drag & Resize Box */}
+                    <div
+                      ref={roiContainerRef}
+                      style={{
+                        position: 'relative',
+                        width: '100%',
+                        maxWidth: '720px',
+                        aspectRatio: '16 / 9',
+                        margin: '0 auto',
+                        background: sampleVideoFrame ? `url(${sampleVideoFrame}) center/cover no-repeat` : '#0f172a',
+                        borderRadius: '8px',
+                        border: '2px solid rgba(255,255,255,0.15)',
+                        overflow: 'hidden',
+                        userSelect: 'none',
+                        boxShadow: '0 4px 20px rgba(0,0,0,0.6)'
+                      }}
+                    >
+                      {/* Subtitle Zone Dimming Mask at Bottom (Indicator) */}
+                      <div
+                        style={{
+                          position: 'absolute',
+                          left: 0,
+                          right: 0,
+                          bottom: 0,
+                          height: '13%',
+                          background: 'rgba(239, 68, 68, 0.25)',
+                          borderTop: '1px dashed #ef4444',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          color: '#fca5a5',
+                          fontSize: '11px',
+                          fontWeight: 'bold',
+                          pointerEvents: 'none',
+                          zIndex: 5
+                        }}
+                      >
+                        🚫 VÙNG PHỤ ĐỀ ĐÁY (Tự Động Bỏ Qua 100%)
+                      </div>
+
+                      {/* Interactive Draggable & Resizable ROI Bounding Box */}
+                      <div
+                        style={{
+                          position: 'absolute',
+                          left: `${customROI.x}%`,
+                          top: `${customROI.y}%`,
+                          width: `${customROI.w}%`,
+                          height: `${customROI.h}%`,
+                          border: '2px solid #38bdf8',
+                          background: 'rgba(56, 189, 248, 0.22)',
+                          boxShadow: '0 0 15px rgba(56, 189, 248, 0.45)',
+                          cursor: isDraggingROI ? 'grabbing' : 'grab',
+                          zIndex: 10,
+                          boxSizing: 'border-box'
+                        }}
+                        onMouseDown={(e) => {
+                          e.preventDefault();
+                          roiDragStart.current = {
+                            mouseX: e.clientX,
+                            mouseY: e.clientY,
+                            startROI: { ...customROI }
+                          };
+                          setIsDraggingROI(true);
+                        }}
+                      >
+                        {/* Live Header Label inside Box */}
+                        <div
+                          style={{
+                            position: 'absolute',
+                            top: '4px',
+                            left: '4px',
+                            background: 'rgba(0, 0, 0, 0.85)',
+                            border: '1px solid #38bdf8',
+                            color: '#38bdf8',
+                            fontSize: '11px',
+                            fontWeight: 'bold',
+                            padding: '2px 6px',
+                            borderRadius: '4px',
+                            pointerEvents: 'none',
+                            whiteSpace: 'nowrap'
+                          }}
+                        >
+                          📍 VÙNG QUÉT AI ({customROI.w}% x {customROI.h}%)
+                        </div>
+
+                        {/* Center Drag Hint */}
+                        <div 
+                          style={{ 
+                            position: 'absolute', 
+                            top: '50%', 
+                            left: '50%', 
+                            transform: 'translate(-50%, -50%)', 
+                            color: 'rgba(255,255,255,0.7)', 
+                            fontSize: '11px', 
+                            fontWeight: 'bold', 
+                            pointerEvents: 'none',
+                            textShadow: '0 1px 3px black'
+                          }}
+                        >
+                          ✋ Giữ chuột để kéo di chuyển
+                        </div>
+
+                        {/* Resize Handle: Top-Left */}
+                        <div
+                          style={{
+                            position: 'absolute',
+                            left: '-6px',
+                            top: '-6px',
+                            width: '12px',
+                            height: '12px',
+                            background: '#38bdf8',
+                            border: '2px solid #ffffff',
+                            borderRadius: '2px',
+                            cursor: 'nwse-resize',
+                            zIndex: 20
+                          }}
+                          onMouseDown={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            roiDragStart.current = {
+                              mouseX: e.clientX,
+                              mouseY: e.clientY,
+                              startROI: { ...customROI }
+                            };
+                            setIsResizingROI('tl');
+                          }}
+                        />
+
+                        {/* Resize Handle: Top-Right */}
+                        <div
+                          style={{
+                            position: 'absolute',
+                            right: '-6px',
+                            top: '-6px',
+                            width: '12px',
+                            height: '12px',
+                            background: '#38bdf8',
+                            border: '2px solid #ffffff',
+                            borderRadius: '2px',
+                            cursor: 'nesw-resize',
+                            zIndex: 20
+                          }}
+                          onMouseDown={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            roiDragStart.current = {
+                              mouseX: e.clientX,
+                              mouseY: e.clientY,
+                              startROI: { ...customROI }
+                            };
+                            setIsResizingROI('tr');
+                          }}
+                        />
+
+                        {/* Resize Handle: Bottom-Left */}
+                        <div
+                          style={{
+                            position: 'absolute',
+                            left: '-6px',
+                            bottom: '-6px',
+                            width: '12px',
+                            height: '12px',
+                            background: '#38bdf8',
+                            border: '2px solid #ffffff',
+                            borderRadius: '2px',
+                            cursor: 'nesw-resize',
+                            zIndex: 20
+                          }}
+                          onMouseDown={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            roiDragStart.current = {
+                              mouseX: e.clientX,
+                              mouseY: e.clientY,
+                              startROI: { ...customROI }
+                            };
+                            setIsResizingROI('bl');
+                          }}
+                        />
+
+                        {/* Resize Handle: Bottom-Right */}
+                        <div
+                          style={{
+                            position: 'absolute',
+                            right: '-6px',
+                            bottom: '-6px',
+                            width: '12px',
+                            height: '12px',
+                            background: '#38bdf8',
+                            border: '2px solid #ffffff',
+                            borderRadius: '2px',
+                            cursor: 'nwse-resize',
+                            zIndex: 20
+                          }}
+                          onMouseDown={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            roiDragStart.current = {
+                              mouseX: e.clientX,
+                              mouseY: e.clientY,
+                              startROI: { ...customROI }
+                            };
+                            setIsResizingROI('br');
+                          }}
+                        />
+                      </div>
+                    </div>
+
+                    <div className="flex-between mt-2 text-xs text-muted" style={{ maxWidth: '720px', margin: '8px auto 0' }}>
+                      <span>💡 <strong>Hướng dẫn:</strong> Dùng chuột kéo ô màu xanh để di chuyển, hoặc kéo <strong>4 góc vuông</strong> để phóng to/thu nhỏ vùng nhận diện khớp 100% vị trí bảng tên trên phim!</span>
+                      <button
+                        type="button"
+                        className="btn btn-xs btn-outline text-yellow font-bold"
+                        onClick={() => setCustomROI({ x: 2, y: 12, w: 42, h: 74 })}
+                      >
+                        🔄 Đặt Lại Chuẩn Cột Trái
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
+
 
 
           {/* Live Scanning Status & Preview Box */}
