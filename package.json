@@ -5,13 +5,19 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
+    "server": "node server/index.js",
+    "start": "node server/index.js",
     "build": "vite build",
     "lint": "oxlint",
     "preview": "vite preview"
   },
+
   "dependencies": {
+    "cors": "^2.8.6",
+    "express": "^5.2.1",
     "jszip": "^3.10.1",
     "lucide-react": "^1.31.0",
+    "mysql2": "^3.23.4",
     "react": "^19.2.8",
     "react-dom": "^19.2.8"
   },

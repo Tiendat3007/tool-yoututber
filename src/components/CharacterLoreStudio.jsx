@@ -2,7 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { 
   Users, Sparkles, Plus, Download, Copy, Check, Trash2, Edit3, Film, 
   Layers, Clock, Shield, Search, ChevronRight, Video, ArrowRight, BookOpen, AlertCircle, UploadCloud,
-  Eye, Camera, Play, CheckCircle2, Zap, History, RotateCcw, FileText, Calendar, Palette, Type
+  Eye, Camera, Play, CheckCircle2, Zap, History, RotateCcw, FileText, Calendar, Palette, Type, Database
 } from 'lucide-react';
 
 import { 
@@ -19,6 +19,16 @@ import {
   extractFramesFromVideo,
   scanVideoFramesWithVisionAI
 } from '../utils/characterExtractor';
+
+import {
+  fetchCharactersFromMySQL,
+  saveCharactersToMySQL,
+  fetchScanHistoryFromMySQL,
+  saveScanSessionToMySQL,
+  deleteScanSessionFromMySQL,
+  checkMySQLHealth
+} from '../utils/dbSync';
+
 
 
 
@@ -149,8 +159,44 @@ export default function CharacterLoreStudio({
     }
   }, [scanHistory]);
 
+  // MySQL Persistence & Auto-Sync
+  const [isMySQLSyncing, setIsMySQLSyncing] = useState(false);
+
+  // Sync to MySQL
+  const handleSaveToMySQL = async () => {
+    setIsMySQLSyncing(true);
+    const ok = await saveCharactersToMySQL(characters);
+    setIsMySQLSyncing(false);
+    if (ok) {
+      setScanProgress(`✅ Đã lưu thành công ${characters.length} nhân vật vào Database MySQL (tutien_srt_tool)!`);
+    } else {
+      setScanProgress('⚠️ Không thể kết nối tới MySQL Server (Vui lòng chạy "npm run server")');
+    }
+    setTimeout(() => setScanProgress(''), 4000);
+  };
+
+  // Load from MySQL
+  const handleLoadFromMySQL = async () => {
+    setIsMySQLSyncing(true);
+    const dbChars = await fetchCharactersFromMySQL();
+    const dbHistory = await fetchScanHistoryFromMySQL();
+    setIsMySQLSyncing(false);
+
+    if (Array.isArray(dbChars) && dbChars.length > 0) {
+      setCharacters(dbChars);
+      if (Array.isArray(dbHistory) && dbHistory.length > 0) {
+        setScanHistory(dbHistory);
+      }
+      setScanProgress(`✅ Đã tải thành công ${dbChars.length} nhân vật từ Database MySQL!`);
+    } else {
+      setScanProgress('⚠️ Không tìm thấy dữ liệu trên MySQL hoặc Server chưa khởi động.');
+    }
+    setTimeout(() => setScanProgress(''), 4000);
+  };
+
   // Filtered files for timeline stitching
   const filteredFiles = files.filter(f => f.name.toLowerCase().includes(fileSearchQuery.toLowerCase()));
+
 
   // Effective target files for scanning and stitching
   const effectiveTargetFiles = selectedFileIds.length > 0 
@@ -868,6 +914,26 @@ export default function CharacterLoreStudio({
           </button>
 
           <button
+            className="btn btn-secondary btn-sm flex-center gap-1 text-green font-bold"
+            onClick={handleSaveToMySQL}
+            disabled={isMySQLSyncing}
+            title="Lưu toàn bộ hồ sơ nhân vật vào Cơ Sở Dữ Liệu MySQL (tutien_srt_tool)"
+          >
+            <Database size={14} className={isMySQLSyncing ? 'spinner' : 'text-green'} />
+            <span>{isMySQLSyncing ? 'Đang Lưu...' : '💾 Lưu Vào MySQL'}</span>
+          </button>
+
+          <button
+            className="btn btn-secondary btn-sm flex-center gap-1 text-cyan font-bold"
+            onClick={handleLoadFromMySQL}
+            disabled={isMySQLSyncing}
+            title="Tải lại toàn bộ danh sách nhân vật đã lưu từ MySQL"
+          >
+            <Database size={14} className={isMySQLSyncing ? 'spinner' : 'text-cyan'} />
+            <span>📥 Tải Từ MySQL</span>
+          </button>
+
+          <button
             className="btn btn-cyan btn-sm font-bold flex-center gap-1"
             onClick={() => handleExportIntroSRT(true)}
             title="Xuất file SRT chứa các thẻ giới thiệu nhân vật khớp dòng thời gian video MP4 dài"
@@ -882,6 +948,7 @@ export default function CharacterLoreStudio({
           >
             <Download size={14} /> Xuất Chú Thích (.ASS - Theo Video MP4)
           </button>
+
         </div>
 
       </div>

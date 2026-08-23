@@ -1,5 +1,6 @@
-import React from 'react';
-import { Sparkles, BookOpen, Sliders, FileText, Key, Download, RefreshCw, Layers, Video, Users } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { Sparkles, BookOpen, Sliders, FileText, Key, Download, RefreshCw, Layers, Video, Users, Database } from 'lucide-react';
+import { checkMySQLHealth } from '../utils/dbSync';
 
 export default function Header({ 
   activeTab, 
@@ -9,6 +10,24 @@ export default function Header({
   isBatchProcessing = false,
   isLoreScanning = false
 }) {
+  const [dbStatus, setDbStatus] = useState({ connected: false, checking: true });
+
+  useEffect(() => {
+    let mounted = true;
+    const checkStatus = async () => {
+      const res = await checkMySQLHealth();
+      if (mounted) {
+        setDbStatus({ connected: res.connected, checking: false, data: res.data });
+      }
+    };
+    checkStatus();
+    const interval = setInterval(checkStatus, 10000);
+    return () => {
+      mounted = false;
+      clearInterval(interval);
+    };
+  }, []);
+
   return (
     <header className="app-header">
       <div className="header-container">
@@ -17,8 +36,17 @@ export default function Header({
             <Sparkles className="logo-icon text-cyan" />
           </div>
           <div>
-            <h1 className="brand-title">
-              TU TIÊN <span className="highlight-cyan">SRT SUBTITLE</span> PRO
+            <h1 className="brand-title flex-center gap-2" style={{ justifyContent: 'flex-start' }}>
+              <span>TU TIÊN <span className="highlight-cyan">SRT SUBTITLE</span> PRO</span>
+              {dbStatus.connected ? (
+                <span className="badge badge-green flex-center gap-1 font-mono text-xs" style={{ padding: '2px 8px', border: '1px solid #10b981' }} title="Đã kết nối Database MySQL cục bộ (tutien_srt_tool@localhost:3306)">
+                  <Database size={11} className="text-green" /> MySQL: root@3306
+                </span>
+              ) : (
+                <span className="badge badge-secondary flex-center gap-1 font-mono text-xs text-muted" style={{ padding: '2px 8px' }} title="MySQL Offline: Đang lưu trữ ngầm trên IndexedDB / LocalStorage">
+                  <Database size={11} /> DB: IndexedDB
+                </span>
+              )}
             </h1>
             <p className="brand-subtitle">Tool Dịch & Chỉnh Sửa Phụ Đề Tu Tiên • Kiếm Hiệp • Hán Việt</p>
           </div>
@@ -77,7 +105,6 @@ export default function Header({
             )}
           </button>
 
-
           <button
             className="nav-btn ai-settings-btn"
             onClick={onOpenAISettings}
@@ -90,4 +117,3 @@ export default function Header({
     </header>
   );
 }
-
