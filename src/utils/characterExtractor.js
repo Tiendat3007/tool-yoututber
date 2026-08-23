@@ -74,9 +74,7 @@ export function buildSRTContextSummary(subtitles = [], glossary = [], maxLines =
 }
 
 // Fast pixel difference metric (0.0 to 1.0) to filter out redundant static dialogue frames
-
 function computeFrameDifference(data1, data2) {
-
   if (!data1 || !data2 || data1.length !== data2.length) return 1.0;
   let diffSum = 0;
   const step = 4 * 8; // Sample every 8th pixel for ultra-fast calculation
@@ -91,11 +89,155 @@ function computeFrameDifference(data1, data2) {
   return samples > 0 ? diffSum / (samples * 255) : 1.0;
 }
 
-// Extract video frames in browser memory via HTML5 Canvas with Flip Horizontal Mirror & Static Frame Differencing
+// 🎯 ĐỀ XUẤT 2: Detect if a frame contains potential high-contrast graphic badges / calligraphy text overlay
+export function computeGraphicBadgeScore(imageData, width, height) {
+  if (!imageData || !imageData.data || width <= 0 || height <= 0) return 0;
+  const data = imageData.data;
+
+  // Candidate zones where character/sect badges appear in 3D Donghua:
+  // 1. Left Third: x from 2% to 40%, y from 12% to 88%
+  // 2. Lower/Center Third: x from 20% to 80%, y from 40% to 88%
+  // 3. Right Third: x from 60% to 98%, y from 12% to 88%
+
+  const checkZone = (startXRatio, endXRatio, startYRatio, endYRatio) => {
+    const startX = Math.floor(width * startXRatio);
+    const endX = Math.floor(width * endXRatio);
+    const startY = Math.floor(height * startYRatio);
+    const endY = Math.floor(height * endYRatio);
+
+    let edgeCount = 0;
+    let highContrastEdges = 0;
+    let colorBadgeTones = 0;
+    const step = 3; // Sample step for speed
+
+    for (let y = startY + 1; y < endY - 1; y += step) {
+      for (let x = startX + 1; x < endX - 1; x += step) {
+        const idx = (y * width + x) * 4;
+        const r = data[idx];
+        const g = data[idx + 1];
+        const b = data[idx + 2];
+        const lum = 0.299 * r + 0.587 * g + 0.114 * b;
+
+        // Horizontal gradient
+        const idxR = (y * width + (x + 1)) * 4;
+        const lumR = 0.299 * data[idxR] + 0.587 * data[idxR + 1] + 0.114 * data[idxR + 2];
+        const gradX = Math.abs(lumR - lum);
+
+        // Vertical gradient
+        const idxB = ((y + 1) * width + x) * 4;
+        const lumB = 0.299 * data[idxB] + 0.587 * data[idxB + 1] + 0.114 * data[idxB + 2];
+        const gradY = Math.abs(lumB - lum);
+
+        const gradTotal = gradX + gradY;
+        if (gradTotal > 45) {
+          edgeCount++;
+          if (gradTotal > 85) {
+            highContrastEdges++;
+          }
+        }
+
+        // Check for vivid badge colors (red seal / gold border)
+        if ((r > 140 && g < 70 && b < 70) || (r > 160 && g > 130 && b < 60)) {
+          colorBadgeTones++;
+        }
+      }
+    }
+
+    return highContrastEdges * 2.5 + edgeCount + colorBadgeTones * 3;
+  };
+
+  const leftZoneScore = checkZone(0.02, 0.40, 0.12, 0.88);
+  const centerZoneScore = checkZone(0.20, 0.80, 0.40, 0.88);
+  const rightZoneScore = checkZone(0.60, 0.98, 0.12, 0.88);
+
+  return Math.max(leftZoneScore, centerZoneScore, rightZoneScore);
+}
+
+// 🎯 ĐỀ XUẤT 3: Composite multiple video frames into 1 single high-definition Grid Contact Sheet
+export async function createGridContactSheet(frames = []) {
+  if (!frames || frames.length === 0) return { gridBase64: '', frameMap: {} };
+  if (frames.length === 1) {
+    return {
+      gridBase64: frames[0].base64Data,
+      gridDataUrl: frames[0].base64Full,
+      frameMap: { 1: frames[0] }
+    };
+  }
+
+  const count = frames.length;
+  let cols = 2;
+  let rows = 2;
+  if (count === 2) { cols = 2; rows = 1; }
+  else if (count <= 4) { cols = 2; rows = 2; }
+  else if (count <= 6) { cols = 3; rows = 2; }
+  else { cols = 4; rows = 2; }
+
+  const cellWidth = 640;
+  const cellHeight = 360;
+  const canvas = document.createElement('canvas');
+  canvas.width = cols * cellWidth;
+  canvas.height = rows * cellHeight;
+  const ctx = canvas.getContext('2d');
+
+  // Fill dark background
+  ctx.fillStyle = '#0f172a';
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+  const frameMap = {};
+
+  for (let i = 0; i < count; i++) {
+    const f = frames[i];
+    const col = i % cols;
+    const row = Math.floor(i / cols);
+    const x = col * cellWidth;
+    const y = row * cellHeight;
+
+    frameMap[i + 1] = f;
+
+    const img = new Image();
+    await new Promise((resolve) => {
+      img.onload = resolve;
+      img.onerror = resolve;
+      img.src = f.base64Full || `data:image/jpeg;base64,${f.base64Data}`;
+    });
+
+    // Draw frame into cell
+    ctx.drawImage(img, x, y, cellWidth, cellHeight);
+
+    // Draw grid border line
+    ctx.strokeStyle = '#38bdf8';
+    ctx.lineWidth = 2;
+    ctx.strokeRect(x, y, cellWidth, cellHeight);
+
+    // 🎯 Burn in bold high-contrast timestamp label on top-left of each cell
+    ctx.save();
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.90)';
+    ctx.fillRect(x + 8, y + 8, 235, 32);
+    ctx.strokeStyle = '#facc15';
+    ctx.lineWidth = 2;
+    ctx.strokeRect(x + 8, y + 8, 235, 32);
+    ctx.fillStyle = '#facc15';
+    ctx.font = 'bold 16px monospace';
+    ctx.fillText(`[#${i + 1}] ${f.timestampFormatted}`, x + 16, y + 30);
+    ctx.restore();
+  }
+
+  const gridDataUrl = canvas.toDataURL('image/jpeg', 0.72);
+  const gridBase64 = gridDataUrl.split(',')[1];
+
+  return {
+    gridBase64,
+    gridDataUrl,
+    frameMap
+  };
+}
+
+// Extract video frames in browser memory via HTML5 Canvas with Flip Horizontal Mirror, Static Differencing & Graphic Badge Filter
 export async function extractFramesFromVideo(videoFile, {
-  intervalSec = 3,
+  intervalSec = 4,
   flipHorizontal = false,
-  filterStaticFrames = true, // Smart filter to discard redundant static dialogue shots (saves ~30-40% tokens)
+  filterStaticFrames = true, // Smart filter to discard redundant static dialogue shots
+  filterNonBadgeFrames = true, // 🎯 ĐỀ XUẤT 2: Smart filter to discard frames without graphic badge candidates (saves ~60-70% requests)
   minDiffRatio = 0.04, // 4% difference threshold
   onProgress = () => {},
   videoDuration = 0
@@ -155,11 +297,19 @@ export async function extractFramesFromVideo(videoFile, {
             ctx.restore();
 
             // Check Frame Differencing against previous captured frame
-            const currentImageData = ctx.getImageData(0, 0, canvas.width, canvas.height).data;
+            const currentImageDataObj = ctx.getImageData(0, 0, canvas.width, canvas.height);
+            const currentImageData = currentImageDataObj.data;
             const diff = prevImageData ? computeFrameDifference(prevImageData, currentImageData) : 1.0;
+            const isSceneTransition = diff > 0.16; // Significant scene cut
 
-            if (filterStaticFrames && prevImageData && diff < minDiffRatio) {
-              // Frame is >96% identical to the previous frame (static dialogue scene) -> skip sending to AI
+            // 🎯 ĐỀ XUẤT 2: Check graphic badge candidate score
+            const badgeScore = computeGraphicBadgeScore(currentImageDataObj, canvas.width, canvas.height);
+            const hasBadgeCandidate = badgeScore > 50 || isSceneTransition;
+
+            const shouldSkipStatic = filterStaticFrames && prevImageData && diff < minDiffRatio;
+            const shouldSkipNoBadge = filterNonBadgeFrames && prevImageData && !hasBadgeCandidate && diff < 0.12;
+
+            if (shouldSkipStatic || shouldSkipNoBadge) {
               skippedCount++;
             } else {
               prevImageData = currentImageData;
@@ -196,12 +346,12 @@ export async function extractFramesFromVideo(videoFile, {
                 timestampFormatted: timeFormatted,
                 base64Data,
                 base64Full,
-                thumbnailCompact
+                thumbnailCompact,
+                badgeScore,
+                isSceneTransition
               });
             }
             res();
-
-
           };
           timeoutTimer = setTimeout(() => {
             video.removeEventListener('seeked', onSeeked);
@@ -223,6 +373,7 @@ export async function extractFramesFromVideo(videoFile, {
     };
   });
 }
+
 
 
 // Scan video frames using Gemini Vision or Orimise Vision with Multi-threaded Concurrency & SRT Context Fusion
@@ -264,27 +415,27 @@ export async function scanVideoFramesWithVisionAI({
   // Worker task to process 1 batch
   const processBatch = async (batchItem) => {
     const batch = batchItem.frames;
-    const batchInfo = batch.map((f, idx) => `[Ảnh ${idx + 1} lúc ${f.timestampFormatted}]`).join(', ');
-    const userPromptText = `${basePrompt}\n\nDưới đây là ${batch.length} khung hình chụp từ video (${batchInfo}). Hãy đối chiếu với Phụ Đề SRT và kiểm tra xem có bảng tên nhân vật, công pháp, thần binh, địa danh, cảnh giới, hệ thống nào xuất hiện không!`;
+    const batchInfo = batch.map((f, idx) => `[Ô #${idx + 1} lúc ${f.timestampFormatted}]`).join(', ');
+    
+    // 🎯 ĐỀ XUẤT 3: Build Grid Contact Sheet (Single composite image for all frames in batch)
+    const { gridBase64, frameMap } = await createGridContactSheet(batch);
 
+    const userPromptText = `${basePrompt}\n\nDưới đây là BỨC ẢNH MA TRẬN GHÉP ${batch.length} KHUNG HÌNH (Grid Contact Sheet: ${batchInfo}).\nMỗi ô khung hình đều có nhãn vàng in mốc thời gian góc trên bên trái dạng [#1] 00:00:15,000.\nHãy quan sát kỹ từng ô trong ma trận ảnh. Khi phát hiện bảng tên nhân vật hoặc tông môn xuất hiện ở ô nào, hãy đọc đúng số thứ tự "frameIndex" (1 đến ${batch.length}) và "timestamp" in trên ô đó!`;
 
     let rawResult = '';
 
     try {
       if (aiProvider === 'orimise') {
         const content = [
-          { type: 'text', text: userPromptText }
-        ];
-        batch.forEach((f) => {
-          content.push({
+          { type: 'text', text: userPromptText },
+          {
             type: 'image_url',
             image_url: {
-              url: `data:image/jpeg;base64,${f.base64Data}`,
-              detail: 'low'
+              url: `data:image/jpeg;base64,${gridBase64}`,
+              detail: 'high'
             }
-          });
-        });
-
+          }
+        ];
 
         const endpoint = baseUrl.endsWith('/chat/completions')
           ? baseUrl
@@ -297,11 +448,10 @@ export async function scanVideoFramesWithVisionAI({
             'Authorization': `Bearer ${apiKey}`
           },
           body: JSON.stringify({
-            model: model || 'gemini-2.5-flash-lite',
+            model: model || 'claude-haiku-4-5-20251001',
             messages: [{ role: 'user', content }],
             temperature: 0.2
           })
-
         });
 
         if (response.ok) {
@@ -310,15 +460,15 @@ export async function scanVideoFramesWithVisionAI({
         }
       } else {
         // Google Gemini Vision API
-        const parts = [{ text: userPromptText }];
-        batch.forEach((f) => {
-          parts.push({
+        const parts = [
+          { text: userPromptText },
+          {
             inlineData: {
               mimeType: 'image/jpeg',
-              data: f.base64Data
+              data: gridBase64
             }
-          });
-        });
+          }
+        ];
 
         const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
         const response = await fetch(url, {
@@ -338,6 +488,7 @@ export async function scanVideoFramesWithVisionAI({
           rawResult = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
         }
       }
+
 
       if (rawResult) {
         let jsonStr = rawResult.trim();

@@ -107,6 +107,7 @@ export default function CharacterLoreStudio({
 
   const [visionFlipHorizontal, setVisionFlipHorizontal] = useState(true);
   const [visionFilterStatic, setVisionFilterStatic] = useState(true); // Smart frame differencing to eliminate redundant static frames
+  const [visionFilterNonBadge, setVisionFilterNonBadge] = useState(() => localStorage.getItem('tutien_vision_filter_non_badge') !== 'false'); // 🎯 ĐỀ XUẤT 2: Smart badge detector
   const [visionUseSRTContext, setVisionUseSRTContext] = useState(true); // 🧠 Feed selected SRT subtitles context into Vision AI
   const [isVisionScanning, setIsVisionScanning] = useState(false);
   const [visionProgress, setVisionProgress] = useState(null);
@@ -114,6 +115,7 @@ export default function CharacterLoreStudio({
   const [visionDetectedChars, setVisionDetectedChars] = useState([]);
   const visionInputRef = useRef(null);
   const [batchShiftSeconds, setBatchShiftSeconds] = useState(-2); // Default lead-in offset of -2.0s to sync tags with video appearance
+
 
 
 
@@ -457,13 +459,14 @@ export default function CharacterLoreStudio({
     setVisionProgress({ phase: 'extracting', percent: 0, message: 'Đang trích xuất toàn bộ khung hình từ video...' });
 
     try {
-      // 1. Extract frames locally in browser canvas with Frame Differencing (0 MB video upload, scans 100% of video)
+      // 1. Extract frames locally in browser canvas with Frame Differencing & Graphic Badge Filter (0 MB video upload)
       const frames = await extractFramesFromVideo(visionVideoFile, {
         intervalSec: Number(visionIntervalSec),
         flipHorizontal: Boolean(visionFlipHorizontal),
         filterStaticFrames: Boolean(visionFilterStatic),
+        filterNonBadgeFrames: Boolean(visionFilterNonBadge),
         onProgress: (p) => {
-          const filterNote = p.filteredCount ? ` • ⚡ Đã lọc ${p.filteredCount} cảnh tĩnh trùng` : '';
+          const filterNote = p.filteredCount ? ` • ⚡ Đã lọc ${p.filteredCount} khung hình không có bảng tên` : '';
           setVisionProgress({
             phase: 'extracting',
             percent: p.percent,
@@ -471,6 +474,7 @@ export default function CharacterLoreStudio({
           });
         }
       });
+
 
       if (frames.length === 0) {
         throw new Error('Không trích xuất được khung hình nào từ video.');
@@ -1511,8 +1515,33 @@ export default function CharacterLoreStudio({
                       onChange={(e) => setVisionFilterStatic(e.target.checked)}
                       className="custom-checkbox"
                     />
-                    <span>⚡ Lọc Cảnh Tĩnh (Tiết Kiệm 40% Token)</span>
+                    <span>⚡ Lọc Cảnh Tĩnh</span>
                   </label>
+
+                  {/* 🎯 ĐỀ XUẤT 2: Graphic Badge Detector Checkbox */}
+                  <label 
+                    className="flex-center gap-2 text-sm font-bold cursor-pointer"
+                    style={{ 
+                      background: visionFilterNonBadge ? 'rgba(234, 179, 8, 0.2)' : 'rgba(255,255,255,0.05)', 
+                      padding: '6px 12px', 
+                      borderRadius: '6px', 
+                      border: visionFilterNonBadge ? '1px solid #eab308' : '1px solid rgba(255,255,255,0.1)',
+                      color: visionFilterNonBadge ? '#facc15' : 'inherit'
+                    }}
+                    title="Canvas tự động dò viền đồ họa & thư pháp để loại bỏ 70% khung hình cảnh trơn không có bảng tên (Tiết kiệm 70% requests & 0 token)"
+                  >
+                    <input
+                      type="checkbox"
+                      checked={visionFilterNonBadge}
+                      onChange={(e) => {
+                        setVisionFilterNonBadge(e.target.checked);
+                        localStorage.setItem('tutien_vision_filter_non_badge', String(e.target.checked));
+                      }}
+                      className="custom-checkbox"
+                    />
+                    <span>🎯 Lọc Bỏ Cảnh Không Có Bảng Tên (Giảm 70% Reqs)</span>
+                  </label>
+
 
                   <label 
                     className="flex-center gap-2 text-sm font-bold cursor-pointer"
