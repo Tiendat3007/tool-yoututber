@@ -277,7 +277,26 @@ app.post('/api/projects', async (req, res) => {
 });
 
 // Load Project State
-app.get('/api/projects/:id?', async (req, res) => {
+app.get('/api/projects', async (req, res) => {
+  try {
+    const pool = getPool();
+    if (!pool) return res.status(503).json({ error: 'DB not connected' });
+    const [rows] = await pool.query('SELECT * FROM projects WHERE id = ?', ['current_project']);
+    if (rows.length === 0) return res.json(null);
+    const p = rows[0];
+    res.json({
+      id: p.id,
+      name: p.name,
+      files: p.files_json ? JSON.parse(p.files_json) : [],
+      activeFileId: p.active_file_id,
+      activeTab: p.active_tab
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.get('/api/projects/:id', async (req, res) => {
   try {
     const pool = getPool();
     if (!pool) return res.status(503).json({ error: 'DB not connected' });
@@ -296,6 +315,7 @@ app.get('/api/projects/:id?', async (req, res) => {
     res.status(500).json({ error: err.message });
   }
 });
+
 
 // Start Server & Connect Database
 async function start() {
