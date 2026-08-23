@@ -217,6 +217,13 @@ ${selectedFiles.map((f, i) => `${i === 0 ? '00:00' : '...'} Tập ${i + 1}: ${f.
 6. 30 THẺ TAGS YOUTUBE (tags):
    - Danh sách các từ khóa hot nhất về phim phân cách bằng dấu phẩy.
 
+7. GỢI Ý 5–8 PHÂN CẢNH THUMBNAIL CAO TRÀO ĐẶC SẮC NHẤT CỦA BỘ PHIM (suggestedScenes):
+   - Trích xuất 5-8 khoảnh khắc kịch tính nhất từ chính phụ đề SRT và các nhân vật của bộ phim này (VD: Cảnh bị phế tu vi ở đại điện, Cảnh đoạt kiếm tại kiếm các, Cảnh đại chiến cứu sư tỷ, Cảnh thức tỉnh thần thông vả mặt kẻ thù, Cảnh triệu hồi thần thú...).
+   - Mỗi cảnh gồm:
+     * title: Tên phân cảnh ngắn gọn (3-6 từ) (VD: "Bị Phế Tu Vi Ở Đại Điện", "Đoạt Trấn Trạch Thần Kiếm", "Đại Chiến Cứu Sư Tỷ", "Đột Phá Kim Đan Vả Mặt"...)
+     * icon: Emoji trực quan (💔, ⚔️, ⚡, 💥, 🐉, 🖤, 👑, 🔥...)
+     * prompt: Câu prompt tiếng Việt chi tiết mô tả bố cục tiền cảnh nhân vật chính to lớn + hậu cảnh kẻ thù / bối cảnh phim để nạp vào AI vẽ ảnh.
+
 BẮT BUỘC TRẢ VỀ ĐÚNG ĐỊNH DẠNG JSON DUY NHẤT SAU (Không thêm bất kỳ chữ nào ngoài JSON):
 {
   "storySummary": "Bài tóm tắt cốt truyện 350-550 chữ...",
@@ -234,12 +241,35 @@ BẮT BUỘC TRẢ VỀ ĐÚNG ĐỊNH DẠNG JSON DUY NHẤT SAU (Không thêm 
     { "line1": "DÒNG 1 MẪU 4 (7-10 TỪ IN HOA)", "line2": "DÒNG 2 MẪU 4 (7-10 TỪ IN HOA)" },
     { "line1": "DÒNG 1 MẪU 5 (7-10 TỪ IN HOA)", "line2": "DÒNG 2 MẪU 5 (7-10 TỪ IN HOA)" }
   ],
+  "suggestedScenes": [
+    {
+      "title": "Bị Phế Tu Vi Tại Đại Điện",
+      "icon": "💔",
+      "prompt": "Bố cục đa nhân vật: Nhân vật chính to lớn nổi bật ở tiền cảnh quỳ kiên cường giữa đại điện, tu vi bị phế xiềng xích vỡ vụn, mắt rực sáng thức tỉnh thần thông bí mật, hậu cảnh chưởng môn và các trưởng lão nhìn xuống khinh bỉ"
+    },
+    {
+      "title": "Một Mình Đại Chiến Cứu Sư Tỷ",
+      "icon": "⚔️",
+      "prompt": "Bố cục đa nhân vật: Nhân vật chính chiếm 70% tiền cảnh cầm thần kiếm hoàng kim chém vỡ kết giới, trung cảnh sư tỷ bị thương, hậu cảnh vạn ma đầu vây hãm"
+    },
+    {
+      "title": "Đột Phá Sức Mạnh Vả Mặt Phản Diện",
+      "icon": "💥",
+      "prompt": "Bố cục đa nhân vật: Nhân vật chính ở trung tâm tiền cảnh bộc phát linh lực kinh thiên động địa, phản diện hoảng sợ bay dạt ra xa"
+    },
+    {
+      "title": "Triệu Hồi Thần Long Hộ Thể",
+      "icon": "🐉",
+      "prompt": "Bố cục đa nhân vật: Nhân vật chính ở tiền cảnh tỏa hào quang, phía sau là hư ảnh rồng thần khổng lồ cuồn cuộn mây trời che lấp cả chiến trường"
+    }
+  ],
   "imagePromptEn": "Cinematic 16:9 master piece of Xianxia protagonist with glowing eyes and golden dragon aura...",
   "imagePromptVi": "Mô tả ý tưởng hình ảnh thumbnail bằng tiếng Việt...",
   "description": "Nội dung mô tả YouTube chi tiết...",
   "tags": "review phim tu tien, hoat hinh 3d trung quoc, ..."
 }
 `;
+
 
   const customPromptDirective = customPrompt && customPrompt.trim()
     ? `\n\n=== 🎯 YÊU CẦU ĐẶC BIỆT TỪ CREATOR (CUSTOM PROMPT): ===\n${customPrompt.trim()}\n=> LƯU Ý BẮT BUỘC: Hãy đặc biệt ưu tiên áp dụng đúng yêu cầu tùy chỉnh này khi tạo Tóm Tắt Cốt Truyện, 5 Tiêu Đề, 5 Mẫu Chữ Thumbnail, Mô Tả Video và Thẻ Tags!\n`
@@ -1175,5 +1205,169 @@ export function exportStudioResultsToTXT(resultsList = [], seriesTitle = 'Bo_Phi
   a.download = `${seriesTitle.replace(/[\s/\\:]+/g, '_')}_Metadata_Full.txt`;
   a.click();
   URL.revokeObjectURL(url);
+}
+
+// 🔍 5. Dedicated AI Story Scene Extractor - Analyzes full SRT & character references to extract dynamic thumbnail scenes
+export async function analyzeAndSuggestStoryScenes({
+
+  selectedFiles = [],
+  characterReferences = [],
+  genre = 'Tu Tiên / Tiên Hiệp',
+  contentType = 'Review Phim / Tóm Tắt Phim',
+  aiProvider = 'orimise',
+  apiKey,
+  baseUrl = 'https://api.orimise.com/v1',
+  model = 'claude-sonnet-5'
+}) {
+  if (!apiKey) {
+    throw new Error('Chưa nhập API Key trong Cấu Hình AI!');
+  }
+  if (!selectedFiles || selectedFiles.length === 0) {
+    throw new Error('Vui lòng chọn ít nhất 1 file SRT phụ đề để phân tích cảnh!');
+  }
+
+  const formatCompactTime = (timeStr) => {
+    if (!timeStr) return '';
+    return timeStr.replace(/^00:/, '').split(',')[0].split('.')[0];
+  };
+
+  const fullTranscriptContext = selectedFiles.map((file, fileIdx) => {
+    let prevText = '';
+    const compactLines = (file.subtitles || [])
+      .map(s => {
+        const text = (s.translatedText || s.originalText || '').trim();
+        if (!text || text === prevText) return null;
+        prevText = text;
+        const time = formatCompactTime(s.startTime);
+        return time ? `[${time}] ${text}` : text;
+      })
+      .filter(Boolean)
+      .join('\n');
+
+    return `=== TẬP #${fileIdx + 1}: ${file.name} (${(file.subtitles || []).length} dòng) ===\n${compactLines}`;
+  }).join('\n\n');
+
+  let charRefContext = '';
+  if (Array.isArray(characterReferences) && characterReferences.length > 0) {
+    charRefContext = `\n=== 👥 DANH SÁCH NHÂN VẬT THAM CHIẾU (${characterReferences.length} nhân vật): ===\n` +
+      characterReferences.map((c, i) => `[#${i + 1}] ${c.name || 'Nhân vật'} (${c.role || ''} | ${c.realm || ''})`).join('\n') + '\n';
+  }
+
+  const systemPrompt = `You are an Elite Viral YouTube Anime / Donghua Thumbnail Director.
+Your task is to thoroughly analyze the 100% full SRT subtitle dialogue and character references of this movie, and extract 6 to 8 most dramatic, climactic, viral, and visually stunning key scenes (Phân cảnh cao trào đắt giá nhất của chính bộ phim này).
+
+COMPOSITION RULES FOR EACH SCENE:
+- Hero Dominance: The main protagonist MUST be prominent in the close foreground (to lớn, nổi bật ở tiền cảnh chiếm 60-70% khung hình).
+- Multi-character interaction: Describe secondary characters, villains, sect masters, elders, or enemy armies in the midground & background.
+- Contextual accuracy: Use exact names of characters, sect locations, artifacts, swords, and techniques from the provided subtitles.
+
+Return ONLY valid JSON array with 6-8 scenes:
+{
+  "suggestedScenes": [
+    {
+      "title": "Tên phân cảnh ngắn (3-6 từ)",
+      "icon": "💔",
+      "prompt": "Bố cục đa nhân vật: Nhân vật chính [Tên NV] to lớn nổi bật ở tiền cảnh quỳ kiên cường giữa đại điện, tu vi bị phế xiềng xích vỡ vụn, mắt rực sáng thức tỉnh thần thông bí mật, hậu cảnh [Tên Chưởng Môn/Trưởng Lão] và hàng trăm đệ tử nhìn xuống khinh bỉ"
+    }
+  ]
+}`;
+
+  const userMessage = `THỂ LOẠI: ${genre}
+ĐỊNH DẠNG: ${contentType}
+${charRefContext}
+=== NỘI DUNG TOÀN BỘ 100% PHỤ ĐỀ SRT CỦA TẤT CẢ CÁC TẬP ===
+${fullTranscriptContext}
+=== HẾT PHỤ ĐỀ SRT ===
+
+HÃY PHÂN TÍCH VÀ TRÍCH XUẤT 6 ĐẾN 8 PHÂN CẢNH CAO TRÀO ĐẶC SẮC NHẤT CỦA BỘ PHIM TRÊN ĐỂ TẠO PROMPT THUMBNAIL. XUẤT RA 1 ĐỐI TƯỢNG JSON DUY NHẤT:`;
+
+  let rawText = '';
+
+  if (aiProvider === 'orimise') {
+    const endpoint = baseUrl.endsWith('/chat/completions')
+      ? baseUrl
+      : `${baseUrl.replace(/\/$/, '')}/chat/completions`;
+
+    const userContent = [{ type: 'text', text: userMessage }];
+    if (Array.isArray(characterReferences)) {
+      characterReferences.forEach((ref) => {
+        const imgUrl = ref.imageBase64 || ref.thumbnail;
+        if (imgUrl && typeof imgUrl === 'string' && imgUrl.startsWith('data:image')) {
+          userContent.push({ type: 'image_url', image_url: { url: imgUrl } });
+        }
+      });
+    }
+
+    const reqBody = {
+      model: model,
+      messages: [
+        { role: 'system', content: systemPrompt },
+        { role: 'user', content: userContent.length > 1 ? userContent : userMessage }
+      ],
+      temperature: 0.7
+    };
+    if (model.includes('gpt') || model.includes('gemini')) {
+      reqBody.response_format = { type: 'json_object' };
+    }
+
+    const response = await fetch(endpoint, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${apiKey}`
+      },
+      body: JSON.stringify(reqBody)
+    });
+
+    if (!response.ok) {
+      const err = await response.json().catch(() => ({}));
+      throw new Error(err.error?.message || `Lỗi Orimise API HTTP ${response.status}`);
+    }
+
+    const data = await response.json();
+    rawText = data.choices?.[0]?.message?.content || '';
+  } else {
+    // Gemini API
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
+    const parts = [{ text: `${systemPrompt}\n\n${userMessage}` }];
+
+    if (Array.isArray(characterReferences)) {
+      characterReferences.forEach((ref) => {
+        const imgUrl = ref.imageBase64 || ref.thumbnail;
+        if (imgUrl && typeof imgUrl === 'string' && imgUrl.startsWith('data:image')) {
+          const mimeMatch = imgUrl.match(/^data:(image\/[a-z]+);base64,/i);
+          const mimeType = mimeMatch ? mimeMatch[1] : 'image/jpeg';
+          const cleanBase64 = imgUrl.replace(/^data:image\/[a-z]+;base64,/, '');
+          parts.push({
+            inlineData: { mimeType: mimeType, data: cleanBase64 }
+          });
+        }
+      });
+    }
+
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        contents: [{ role: 'user', parts: parts }],
+        generationConfig: { temperature: 0.7, responseMimeType: 'application/json' }
+      })
+    });
+
+    if (!response.ok) {
+      const err = await response.json().catch(() => ({}));
+      throw new Error(err.error?.message || `Lỗi Gemini API HTTP ${response.status}`);
+    }
+
+    const data = await response.json();
+    rawText = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
+  }
+
+  const parsed = safeParseAIJson(rawText);
+  if (!parsed || !Array.isArray(parsed.suggestedScenes)) {
+    throw new Error('Không thể bóc tách phân cảnh từ AI. Vui lòng thử lại!');
+  }
+
+  return parsed.suggestedScenes;
 }
 

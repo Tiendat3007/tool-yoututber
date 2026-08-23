@@ -12,10 +12,12 @@ import {
   regenerateDescriptionOnly,
   regenerateStorySummaryOnly,
   regenerateImagePromptOnly,
+  analyzeAndSuggestStoryScenes,
   generateBatchStudioForFiles,
   exportStudioResultsToCSV,
   exportStudioResultsToTXT
 } from '../utils/youtuberGenerator';
+
 
 import { exportThumbnailHD, generateAIThumbnailImage, THUMBNAIL_COLOR_THEMES } from '../utils/thumbnailExporter';
 import { uploadReferenceImageToOrimise, generateOrimiseImage } from '../utils/orimiseImageApi';
@@ -83,8 +85,13 @@ export default function YoutuberStudio({
   const [descPrompt, setDescPrompt] = useState('');
   const [isRegeneratingDesc, setIsRegeneratingDesc] = useState(false);
 
+  // 🔍 Dynamic Story Scenes Extracted from Subtitles
+  const [isAnalyzingScenes, setIsAnalyzingScenes] = useState(false);
+  const [selectedSceneIdx, setSelectedSceneIdx] = useState(null);
+
   // 👥 Character Reference Images for AI Image Prompt Generation
   const [characterRefImages, setCharacterRefImages] = useState([]);
+
   const [isCharPickerOpen, setIsCharPickerOpen] = useState(false);
   const charImageInputRef = useRef(null);
 
@@ -909,6 +916,63 @@ ${fullImagePromptEn || generatedData.imagePromptEn}
       setIsRegeneratingImagePrompt(false);
     }
   };
+
+  // 🔍 AI Dynamic Story Scene Extractor - Scans full SRT to suggest 6-8 dramatic thumbnail scenes
+
+  const handleAnalyzeStoryScenes = async () => {
+    if (selectedFilesList.length === 0) {
+      alert('Vui lòng chọn ít nhất 1 file SRT phụ đề để AI phân tích cảnh nổi bật!');
+      return;
+    }
+    const apiKey = aiProvider === 'orimise' ? orimiseKey : geminiKey;
+    if (!apiKey) {
+      alert(`Vui lòng nhập ${aiProvider === 'orimise' ? 'Orimise' : 'Google Gemini'} API Key trong Cấu Hình AI!`);
+      return;
+    }
+
+    setIsAnalyzingScenes(true);
+    try {
+      const scenes = await analyzeAndSuggestStoryScenes({
+        selectedFiles: selectedFilesList,
+        characterReferences: characterRefImages,
+        genre,
+        contentType,
+        aiProvider,
+        apiKey,
+        baseUrl: orimiseBaseUrl,
+        model: selectedAnalysisModel
+      });
+
+      const updatedData = {
+        ...(generatedData || {}),
+        suggestedScenes: scenes
+      };
+      setGeneratedData(updatedData);
+
+      if (scenes.length > 0) {
+        setImageIdeaPrompt(scenes[0].prompt);
+        setSelectedSceneIdx(0);
+      }
+
+      if (activeSessionId) {
+        setHistorySessions(prev => {
+          const updated = prev.map(s => s.id === activeSessionId ? { ...s, generatedData: updatedData } : s);
+          saveYoutuberHistoryToDB(updated, activeSessionId);
+          return updated;
+        });
+      }
+    } catch (err) {
+      alert(`Lỗi phân tích cảnh nổi bật: ${err.message}`);
+    } finally {
+      setIsAnalyzingScenes(false);
+    }
+  };
+
+  const handleSelectStoryScene = (scene, idx) => {
+    setSelectedSceneIdx(idx);
+    setImageIdeaPrompt(scene.prompt);
+  };
+
 
 
   // 🪄 4. Re-render Description & Tags according to prompt
@@ -1951,50 +2015,121 @@ ${fullImagePromptEn || generatedData.imagePromptEn}
                   </div>
                 )}
 
-                {/* Quick Character Prompt Action Presets (Multi-character Hero Composition) */}
-                <div className="prompt-presets-chips flex-center gap-1 mt-2" style={{ flexWrap: 'wrap', justifyContent: 'flex-start' }}>
-                  <span className="text-xs text-muted mr-1 font-bold">Mẫu bối cảnh nhiều nhân vật:</span>
-                  <button
-                    type="button"
-                    className="btn btn-secondary btn-xs font-bold"
-                    onClick={() => setImageIdeaPrompt(`Bố cục đa nhân vật: Nhân vật chính to lớn nổi bật ở cận cảnh tiền cảnh quỳ kiên cường giữa đại điện, tu vi bị phế xiềng xích vỡ vụn, mắt rực sáng thức tỉnh thần thông bí mật, hậu cảnh chưởng môn và hàng trăm trưởng lão môn phái bao vây nhìn xuống cười nhạo khinh bỉ`)}
-                    title="Cảnh nhân vật chính bị phế tu vi / trục xuất khỏi tông môn, nổi bật ở tiền cảnh"
-                  >
-                    💔 Bị Phế Tu Vi / Trục Xuất
-                  </button>
-                  <button
-                    type="button"
-                    className="btn btn-secondary btn-xs font-bold"
-                    onClick={() => setImageIdeaPrompt(`Bố cục đa nhân vật: Nhân vật chính khổng lồ chiếm 70% tiền cảnh vung thần kiếm hoàng kim kiếm khí rực lửa, hậu cảnh hàng vạn đệ tử tông môn và ma thú hắc ám bao vây dày đặc trong tuyệt vọng`)}
-                    title="Cảnh nhân vật chính 1 mình đại chiến vạn quân"
-                  >
-                    ⚔️ Đại Chiến Vạn Quân
-                  </button>
-                  <button
-                    type="button"
-                    className="btn btn-secondary btn-xs font-bold"
-                    onClick={() => setImageIdeaPrompt(`Bố cục đa nhân vật: Nhân vật chính ở trung tâm tiền cảnh bộc phát linh lực kinh thiên động địa thức tỉnh cảnh giới tối thượng, trung cảnh và hậu cảnh kẻ thù phản diện hoảng sợ bay dạt ra xa`)}
-                    title="Cảnh đột phá sức mạnh vả mặt kẻ thù"
-                  >
-                    💥 Vả Mặt Phản Diện
-                  </button>
-                  <button
-                    type="button"
-                    className="btn btn-secondary btn-xs font-bold"
-                    onClick={() => setImageIdeaPrompt(`Bố cục đa nhân vật: Nhân vật chính ở cận cảnh tỏa ánh sáng linh lực uy phong, phía sau là hư ảnh rồng thần hoàng kim khổng lồ cuồn cuộn mây trời che lấp cả chiến trường`)}
-                    title="Cảnh triệu hồi linh thú thần long"
-                  >
-                    🐉 Triệu Hồi Thần Long
-                  </button>
-                  <button
-                    type="button"
-                    className="btn btn-secondary btn-xs font-bold"
-                    onClick={() => setImageIdeaPrompt(`Bố cục đa nhân vật: Nhân vật chính ở tiền cảnh hóa thân Ma Thần mắt đỏ kiếm đen sát khí ngút trời, hậu cảnh liên minh chính đạo khiếp sợ kinh hoàng lùi bước`)}
-                    title="Cảnh nhập ma / tu la cuồng nộ"
-                  >
-                    🖤 Ma Thần Giáng Thế
-                  </button>
+                {/* 🌟 Dynamic Key Scenes Extracted from Movie Subtitles & Generic Presets */}
+                <div className="dynamic-scenes-panel mt-3 pt-2" style={{ borderTop: '1px dashed rgba(168, 85, 247, 0.25)' }}>
+                  <div className="flex-between mb-2" style={{ flexWrap: 'wrap', gap: '8px' }}>
+                    <div className="flex-center gap-1">
+                      <Sparkles size={14} className="text-yellow" />
+                      <span className="text-xs font-bold text-yellow">
+                        ✨ Gợi Ý Phân Cảnh Nổi Bật Của Bộ Phim ({generatedData?.suggestedScenes?.length || 0}):
+                      </span>
+                    </div>
+
+                    <button
+                      type="button"
+                      className="btn btn-purple btn-xs font-bold flex-center gap-1"
+                      onClick={handleAnalyzeStoryScenes}
+                      disabled={isAnalyzingScenes}
+                      title="AI quét toàn bộ phụ đề SRT để bóc tách 6-8 phân cảnh cao trào đắt giá nhất của bộ phim"
+                    >
+                      {isAnalyzingScenes ? <RefreshCw size={13} className="spinner" /> : <Search size={13} />}
+                      <span>{isAnalyzingScenes ? 'Đang phân tích...' : '🔍 AI Quét Cảnh Nổi Bật'}</span>
+                    </button>
+                  </div>
+
+                  {/* Render Dynamic Story Scenes if available */}
+                  {generatedData?.suggestedScenes && generatedData.suggestedScenes.length > 0 ? (
+                    <div className="story-scenes-grid flex-center gap-1 mb-2" style={{ flexWrap: 'wrap', justifyContent: 'flex-start' }}>
+                      {generatedData.suggestedScenes.map((scene, sIdx) => {
+                        const isSelected = selectedSceneIdx === sIdx || imageIdeaPrompt === scene.prompt;
+                        return (
+                          <button
+                            key={sIdx}
+                            type="button"
+                            className={`btn btn-xs font-bold flex-center gap-1 ${isSelected ? 'btn-purple-glow active' : 'btn-secondary'}`}
+                            style={{
+                              border: isSelected ? '1px solid #a855f7' : '1px solid rgba(255,255,255,0.12)',
+                              background: isSelected ? 'rgba(168, 85, 247, 0.35)' : 'rgba(255,255,255,0.05)',
+                              padding: '5px 10px',
+                              fontSize: '12px'
+                            }}
+                            onClick={() => handleSelectStoryScene(scene, sIdx)}
+                            title={scene.prompt}
+                          >
+                            <span>{scene.icon || '🎬'}</span>
+                            <span>{scene.title}</span>
+                            {isSelected && <Check size={12} className="text-emerald ml-1" />}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  ) : (
+                    <div className="text-xs text-muted mb-2">
+                      💡 Nhấn nút <strong>[🔍 AI Quét Cảnh Nổi Bật]</strong> ở trên để AI đọc toàn bộ kịch bản SRT và bóc tách các cảnh đắt giá nhất của phim!
+                    </div>
+                  )}
+
+                  {/* Fallback Multi-character Hero Presets */}
+                  <div className="prompt-presets-chips flex-center gap-1 mt-1" style={{ flexWrap: 'wrap', justifyContent: 'flex-start' }}>
+                    <span className="text-xs text-muted mr-1 font-bold">Mẫu kinh điển:</span>
+                    <button
+                      type="button"
+                      className="btn btn-secondary btn-xs font-bold"
+                      onClick={() => {
+                        setSelectedSceneIdx(null);
+                        setImageIdeaPrompt(`Bố cục đa nhân vật: Nhân vật chính to lớn nổi bật ở cận cảnh tiền cảnh quỳ kiên cường giữa đại điện, tu vi bị phế xiềng xích vỡ vụn, mắt rực sáng thức tỉnh thần thông bí mật, hậu cảnh chưởng môn và hàng trăm trưởng lão môn phái bao vây nhìn xuống cười nhạo khinh bỉ`);
+                      }}
+                      title="Cảnh nhân vật chính bị phế tu vi / trục xuất khỏi tông môn, nổi bật ở tiền cảnh"
+                    >
+                      💔 Bị Phế Tu Vi / Trục Xuất
+                    </button>
+                    <button
+                      type="button"
+                      className="btn btn-secondary btn-xs font-bold"
+                      onClick={() => {
+                        setSelectedSceneIdx(null);
+                        setImageIdeaPrompt(`Bố cục đa nhân vật: Nhân vật chính khổng lồ chiếm 70% tiền cảnh vung thần kiếm hoàng kim kiếm khí rực lửa, hậu cảnh hàng vạn đệ tử tông môn và ma thú hắc ám bao vây dày đặc trong tuyệt vọng`);
+                      }}
+                      title="Cảnh nhân vật chính 1 mình đại chiến vạn quân"
+                    >
+                      ⚔️ Đại Chiến Vạn Quân
+                    </button>
+                    <button
+                      type="button"
+                      className="btn btn-secondary btn-xs font-bold"
+                      onClick={() => {
+                        setSelectedSceneIdx(null);
+                        setImageIdeaPrompt(`Bố cục đa nhân vật: Nhân vật chính ở trung tâm tiền cảnh bộc phát linh lực kinh thiên động địa thức tỉnh cảnh giới tối thượng, trung cảnh và hậu cảnh kẻ thù phản diện hoảng sợ bay dạt ra xa`);
+                      }}
+                      title="Cảnh đột phá sức mạnh vả mặt kẻ thù"
+                    >
+                      💥 Vả Mặt Phản Diện
+                    </button>
+                    <button
+                      type="button"
+                      className="btn btn-secondary btn-xs font-bold"
+                      onClick={() => {
+                        setSelectedSceneIdx(null);
+                        setImageIdeaPrompt(`Bố cục đa nhân vật: Nhân vật chính ở cận cảnh tỏa ánh sáng linh lực uy phong, phía sau là hư ảnh rồng thần hoàng kim khổng lồ cuồn cuộn mây trời che lấp cả chiến trường`);
+                      }}
+                      title="Cảnh triệu hồi linh thú thần long"
+                    >
+                      🐉 Triệu Hồi Thần Long
+                    </button>
+                    <button
+                      type="button"
+                      className="btn btn-secondary btn-xs font-bold"
+                      onClick={() => {
+                        setSelectedSceneIdx(null);
+                        setImageIdeaPrompt(`Bố cục đa nhân vật: Nhân vật chính ở tiền cảnh hóa thân Ma Thần mắt đỏ kiếm đen sát khí ngút trời, hậu cảnh liên minh chính đạo khiếp sợ kinh hoàng lùi bước`);
+                      }}
+                      title="Cảnh nhập ma / tu la cuồng nộ"
+                    >
+                      🖤 Ma Thần Giáng Thế
+                    </button>
+                  </div>
                 </div>
+
 
               </div>
 
