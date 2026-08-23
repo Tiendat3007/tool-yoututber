@@ -646,26 +646,21 @@ export default function CharacterLoreStudio({
     setEditingChar(null);
   };
 
-  const fileOffsets = computeFileOffsets(effectiveTargetFiles, fileDurations, gapSeconds);
+  const { fileOffsets } = computeFileOffsets(effectiveTargetFiles, fileDurations, gapSeconds);
 
   // Helper to compute cumulative full movie MP4 timestamp for each character
   const getFullMovieTimestamp = (char) => {
-    if (char.source === 'vision_ocr') {
-      return char.firstTimestamp; // Vision OCR has exact MP4 timestamp directly!
-    }
     const offset = findFileOffset(char, effectiveTargetFiles, fileOffsets);
     const localMs = srtTimeToMs(char.firstTimestamp);
     return msToSrtTime(offset + localMs);
   };
 
   const getFullMovieStartMs = (char) => {
-    if (char.source === 'vision_ocr') {
-      return srtTimeToMs(char.firstTimestamp);
-    }
     const offset = findFileOffset(char, effectiveTargetFiles, fileOffsets);
     const localMs = srtTimeToMs(char.firstTimestamp);
     return offset + localMs;
   };
+
 
   // Apply chosen format template to all existing characters
   const handleApplyFormatToAll = () => {

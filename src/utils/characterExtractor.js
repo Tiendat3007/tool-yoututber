@@ -334,9 +334,35 @@ export async function scanVideoFramesWithVisionAI({
             if (cleanName && !seenNames.has(cleanName)) {
               seenNames.add(cleanName);
 
-              // Find closest frame to attach thumbnail
-              const matchedFrame = (char.frameIndex && batch[char.frameIndex - 1]) ? batch[char.frameIndex - 1] : batch[0];
-              const actualTimestamp = char.timestamp || matchedFrame.timestampFormatted;
+              // 🎯 Smart & Accurate Frame Resolution: Match to exact video seek timestamp
+              let matchedFrame = batch[0];
+              if (typeof char.frameIndex === 'number' && !isNaN(char.frameIndex)) {
+                const fIdx = Math.round(char.frameIndex);
+                if (fIdx >= 1 && fIdx <= batch.length) {
+                  matchedFrame = batch[fIdx - 1];
+                } else {
+                  const foundGlobal = batch.find(f => f.frameIndex === fIdx);
+                  if (foundGlobal) matchedFrame = foundGlobal;
+                }
+              } else if (char.timestamp && typeof char.timestamp === 'string') {
+                const targetMs = srtTimeToMs(char.timestamp);
+                if (targetMs > 0) {
+                  let closest = batch[0];
+                  let minDiff = Infinity;
+                  for (const f of batch) {
+                    const diff = Math.abs(f.timestampSec * 1000 - targetMs);
+                    if (diff < minDiff) {
+                      minDiff = diff;
+                      closest = f;
+                    }
+                  }
+                  matchedFrame = closest;
+                }
+              }
+
+              // 🎯 ALWAYS use the verified video canvas seek timestamp from the video player!
+              const actualTimestamp = matchedFrame.timestampFormatted;
+
 
               const formattedTag = cleanAndFormatIntroTag({
                 name: char.name || 'Nhân vật',
