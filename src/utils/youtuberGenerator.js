@@ -96,6 +96,7 @@ function safeParseAIJson(rawText) {
 
 export async function generateYoutubeContent({
   selectedFiles = [],
+  characterReferences = [],
   genre = 'Tu Tiên / Tiên Hiệp',
   contentType = 'Review Phim / Tóm Tắt Phim',
   customPrompt = '',
@@ -149,14 +150,31 @@ export async function generateYoutubeContent({
     return `=== TẬP #${fileIdx + 1}: ${file.name} (${file.subtitles.length} dòng) ===\n${compactLines}`;
   }).join('\n\n');
 
+  let charRefContext = '';
+  if (Array.isArray(characterReferences) && characterReferences.length > 0) {
+    charRefContext = `\n=== 👥 DANH SÁCH NHÂN VẬT THAM CHIẾU TỪ PHIM (${characterReferences.length} nhân vật): ===\n` +
+      characterReferences.map((c, i) => {
+        const info = [
+          c.name ? `Tên: ${c.name}` : '',
+          c.role ? `Thân phận: ${c.role}` : '',
+          c.sect ? `Môn phái: ${c.sect}` : '',
+          c.realm ? `Cảnh giới: ${c.realm}` : '',
+          c.note ? `Ghi chú: ${c.note}` : ''
+        ].filter(Boolean).join(' | ');
+        return `[Nhân vật #${i + 1}] ${info}`;
+      }).join('\n') +
+      `\n=> YÊU CẦU: Hãy soi kỹ các ảnh tham chiếu đính kèm và mô tả chính xác ngoại hình, kiểu tóc, y phục, thần khí và vũ khí của các nhân vật trên vào Prompt Midjourney/Flux!\n`;
+  }
+
   const systemPrompt = `You are an Elite YouTube Creative Director & Viral Content Strategist specializing in Review Truyện Tranh / Manhua / Donghua 3D / Phim Tu Tiên.
 
 QUY TRÌNH 2 BƯỚC BẮT BUỘC KHI XỬ LÝ DỮ LIỆU:
 
-BƯỚC 1: ĐỌC VÀ HIỂU TRỌN VẸN 100% CỐT TRUYỆN TỪ ĐẦU ĐẾN CUỐI
+BƯỚC 1: ĐỌC VÀ HIỂU TRỌN VẸN 100% CỐT TRUYỆN TỪ ĐẦU ĐẾN CUỐI & ẢNH THAM CHIẾU
 - Đọc kỹ toàn bộ từng câu thoại trong tất cả các tập phim SRT được cung cấp bên dưới (không bỏ sót tình tiết nào).
+- Soi kỹ các ảnh tham chiếu nhân vật (nếu có) để nắm rõ diện mạo, y phục, thần kiếm, pháp bảo.
 - Nắm rõ: Nhân vật chính là ai, khởi đầu từ nghịch cảnh nào (bị phế, hủy hôn, đuổi khỏi tông môn, trọng sinh, xuyên không...)?
-- Xuất hiện công pháp, hệ thống, bảo vật hay cơ duyên gì?
+- Xuất hiện công pháp, bảo vật hay cơ duyên gì?
 - Những phân đoạn cao trào, vả mặt kẻ thù, đột phá cảnh giới và kết cục của chuỗi tập phim.
 
 BƯỚC 2: TỔNG HỢP VÀ SÁNG TẠO BỘ METADATA YOUTUBE CHUẨN VIRAL
@@ -169,7 +187,7 @@ BƯỚC 2: TỔNG HỢP VÀ SÁNG TẠO BỘ METADATA YOUTUBE CHUẨN VIRAL
    - Chia 5 góc độ hấp dẫn khác nhau dựa trên đúng cốt truyện đã đọc:
      + Tiêu đề #1: Góc độ Xuyên Không / Trọng Sinh thức tỉnh.
      + Tiêu đề #2: Góc độ Nghịch cảnh / Bị tông môn ruồng bỏ & vả mặt.
-     + Tiêu đề #3: Góc độ Thần kiếm / Hệ thống / Bảo vật vô địch.
+     + Tiêu đề #3: Góc độ Thần kiếm / Bảo vật vô địch.
      + Tiêu đề #4: Góc độ Tu La / Ma Đạo / Bá vương giáng thế.
      + Tiêu đề #5: Góc độ Đột phá cảnh giới / Quét sạch vạn giới.
 
@@ -180,63 +198,46 @@ BƯỚC 2: TỔNG HỢP VÀ SÁNG TẠO BỘ METADATA YOUTUBE CHUẨN VIRAL
      + Mẫu #3 tương ứng và bổ trợ cho Tiêu đề #3.
      + Mẫu #4 tương ứng và bổ trợ cho Tiêu đề #4.
      + Mẫu #5 tương ứng và bổ trợ cho Tiêu đề #5.
-   - Mỗi mẫu gồm 2 dòng, mỗi dòng DÀI KHOẢNG 7 ĐẾN 10 TỪ (viết HOA, cuốn hút, giàu hình tượng, kịch tính, đầy đủ ý nghĩa):
-     + line1 (Chữ vàng 3D đập mắt - 7 đến 10 từ): Nêu bật biến cố / nghịch cảnh hiểm nghèo của Tiêu đề đó.
-     + line2 (Chữ xanh ngọc kịch tính - 7 đến 10 từ): Nêu bật thức tỉnh sức mạnh / vả mặt phản đòn quét sạch kẻ thù của Tiêu đề đó.
+   - Mỗi mẫu gồm 2 dòng:
+     * Dòng 1 (line1): 7–10 từ, IN HOA TOÀN BỘ, tạo nghịch cảnh tột cùng hoặc câu hỏi kích thích trí tò mò cực độ (VD: "TÔ SƯ HUYNH XUYÊN KHÔNG...", "BỊ TÔNG MÔN TRỤC XUẤT...").
+     * Dòng 2 (line2): 7–10 từ, IN HOA TOÀN BỘ, cú twist vả mặt hoặc kết quả bá đạo rung chuyển trời đất (VD: "LIỀN THỨC TỈNH THẦN THÔNG VÔ ĐỊCH!", "MỘT KIẾM CHÉM DIỆT CẢ TÔNG MÔN!").
 
-4. BẢNG MỐC THỜI GIAN PHÂN CẢNH YOUTUBE (timestamps):
-   - Mảng 4 - 6 mốc thời gian diễn biến chính (VD: "00:00 Mở đầu: Xuyên Không...", "03:45 Nghịch Cảnh...", "12:10 Cao Trào...", "20:30 Kết Cục...").
+4. MÔ TẢ YOUTUBE CHUẨN SEO & HẤP DẪN (description):
+   - Mở đầu bằng đoạn giới thiệu gay cấn về nội dung chuỗi tập phim.
+   - Đính kèm tóm tắt nội dung hấp dẫn.
+   - Danh sách mốc thời gian (Timestamps) tự động cho từng tập phim:
+${selectedFiles.map((f, i) => `${i === 0 ? '00:00' : '...'} Tập ${i + 1}: ${f.name.replace(/\.srt$/i, '')}`).join('\n')}
+   - Kêu gọi Like, Đăng ký kênh, Bình luận tương tác.
+   - 3 hashtag chính ở cuối (VD: #ReviewPhim #HoatHinh3D #TuTien).
 
 5. PROMPT ẢNH MIDJOURNEY/FLUX (imagePromptEn & imagePromptVi):
-   - 16:9 Midjourney v6/Flux prompt miêu tả đúng nhân vật, áo choàng chiến bào, thần kiếm, hào quang linh lực và bối cảnh tông môn trong phim, 8k cinematic octane render, chừa không gian giữa để đặt chữ 3D.
+   - 16:9 Midjourney v6.1/Flux prompt miêu tả đúng nhân vật (dựa trên ảnh tham chiếu nếu có), áo choàng chiến bào, thần kiếm, hào quang linh lực và bối cảnh tông môn trong phim, 8k cinematic octane render, chừa không gian giữa để đặt chữ 3D.
+   - imagePromptVi: Gợi ý bối cảnh và nhân vật bằng tiếng Việt dễ hiểu.
 
-6. MÔ TẢ & TAGS (description & tags):
-   - Mô tả video YouTube cuốn hút theo dòng thời gian, nhúng sẵn mốc thời gian và danh sách thẻ tags SEO.
+6. 30 THẺ TAGS YOUTUBE (tags):
+   - Danh sách các từ khóa hot nhất về phim phân cách bằng dấu phẩy.
 
-REQUIRED OUTPUT JSON FORMAT (Return ONLY valid JSON):
+BẮT BUỘC TRẢ VỀ ĐÚNG ĐỊNH DẠNG JSON DUY NHẤT SAU (Không thêm bất kỳ chữ nào ngoài JSON):
 {
-  "storySummary": "Bài tóm tắt toàn bộ cốt truyện chi tiết, mạch lạc, dễ hiểu...",
+  "storySummary": "Bài tóm tắt cốt truyện 350-550 chữ...",
   "titles": [
-    "💥 [Tiêu đề 1 chuẩn 80-90 ký tự: Góc độ Xuyên Không/Trọng Sinh]",
-    "🔥 [Tiêu đề 2 chuẩn 80-90 ký tự: Góc độ Nghịch Cảnh Vả Mặt]",
-    "⚡ [Tiêu đề 3 chuẩn 80-90 ký tự: Góc độ Hệ Thống/Bảo Vật Vô Địch]",
-    "👑 [Tiêu đề 4 chuẩn 80-90 ký tự: Góc độ Ma Tôn/Tu La Bá Vương]",
-    "😱 [Tiêu đề 5 chuẩn 80-90 ký tự: Góc độ Đột Phá Quét Sạch Thiên Hạ]"
+    "Tiêu đề 1...",
+    "Tiêu đề 2...",
+    "Tiêu đề 3...",
+    "Tiêu đề 4...",
+    "Tiêu đề 5..."
   ],
   "thumbnailTexts": [
-    {
-      "line1": "TÔ SƯ HUYNH XUYÊN KHÔNG VỀ THỜI TIÊN CỔ",
-      "line2": "MỘT KIẾM CHÉM ĐỨT TOÀN BỘ XIỀNG XÍCH TÔNG MÔN"
-    },
-    {
-      "line1": "KẺ PHẾ VẬT BỊ CẢ TÔNG MÔN RUỒNG BỎ ĐUỔI ĐI",
-      "line2": "THỨC TỈNH THẦN MA QUYẾT QUÉT SẠCH THIÊN HẠ"
-    },
-    {
-      "line1": "TRỌNG SINH MANG THEO HỆ THỐNG VÔ ĐỊCH THẦN CẤP",
-      "line2": "MỘT BƯỚC ĐỘT PHÁ THÀNH ĐỈNH CAO THẦN MA"
-    },
-    {
-      "line1": "TOÀN GIA BỊ BẮT TỐNG VÀO NGỤC TỐI TU TIÊN",
-      "line2": "HẮN TRIỆU HỒI MA TÔN THẦN KIẾM PHẢN SÁT"
-    },
-    {
-      "line1": "ĐẠI CHIẾN SINH TỬ ĐỐI ĐẦU HÀNG TRĂM TRƯỞNG LÃO",
-      "line2": "MỘT CHIÊU QUYẾT ĐỊNH XÓA SỔ TOÀN BỘ ĐỊCH NHÂN"
-    }
-  ],
-
-  "timestamps": [
-    "00:00 Mở đầu: Xuyên Không Đến Tu Tiên Giới",
-    "03:45 Biến cố: Toàn Gia Bị Tống Vào Hầm Ngục",
-    "08:20 Cơ duyên: Thức Tỉnh Hệ Thống Vô Địch",
-    "14:15 Cao trào: Đột Phá Cảnh Giới Quét Sạch Kẻ Thù",
-    "22:00 Kết cục: Bắt Đầu Hành Trình Vô Địch Thiên Hạ"
+    { "line1": "DÒNG 1 MẪU 1 (7-10 TỪ IN HOA)", "line2": "DÒNG 2 MẪU 1 (7-10 TỪ IN HOA)" },
+    { "line1": "DÒNG 1 MẪU 2 (7-10 TỪ IN HOA)", "line2": "DÒNG 2 MẪU 2 (7-10 TỪ IN HOA)" },
+    { "line1": "DÒNG 1 MẪU 3 (7-10 TỪ IN HOA)", "line2": "DÒNG 2 MẪU 3 (7-10 TỪ IN HOA)" },
+    { "line1": "DÒNG 1 MẪU 4 (7-10 TỪ IN HOA)", "line2": "DÒNG 2 MẪU 4 (7-10 TỪ IN HOA)" },
+    { "line1": "DÒNG 1 MẪU 5 (7-10 TỪ IN HOA)", "line2": "DÒNG 2 MẪU 5 (7-10 TỪ IN HOA)" }
   ],
   "imagePromptEn": "Cinematic 16:9 master piece of Xianxia protagonist with glowing eyes and golden dragon aura...",
   "imagePromptVi": "Mô tả ý tưởng hình ảnh thumbnail bằng tiếng Việt...",
-  "description": "Mô tả video YouTube chi tiết theo các tập phim...",
-  "tags": "tu tiên, tóm tắt phim, review phim tu tiên..."
+  "description": "Nội dung mô tả YouTube chi tiết...",
+  "tags": "review phim tu tien, hoat hinh 3d trung quoc, ..."
 }
 `;
 
@@ -248,16 +249,15 @@ REQUIRED OUTPUT JSON FORMAT (Return ONLY valid JSON):
 ĐỊNH DẠNG: ${contentType}
 DANH SÁCH TẬP PHIM (${selectedFiles.length} TẬP): ${fileNames}
 ${customPromptDirective}
+${charRefContext}
 === NỘI DUNG TOÀN BỘ 100% PHỤ ĐỀ SRT CỦA TẤT CẢ CÁC TẬP ===
 ${fullTranscriptContext}
 === HẾT TOÀN BỘ PHỤ ĐỀ SRT ===
 
 HÃY THỰC HIỆN ĐÚNG QUY TRÌNH 2 BƯỚC:
-1. Đọc và hiểu toàn bộ 100% nội dung phụ đề trên để viết bài TÓM TẮT CỐT TRUYỆN CHI TIẾT (storySummary).
+1. Đọc và hiểu toàn bộ 100% nội dung phụ đề trên và ảnh tham chiếu (nếu có) để viết bài TÓM TẮT CỐT TRUYỆN CHI TIẾT (storySummary).
 2. Tạo 5 Tiêu Đề chuẩn 80-90 ký tự + 5 Mẫu Chữ Thumbnail 2 Dòng (7-10 từ/dòng) + Prompt Ảnh khớp 100% với phim ${customPrompt ? 'và tuân theo đúng yêu cầu đặc biệt của Creator' : ''}.
 3. Xuất ra 1 đối tượng JSON duy nhất:`;
-
-
 
   let rawText = '';
 
@@ -266,11 +266,27 @@ HÃY THỰC HIỆN ĐÚNG QUY TRÌNH 2 BƯỚC:
       ? baseUrl
       : `${baseUrl.replace(/\/$/, '')}/chat/completions`;
 
+    // Multi-modal message construction if images exist
+    const userContent = [];
+    userContent.push({ type: 'text', text: userMessage });
+
+    if (Array.isArray(characterReferences)) {
+      characterReferences.forEach((ref) => {
+        const imgUrl = ref.imageBase64 || ref.thumbnail;
+        if (imgUrl && typeof imgUrl === 'string' && imgUrl.startsWith('data:image')) {
+          userContent.push({
+            type: 'image_url',
+            image_url: { url: imgUrl }
+          });
+        }
+      });
+    }
+
     const reqBody = {
       model: model,
       messages: [
         { role: 'system', content: systemPrompt },
-        { role: 'user', content: userMessage }
+        { role: 'user', content: userContent.length > 1 ? userContent : userMessage }
       ],
       temperature: 0.7
     };
@@ -296,8 +312,27 @@ HÃY THỰC HIỆN ĐÚNG QUY TRÌNH 2 BƯỚC:
     const data = await response.json();
     rawText = data.choices?.[0]?.message?.content || '';
   } else {
-    // Gemini Direct API
+    // Gemini Direct API with Vision
     const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
+
+    const parts = [{ text: `${systemPrompt}\n\n${userMessage}` }];
+
+    if (Array.isArray(characterReferences)) {
+      characterReferences.forEach((ref) => {
+        const imgUrl = ref.imageBase64 || ref.thumbnail;
+        if (imgUrl && typeof imgUrl === 'string' && imgUrl.startsWith('data:image')) {
+          const mimeMatch = imgUrl.match(/^data:(image\/[a-z]+);base64,/i);
+          const mimeType = mimeMatch ? mimeMatch[1] : 'image/jpeg';
+          const cleanBase64 = imgUrl.replace(/^data:image\/[a-z]+;base64,/, '');
+          parts.push({
+            inlineData: {
+              mimeType: mimeType,
+              data: cleanBase64
+            }
+          });
+        }
+      });
+    }
 
     const response = await fetch(url, {
       method: 'POST',
@@ -306,7 +341,7 @@ HÃY THỰC HIỆN ĐÚNG QUY TRÌNH 2 BƯỚC:
         contents: [
           {
             role: 'user',
-            parts: [{ text: `${systemPrompt}\n\n${userMessage}` }]
+            parts: parts
           }
         ],
         generationConfig: {
@@ -324,6 +359,7 @@ HÃY THỰC HIỆN ĐÚNG QUY TRÌNH 2 BƯỚC:
     const data = await response.json();
     rawText = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
   }
+
 
   if (!rawText) {
     throw new Error('AI không trả về kết quả.');

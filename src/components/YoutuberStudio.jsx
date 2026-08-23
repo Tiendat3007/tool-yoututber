@@ -539,6 +539,7 @@ ${fullImagePromptEn || generatedData.imagePromptEn}
     try {
       const result = await generateYoutubeContent({
         selectedFiles: selectedFilesList,
+        characterReferences: characterRefImages,
         genre,
         contentType,
         aiProvider,
@@ -546,6 +547,7 @@ ${fullImagePromptEn || generatedData.imagePromptEn}
         baseUrl: orimiseBaseUrl,
         model: selectedAnalysisModel
       });
+
 
       setGeneratedData(result);
       setSelectedTitleIndex(0);
@@ -850,6 +852,7 @@ ${fullImagePromptEn || generatedData.imagePromptEn}
         storySummary: generatedData.storySummary,
         customPrompt: imageIdeaPrompt,
         characterReferences: characterRefImages,
+        selectedFiles: selectedFilesList,
         genre,
         contentType,
         aiProvider,
@@ -857,6 +860,7 @@ ${fullImagePromptEn || generatedData.imagePromptEn}
         baseUrl: orimiseBaseUrl,
         model: selectedAnalysisModel
       });
+
 
       const updatedData = {
         ...generatedData,
