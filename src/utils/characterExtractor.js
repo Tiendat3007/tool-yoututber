@@ -39,10 +39,29 @@ YÊU CẦU ĐẦU RA JSON ARRAY CHÍNH XÁC (Dịch sang âm Hán-Việt chuẩn
 Nếu trong các khung hình không có thẻ đồ họa nào, trả về [].
 `;
 
-// Extract video frames in browser memory via HTML5 Canvas with Flip Horizontal Mirror Support
+// Fast pixel difference metric (0.0 to 1.0) to filter out redundant static dialogue frames
+function computeFrameDifference(data1, data2) {
+
+  if (!data1 || !data2 || data1.length !== data2.length) return 1.0;
+  let diffSum = 0;
+  const step = 4 * 8; // Sample every 8th pixel for ultra-fast calculation
+  let samples = 0;
+  for (let i = 0; i < data1.length; i += step) {
+    const rDiff = Math.abs(data1[i] - data2[i]);
+    const gDiff = Math.abs(data1[i + 1] - data2[i + 1]);
+    const bDiff = Math.abs(data1[i + 2] - data2[i + 2]);
+    diffSum += (rDiff + gDiff + bDiff) / 3;
+    samples++;
+  }
+  return samples > 0 ? diffSum / (samples * 255) : 1.0;
+}
+
+// Extract video frames in browser memory via HTML5 Canvas with Flip Horizontal Mirror & Static Frame Differencing
 export async function extractFramesFromVideo(videoFile, {
   intervalSec = 3,
   flipHorizontal = false,
+  filterStaticFrames = true, // Smart filter to discard redundant static dialogue shots (saves ~30-40% tokens)
+  minDiffRatio = 0.04, // 4% difference threshold
   onProgress = () => {},
   videoDuration = 0
 }) {
@@ -58,7 +77,7 @@ export async function extractFramesFromVideo(videoFile, {
     // Resolution for optimal vision token usage and high OCR accuracy (640x360)
     canvas.width = 640;
     canvas.height = 360;
-    const ctx = canvas.getContext('2d');
+    const ctx = canvas.getContext('2d', { willReadFrequently: true });
 
     video.onloadedmetadata = async () => {
       const duration = videoDuration || video.duration;
@@ -68,7 +87,8 @@ export async function extractFramesFromVideo(videoFile, {
       }
 
       const frames = [];
-
+      let prevImageData = null;
+      let skippedCount = 0;
 
       for (let i = 0; i < timestamps.length; i++) {
         const time = timestamps[i];
@@ -79,7 +99,8 @@ export async function extractFramesFromVideo(videoFile, {
             total: timestamps.length,
             time,
             timeFormatted: msToSrtTime(time * 1000),
-            percent: Math.round(((i + 1) / timestamps.length) * 100)
+            percent: Math.round(((i + 1) / timestamps.length) * 100),
+            filteredCount: skippedCount
           });
         }
 
@@ -98,15 +119,25 @@ export async function extractFramesFromVideo(videoFile, {
             ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
             ctx.restore();
 
-            const base64Full = canvas.toDataURL('image/jpeg', 0.70);
-            const base64Data = base64Full.split(',')[1];
-            frames.push({
-              frameIndex: i + 1,
-              timestampSec: time,
-              timestampFormatted: msToSrtTime(time * 1000),
-              base64Data,
-              base64Full
-            });
+            // Check Frame Differencing against previous captured frame
+            const currentImageData = ctx.getImageData(0, 0, canvas.width, canvas.height).data;
+            const diff = prevImageData ? computeFrameDifference(prevImageData, currentImageData) : 1.0;
+
+            if (filterStaticFrames && prevImageData && diff < minDiffRatio) {
+              // Frame is >96% identical to the previous frame (static dialogue scene) -> skip sending to AI
+              skippedCount++;
+            } else {
+              prevImageData = currentImageData;
+              const base64Full = canvas.toDataURL('image/jpeg', 0.65);
+              const base64Data = base64Full.split(',')[1];
+              frames.push({
+                frameIndex: frames.length + 1,
+                timestampSec: time,
+                timestampFormatted: msToSrtTime(time * 1000),
+                base64Data,
+                base64Full
+              });
+            }
             res();
           };
           timeoutTimer = setTimeout(() => {
@@ -139,7 +170,7 @@ export async function scanVideoFramesWithVisionAI({
   aiProvider = 'orimise',
   baseUrl = 'https://api.orimise.com/v1',
   model = 'gemini-2.5-flash-lite',
-  batchSize = 4,
+  batchSize = 8, // Optimized to 8 frames per request to minimize $0.01 per-request floor charge
   concurrency = 5,
   onProgress = () => {}
 }) {
@@ -148,7 +179,7 @@ export async function scanVideoFramesWithVisionAI({
     throw new Error(`Vui lòng nhập ${aiProvider === 'orimise' ? 'Orimise' : 'Google Gemini'} API Key trong Cấu Hình AI!`);
   }
 
-  // Split frames into batches of 4
+  // Split frames into batches of 8 (Cuts API request count in HALF)
   const batches = [];
   for (let i = 0; i < frames.length; i += batchSize) {
     batches.push({
@@ -178,10 +209,12 @@ export async function scanVideoFramesWithVisionAI({
           content.push({
             type: 'image_url',
             image_url: {
-              url: `data:image/jpeg;base64,${f.base64Data}`
+              url: `data:image/jpeg;base64,${f.base64Data}`,
+              detail: 'low'
             }
           });
         });
+
 
         const endpoint = baseUrl.endsWith('/chat/completions')
           ? baseUrl

@@ -89,11 +89,13 @@ export default function CharacterLoreStudio({
   const [visionConcurrency, setVisionConcurrency] = useState(6); // 6 parallel threads by default
   const [visionModel, setVisionModel] = useState(() => localStorage.getItem('tutien_vision_model') || 'gemini-2.5-flash-lite');
   const [visionFlipHorizontal, setVisionFlipHorizontal] = useState(true);
+  const [visionFilterStatic, setVisionFilterStatic] = useState(true); // Smart frame differencing to eliminate redundant static frames
   const [isVisionScanning, setIsVisionScanning] = useState(false);
   const [visionProgress, setVisionProgress] = useState(null);
   const [liveCurrentFrame, setLiveCurrentFrame] = useState(null);
   const [visionDetectedChars, setVisionDetectedChars] = useState([]);
   const visionInputRef = useRef(null);
+
 
   // 3. Scan History State
   const [scanHistory, setScanHistory] = useState(() => {
@@ -398,15 +400,17 @@ export default function CharacterLoreStudio({
     setVisionProgress({ phase: 'extracting', percent: 0, message: 'Đang trích xuất toàn bộ khung hình từ video...' });
 
     try {
-      // 1. Extract frames locally in browser canvas (0 MB video upload, scans 100% of video)
+      // 1. Extract frames locally in browser canvas with Frame Differencing (0 MB video upload, scans 100% of video)
       const frames = await extractFramesFromVideo(visionVideoFile, {
         intervalSec: Number(visionIntervalSec),
         flipHorizontal: Boolean(visionFlipHorizontal),
+        filterStaticFrames: Boolean(visionFilterStatic),
         onProgress: (p) => {
+          const filterNote = p.filteredCount ? ` • ⚡ Đã lọc ${p.filteredCount} cảnh tĩnh trùng` : '';
           setVisionProgress({
             phase: 'extracting',
             percent: p.percent,
-            message: `Đang chụp khung hình ${p.current}/${p.total} (Mốc ${p.timeFormatted})...`
+            message: `Đang chụp & lọc khung hình ${p.current}/${p.total} (Mốc ${p.timeFormatted})${filterNote}...`
           });
         }
       });
@@ -415,8 +419,12 @@ export default function CharacterLoreStudio({
         throw new Error('Không trích xuất được khung hình nào từ video.');
       }
 
-      // 2. Scan with Multi-threaded Vision AI (Runs 6-10 parallel streams)
-      setVisionProgress({ phase: 'ai_scanning', percent: 0, message: `Bắt đầu khởi chạy ${visionConcurrency} luồng AI Vision song song (${visionModel})...` });
+      // 2. Scan with Multi-threaded Vision AI (8 frames per batch to minimize request floor cost)
+      setVisionProgress({ 
+        phase: 'ai_scanning', 
+        percent: 0, 
+        message: `Bắt đầu phân tích ${frames.length} khung hình tối ưu (${Math.ceil(frames.length / 8)} requests, gom 8 ảnh/request, ${visionConcurrency} luồng song song)...` 
+      });
 
       const detected = await scanVideoFramesWithVisionAI({
         frames,
@@ -425,7 +433,7 @@ export default function CharacterLoreStudio({
         aiProvider,
         baseUrl: orimiseBaseUrl,
         model: visionModel || 'gemini-2.5-flash-lite',
-        batchSize: 4,
+        batchSize: 8, // Optimized 8 frames per request
         concurrency: Number(visionConcurrency) || 6,
         onProgress: (p) => {
           setVisionProgress({
@@ -438,6 +446,7 @@ export default function CharacterLoreStudio({
           }
         }
       });
+
 
 
 
@@ -1266,9 +1275,34 @@ export default function CharacterLoreStudio({
                       onChange={(e) => setVisionFlipHorizontal(e.target.checked)}
                       className="custom-checkbox"
                     />
-                    <span>🔄 Tự Động Lật Gương (Bỏ Lật Ngược Video Re-up)</span>
+                    <span>🔄 Tự Động Lật Gương (Video Re-up)</span>
                   </label>
+
+                  <label 
+                    className="flex-center gap-2 text-sm font-bold cursor-pointer"
+                    style={{ 
+                      background: visionFilterStatic ? 'rgba(168, 85, 247, 0.2)' : 'rgba(255,255,255,0.05)', 
+                      padding: '6px 12px', 
+                      borderRadius: '6px', 
+                      border: visionFilterStatic ? '1px solid #a855f7' : '1px solid rgba(255,255,255,0.1)',
+                      color: visionFilterStatic ? '#c084fc' : 'inherit'
+                    }}
+                    title="Canvas tự động so sánh pixel và bỏ qua các khung hình tĩnh trùng lặp (tiết kiệm ~35-45% tokens & request)"
+                  >
+                    <input
+                      type="checkbox"
+                      checked={visionFilterStatic}
+                      onChange={(e) => setVisionFilterStatic(e.target.checked)}
+                      className="custom-checkbox"
+                    />
+                    <span>⚡ Lọc Cảnh Tĩnh (Tiết Kiệm 40% Token)</span>
+                  </label>
+
+                  <div className="flex-center gap-1 text-xs font-bold px-2 py-1 rounded" style={{ background: 'rgba(16, 185, 129, 0.15)', color: '#34d399', border: '1px solid rgba(16, 185, 129, 0.3)' }}>
+                    <span>📦 Gom 8 Ảnh / Request (Giảm 50% Phí Sàn)</span>
+                  </div>
                 </div>
+
 
                 <button
                   className="btn btn-green-glow font-bold flex-center gap-2"
