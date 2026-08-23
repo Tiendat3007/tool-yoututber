@@ -128,30 +128,56 @@ export default function App() {
   const [isLoreScanning, setIsLoreScanning] = useState(false);
 
 
-  // LocalStorage sync
+  // LocalStorage sync with quota protection & auto-compacting
   useEffect(() => {
-    localStorage.setItem('tutien_glossary', JSON.stringify(glossary));
+    try {
+      localStorage.setItem('tutien_glossary', JSON.stringify(glossary));
+    } catch (e) {
+      console.warn('LocalStorage quota limit for glossary:', e);
+    }
   }, [glossary]);
 
   useEffect(() => {
-    localStorage.setItem('tutien_extracted_glossary', JSON.stringify(extractedGlossaryTerms));
+    try {
+      localStorage.setItem('tutien_extracted_glossary', JSON.stringify(extractedGlossaryTerms));
+    } catch (e) {
+      console.warn('LocalStorage quota limit for extracted glossary:', e);
+    }
   }, [extractedGlossaryTerms]);
 
   useEffect(() => {
-    localStorage.setItem('tutien_character_lore', JSON.stringify(characters));
+    try {
+      localStorage.setItem('tutien_character_lore', JSON.stringify(characters));
+    } catch (e) {
+      console.warn('LocalStorage quota limit for character lore: saving compact version');
+      try {
+        const compact = (characters || []).slice(0, 100).map(c => ({
+          ...c,
+          thumbnail: (c.thumbnail && c.thumbnail.length > 5000) ? '' : c.thumbnail
+        }));
+        localStorage.setItem('tutien_character_lore', JSON.stringify(compact));
+      } catch (err) {
+        console.warn('Unable to persist character lore to localStorage:', err);
+      }
+    }
   }, [characters]);
 
 
   useEffect(() => {
-    localStorage.setItem('tutien_ai_provider', aiProvider);
-    localStorage.setItem('tutien_orimise_key', orimiseKey);
-    localStorage.setItem('tutien_orimise_url', orimiseBaseUrl);
-    localStorage.setItem('tutien_gemini_key', geminiKey);
-    localStorage.setItem('tutien_ai_model', aiModel);
-    localStorage.setItem('tutien_concurrency', concurrency);
-    localStorage.setItem('tutien_translate_batch_size', translateBatchSize);
-    localStorage.setItem('tutien_custom_prompt', customPrompt);
+    try {
+      localStorage.setItem('tutien_ai_provider', aiProvider);
+      localStorage.setItem('tutien_orimise_key', orimiseKey);
+      localStorage.setItem('tutien_orimise_url', orimiseBaseUrl);
+      localStorage.setItem('tutien_gemini_key', geminiKey);
+      localStorage.setItem('tutien_ai_model', aiModel);
+      localStorage.setItem('tutien_concurrency', concurrency);
+      localStorage.setItem('tutien_translate_batch_size', translateBatchSize);
+      localStorage.setItem('tutien_custom_prompt', customPrompt);
+    } catch (e) {
+      console.warn('LocalStorage quota limit for settings:', e);
+    }
   }, [aiProvider, orimiseKey, orimiseBaseUrl, geminiKey, aiModel, concurrency, translateBatchSize, customPrompt]);
+
 
 
   const handleClearScannedTerms = () => {

@@ -130,15 +130,26 @@ export async function extractFramesFromVideo(videoFile, {
               prevImageData = currentImageData;
               const base64Full = canvas.toDataURL('image/jpeg', 0.65);
               const base64Data = base64Full.split(',')[1];
+
+              // Generate lightweight compact thumbnail (160x90, ~2KB) for safe localStorage & UI card display
+              const thumbCanvas = document.createElement('canvas');
+              thumbCanvas.width = 160;
+              thumbCanvas.height = 90;
+              const thumbCtx = thumbCanvas.getContext('2d');
+              thumbCtx.drawImage(canvas, 0, 0, 160, 90);
+              const thumbnailCompact = thumbCanvas.toDataURL('image/jpeg', 0.5);
+
               frames.push({
                 frameIndex: frames.length + 1,
                 timestampSec: time,
                 timestampFormatted: msToSrtTime(time * 1000),
                 base64Data,
-                base64Full
+                base64Full,
+                thumbnailCompact
               });
             }
             res();
+
           };
           timeoutTimer = setTimeout(() => {
             video.removeEventListener('seeked', onSeeked);
@@ -309,11 +320,12 @@ export async function scanVideoFramesWithVisionAI({
                 firstFileName: videoFileName,
                 firstTimestamp: actualTimestamp,
                 firstEndTimestamp: msToSrtTime(srtTimeToMs(actualTimestamp) + 2000),
-                thumbnail: matchedFrame.base64Full,
+                thumbnail: matchedFrame.thumbnailCompact || matchedFrame.base64Full,
                 introTag: formattedTag,
                 source: 'vision_ocr',
                 enabled: true
               });
+
 
             }
           });
