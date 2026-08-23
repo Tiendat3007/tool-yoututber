@@ -753,19 +753,23 @@ ${fullImagePromptEn || generatedData.imagePromptEn}
     }
   };
 
-  // 👥 Upload custom character reference photos from computer
-  const handleUploadCharacterImage = (e) => {
-    const fileList = Array.from(e.target.files || []);
+  // 👥 Upload multiple custom character reference photos from computer (Parallel high-speed compression)
+  const handleUploadCharacterImage = async (e) => {
+    const fileList = Array.from(e.target?.files || (e.dataTransfer ? e.dataTransfer.files : []));
     if (fileList.length === 0) return;
 
-    fileList.forEach(file => {
+    const processFile = (file) => new Promise((resolve) => {
+      if (!file.type.startsWith('image/')) {
+        resolve(null);
+        return;
+      }
       const reader = new FileReader();
       reader.onload = (event) => {
         const img = new Image();
         img.onload = () => {
           const canvas = document.createElement('canvas');
-          const maxW = 480;
-          const maxH = 480;
+          const maxW = 400;
+          const maxH = 400;
           let width = img.width;
           let height = img.height;
           if (width > height) {
@@ -783,9 +787,9 @@ ${fullImagePromptEn || generatedData.imagePromptEn}
           canvas.height = height;
           const ctx = canvas.getContext('2d');
           ctx.drawImage(img, 0, 0, width, height);
-          const compressedBase64 = canvas.toDataURL('image/jpeg', 0.85);
+          const compressedBase64 = canvas.toDataURL('image/jpeg', 0.82);
 
-          const newRef = {
+          resolve({
             id: `ref_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
             name: file.name.replace(/\.[^/.]+$/, ''),
             role: 'Nhân vật tham chiếu',
@@ -794,14 +798,20 @@ ${fullImagePromptEn || generatedData.imagePromptEn}
             thumbnail: compressedBase64,
             imageBase64: compressedBase64,
             source: 'uploaded'
-          };
-          setCharacterRefImages(prev => [...prev, newRef]);
+          });
         };
+        img.onerror = () => resolve(null);
         img.src = event.target.result;
       };
+      reader.onerror = () => resolve(null);
       reader.readAsDataURL(file);
     });
-    if (e.target) e.target.value = '';
+
+    const newRefs = (await Promise.all(fileList.map(processFile))).filter(Boolean);
+    if (newRefs.length > 0) {
+      setCharacterRefImages(prev => [...prev, ...newRefs]);
+    }
+    if (e.target && e.target.value) e.target.value = '';
   };
 
   // 🎭 Toggle or select a character from the scanned character list (from Character Lore Studio)
@@ -826,9 +836,26 @@ ${fullImagePromptEn || generatedData.imagePromptEn}
     }
   };
 
+  // ⚡ 1-Click Select ALL Scanned Characters from Lore Studio
+  const handleSelectAllLoreCharacters = () => {
+    if (!characters || characters.length === 0) return;
+    const mapped = characters.map(char => ({
+      id: char.id || `lore_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
+      name: char.name,
+      role: char.role || '',
+      sect: char.sect || '',
+      realm: char.realm || '',
+      thumbnail: char.thumbnail,
+      imageBase64: char.thumbnail,
+      source: 'lore'
+    }));
+    setCharacterRefImages(mapped);
+  };
+
   const handleRemoveCharacterRef = (id) => {
     setCharacterRefImages(prev => prev.filter(c => c.id !== id));
   };
+
 
   // 🪄 3. Re-render AI Image Prompts (En & Vi) according to prompt & Character Reference Images
   const handleRegenerateImagePrompt = async () => {
@@ -1843,9 +1870,19 @@ ${fullImagePromptEn || generatedData.imagePromptEn}
 
                 {/* Modal / Dropdown Picker for Scanned Characters */}
                 {isCharPickerOpen && characters && characters.length > 0 && (
-                  <div className="char-picker-dropdown mb-3 p-2 rounded" style={{ background: 'rgba(15, 23, 42, 0.95)', border: '1px solid #a855f7', maxHeight: '220px', overflowY: 'auto' }}>
-                    <div className="flex-between mb-2">
-                      <span className="text-xs font-bold text-cyan">Chọn nhân vật để nạp ảnh vào Prompt AI:</span>
+                  <div className="char-picker-dropdown mb-3 p-2 rounded" style={{ background: 'rgba(15, 23, 42, 0.95)', border: '1px solid #a855f7', maxHeight: '240px', overflowY: 'auto' }}>
+                    <div className="flex-between mb-2 pb-1 border-bottom">
+                      <div className="flex-center gap-2">
+                        <span className="text-xs font-bold text-cyan">Chọn nhân vật để nạp ảnh vào Prompt AI:</span>
+                        <button
+                          type="button"
+                          className="btn btn-cyan btn-xs font-bold"
+                          onClick={handleSelectAllLoreCharacters}
+                          title="Nạp toàn bộ tất cả nhân vật đã quét vào danh sách tham chiếu"
+                        >
+                          ⚡ Chọn Tất Cả ({characters.length})
+                        </button>
+                      </div>
                       <button className="btn-icon btn-xs text-muted" onClick={() => setIsCharPickerOpen(false)}>✕</button>
                     </div>
                     <div className="flex-center gap-2" style={{ flexWrap: 'wrap', justifyContent: 'flex-start' }}>
@@ -1874,6 +1911,7 @@ ${fullImagePromptEn || generatedData.imagePromptEn}
                     </div>
                   </div>
                 )}
+
 
                 {/* Selected Character Reference Thumbnails Ribbon */}
                 {characterRefImages.length > 0 ? (

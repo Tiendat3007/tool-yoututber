@@ -791,10 +791,12 @@ HÃY VIẾT LẠI TÓM TẮT CỐT TRUYỆN THEO ĐÚNG PROMPT TRÊN. XUẤT RA 
 }
 
 
-// 🪄 4. Dedicated AI Generator for Midjourney/Flux Image Prompts according to prompt & Character Reference Images
+// 🪄 4. Dedicated AI Generator for Midjourney/Flux Image Prompts according to prompt, ALL Character Reference Images & ALL SRT Subtitles
 export async function regenerateImagePromptOnly({
   storySummary = '',
   customPrompt = '',
+  selectedFiles = [],
+  fullTranscriptContext = '',
   characterReferences = [],
   genre = 'Tu Tiên / Tiên Hiệp',
   contentType = 'Review Phim / Tóm Tắt Phim',
@@ -806,17 +808,49 @@ export async function regenerateImagePromptOnly({
   if (!apiKey) {
     throw new Error('Chưa nhập API Key trong Cấu Hình AI!');
   }
-  if (!customPrompt && (!characterReferences || characterReferences.length === 0)) {
-    throw new Error('Vui lòng nhập prompt yêu cầu hoặc chọn ít nhất 1 ảnh nhân vật tham chiếu!');
+
+  // Format compact time stamp
+  const formatCompactTime = (timeStr) => {
+    if (!timeStr) return '';
+    return timeStr.replace(/^00:/, '').split(',')[0].split('.')[0];
+  };
+
+  // Compile full 100% transcript of all selected SRT files if provided
+  let transcript = fullTranscriptContext || '';
+  if (!transcript && Array.isArray(selectedFiles) && selectedFiles.length > 0) {
+    transcript = selectedFiles.map((file, fileIdx) => {
+      let prevText = '';
+      const compactLines = (file.subtitles || [])
+        .map(s => {
+          const text = (s.translatedText || s.originalText || '').trim();
+          if (!text || text === prevText) return null;
+          prevText = text;
+          const time = formatCompactTime(s.startTime);
+          return time ? `[${time}] ${text}` : text;
+        })
+        .filter(Boolean)
+        .join('\n');
+
+      return `=== TẬP #${fileIdx + 1}: ${file.name} (${(file.subtitles || []).length} dòng) ===\n${compactLines}`;
+    }).join('\n\n');
   }
 
-  const systemPrompt = `You are an Elite Midjourney, Stable Diffusion & Flux Digital Art Prompt Engineer.
+  const systemPrompt = `You are an Elite Midjourney v6.1, Flux.1 & Stable Diffusion AI Art Director specializing in Chinese 3D Animation (Donghua / Xianxia / Xuanhuan).
 Your mission is to craft a hyper-detailed 16:9 YouTube Thumbnail Art Prompt in English and a concise Vietnamese visual description.
-When Character Reference Images or descriptions are provided, inspect the characters' facial structure, hair color, attire, robes, armor, weapons, and magical aura to ACCURATELY describe them in the prompt so the generated art faithfully replicates the characters from the movie!
 
-RULES:
-1. imagePromptEn: Hyper-detailed prompt with lighting, atmosphere, character appearance, hair, facial features, attire, cinematography, 8k render, --ar 16:9 --v 6.1 --style raw.
-2. imagePromptVi: Gợi ý bối cảnh, nhân vật và bố cục hình ảnh bằng tiếng Việt dễ hiểu.
+MANDATORY DUAL MULTIMODAL SCANNING:
+1. 👁️ THOROUGH VISION SCAN OF ALL ${characterReferences.length} CHARACTER REFERENCE IMAGES:
+   - Carefully inspect EACH and EVERY attached character image.
+   - Accurately describe: facial features, hairstyle, hair color, eye luminescence, forehead insignia/markings, specific robes/armor styling, shoulder armor, jewelry, and held divine weapons/artifacts (swords, staves, spears, pagodas, seals).
+   - Preserve the exact visual identity of the characters from the movie.
+
+2. 📜 DEEP READING OF 100% FULL SRT SUBTITLE TRANSCRIPT:
+   - Read the entire SRT dialogue across all episodes to capture the grandest, most intense battle, martial arts breakthrough, or dramatic climax.
+   - Infuse the scene with the specific energy aura colors, divine beasts, and battlefield environment mentioned in the subtitles.
+
+PROMPT RULES:
+1. imagePromptEn: Hyper-detailed 16:9 Midjourney/Flux prompt with cinematic lighting, dynamic composition, 8k octane render, volumetric god rays, space in middle for 3D overlay text, --ar 16:9 --v 6.1 --style raw.
+2. imagePromptVi: Gợi ý bối cảnh, thần thái nhân vật và bố cục hình ảnh bằng tiếng Việt dễ hiểu.
 3. Return ONLY valid JSON:
 {
   "imagePromptEn": "Hyper realistic 16:9 cinematic anime render of...",
@@ -825,7 +859,7 @@ RULES:
 
   let charRefContext = '';
   if (Array.isArray(characterReferences) && characterReferences.length > 0) {
-    charRefContext = `\n=== 👥 DANH SÁCH NHÂN VẬT THAM CHIẾU TỪ PHIM (${characterReferences.length} nhân vật): ===\n` +
+    charRefContext = `\n=== 👥 DANH SÁCH ${characterReferences.length} ẢNH THAM CHIẾU NHÂN VẬT ĐƯỢC CUNG CẤP: ===\n` +
       characterReferences.map((c, i) => {
         const info = [
           c.name ? `Tên: ${c.name}` : '',
@@ -834,21 +868,21 @@ RULES:
           c.realm ? `Cảnh giới: ${c.realm}` : '',
           c.note ? `Ghi chú: ${c.note}` : ''
         ].filter(Boolean).join(' | ');
-        return `[Nhân vật #${i + 1}] ${info}`;
+        return `[Ảnh nhân vật #${i + 1}] ${info}`;
       }).join('\n') +
-      `\n=> YÊU CẦU QUAN TRỌNG: Hãy soi kỹ các ảnh tham chiếu đính kèm và mô tả chính xác ngoại hình, kiểu tóc, y phục, thần khí và vũ khí của các nhân vật trên vào Prompt Midjourney/Flux!\n`;
+      `\n=> YÊU CẦU BẮT BUỘC: Hãy soi kỹ TOÀN BỘ TỪNG ẢNH THAM CHIẾU đính kèm và mô tả chính xác ngoại hình, kiểu tóc, y phục, thần khí và vũ khí của các nhân vật trên vào Prompt Midjourney/Flux!\n`;
   }
 
   const userMessage = `THỂ LOẠI: ${genre}
 ĐỊNH DẠNG: ${contentType}
 
-=== 🎯 PROMPT YÊU CẦU VẼ ẢNH TỪ CREATOR: ===
+=== 🎯 PROMPT YÊU CẦU TỪ CREATOR: ===
 ${(customPrompt || 'Tạo ảnh thumbnail kịch tính, hoành tráng, làm nổi bật nhân vật chính của bộ phim').trim()}
 ${charRefContext}
-=== TÓM TẮT CỐT TRUYỆN GỐC ===
-${storySummary}
+${storySummary ? `=== TÓM TẮT CỐT TRUYỆN GỐC ===\n${storySummary}\n` : ''}
+${transcript ? `=== TOÀN BỘ 100% PHỤ ĐỀ SRT CỦA TẤT CẢ CÁC TẬP PHIM ===\n${transcript}\n=== HẾT TOÀN BỘ PHỤ ĐỀ SRT ===\n` : ''}
+HÃY QUÉT TOÀN BỘ CÁC ẢNH THAM CHIẾU VÀ TOÀN BỘ 100% PHỤ ĐỀ SRT TRÊN ĐỂ TẠO PROMPT VẼ ẢNH TIẾNG ANH VÀ Ý TƯỞNG TIẾNG VIỆT HOÀN HẢO NHẤT. XUẤT RA 1 ĐỐI TƯỢNG JSON DUY NHẤT:`;
 
-HÃY TẠO PROMPT VẼ ẢNH TIẾNG ANH VÀ Ý TƯỞNG TIẾNG VIỆT THEO ĐÚNG PROMPT VÀ ẢNH THAM CHIẾU TRÊN. XUẤT RA 1 ĐỐI TƯỢNG JSON DUY NHẤT:`;
 
   let rawText = '';
 
