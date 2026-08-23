@@ -100,8 +100,9 @@ export default function CharacterLoreStudio({
   const [visionVideoFile, setVisionVideoFile] = useState(null);
   const [visionIntervalSec, setVisionIntervalSec] = useState(3);
   const [visionConcurrency, setVisionConcurrency] = useState(6); // 6 parallel threads by default
-  const [visionBatchSize, setVisionBatchSize] = useState(12); // Optimized to 12 frames per request (options: 12, 15, 20, 30, 40, 50, 60)
+  const [visionBatchSize, setVisionBatchSize] = useState(4); // Selectable: 2, 4, 6, 8, 10, 12, 15, 20
   const [visionModel, setVisionModel] = useState(() => localStorage.getItem('tutien_vision_model') || 'gemini-2.5-flash-lite');
+
   const [visionFlipHorizontal, setVisionFlipHorizontal] = useState(true);
   const [visionFilterStatic, setVisionFilterStatic] = useState(true); // Smart frame differencing to eliminate redundant static frames
   const [visionUseSRTContext, setVisionUseSRTContext] = useState(true); // 🧠 Feed selected SRT subtitles context into Vision AI
@@ -1429,18 +1430,21 @@ export default function CharacterLoreStudio({
                       onChange={(e) => setVisionBatchSize(Number(e.target.value))}
                       className="input-field select-field input-xs font-bold text-green"
                       style={{ background: 'rgba(0,0,0,0.5)', width: 'auto' }}
-                      title="Số lượng ảnh gửi cùng lúc trong 1 request AI để tối ưu chi phí sàn $0.01"
+                      title="Số lượng ảnh gửi cùng lúc trong 1 request AI để tối ưu chi phí và độ chính xác"
                     >
-                      <option value={12}>12 Ảnh / Request (Khuyên Dùng ⭐)</option>
+                      <option value={2}>2 Ảnh / Request (Độ Chính Xác Tuyệt Đối 🎯)</option>
+                      <option value={4}>4 Ảnh / Request (Khuyên Dùng ⭐ Chuẩn Từng Giây)</option>
+                      <option value={6}>6 Ảnh / Request (Cân Bằng Tốc Độ & Độ Chuẩn)</option>
+                      <option value={8}>8 Ảnh / Request</option>
+                      <option value={10}>10 Ảnh / Request (Tiết Kiệm Request)</option>
+                      <option value={12}>12 Ảnh / Request</option>
                       <option value={15}>15 Ảnh / Request</option>
                       <option value={20}>20 Ảnh / Request</option>
-                      <option value={30}>30 Ảnh / Request (Siêu Gom 🚀 Giảm 80% Reqs)</option>
-                      <option value={40}>40 Ảnh / Request (Siêu Gom 🚀 Giảm 85% Reqs)</option>
-                      <option value={50}>50 Ảnh / Request (Cực Đại 🔥 Giảm 95% Reqs)</option>
-                      <option value={60}>60 Ảnh / Request (Tối Đa ⚡ Giảm 98% Reqs)</option>
+                      <option value={30}>30 Ảnh / Request</option>
                     </select>
                   </div>
                 </div>
+
 
 
 
