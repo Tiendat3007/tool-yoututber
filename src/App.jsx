@@ -95,6 +95,7 @@ export default function App() {
   const [aiModel, setAiModel] = useState(() => localStorage.getItem('tutien_ai_model') || 'gemini-2.5-flash');
 
   const [concurrency, setConcurrency] = useState(() => Number(localStorage.getItem('tutien_concurrency')) || 4);
+  const [translateBatchSize, setTranslateBatchSize] = useState(() => Number(localStorage.getItem('tutien_translate_batch_size')) || 60);
 
   const [customPrompt, setCustomPrompt] = useState(() => localStorage.getItem('tutien_custom_prompt') || '');
   const [isAISettingsOpen, setIsAISettingsOpen] = useState(false);
@@ -148,8 +149,10 @@ export default function App() {
     localStorage.setItem('tutien_gemini_key', geminiKey);
     localStorage.setItem('tutien_ai_model', aiModel);
     localStorage.setItem('tutien_concurrency', concurrency);
+    localStorage.setItem('tutien_translate_batch_size', translateBatchSize);
     localStorage.setItem('tutien_custom_prompt', customPrompt);
-  }, [aiProvider, orimiseKey, orimiseBaseUrl, geminiKey, aiModel, concurrency, customPrompt]);
+  }, [aiProvider, orimiseKey, orimiseBaseUrl, geminiKey, aiModel, concurrency, translateBatchSize, customPrompt]);
+
 
   const handleClearScannedTerms = () => {
     setExtractedGlossaryTerms([]);
@@ -952,6 +955,8 @@ export default function App() {
             batchProgressText={batchProgressText}
             concurrency={concurrency}
             setConcurrency={setConcurrency}
+            translateBatchSize={translateBatchSize}
+            setTranslateBatchSize={setTranslateBatchSize}
             customPrompt={customPrompt}
             setCustomPrompt={setCustomPrompt}
             onExtractGlossary={() => handleExtractGlossary()}
@@ -982,6 +987,8 @@ export default function App() {
             aiModel={aiModel}
             concurrency={concurrency}
             setConcurrency={setConcurrency}
+            translateBatchSize={translateBatchSize}
+            setTranslateBatchSize={setTranslateBatchSize}
             customPrompt={customPrompt}
             setCustomPrompt={setCustomPrompt}
             activePresetId={activePresetId}

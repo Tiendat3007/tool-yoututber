@@ -1,5 +1,5 @@
 import React, { useRef, useState } from 'react';
-import { Files, FileText, FolderPlus, Archive, Trash2, Plus, Download, Sparkles, BookOpen, Zap, Search, ArrowUpDown, Filter, Eraser, CheckCircle2, Check, CheckSquare, Square } from 'lucide-react';
+import { Files, FileText, FolderPlus, Archive, Trash2, Plus, Download, Sparkles, BookOpen, Zap, Search, ArrowUpDown, Filter, Eraser, CheckCircle2, Check, CheckSquare, Square, Layers } from 'lucide-react';
 
 export default function FileListPanel({
   files,
@@ -24,6 +24,8 @@ export default function FileListPanel({
   batchProgressText,
   concurrency = 4,
   setConcurrency,
+  translateBatchSize = 60,
+  setTranslateBatchSize,
   customPrompt,
   setCustomPrompt,
   onExtractGlossary,
@@ -31,6 +33,7 @@ export default function FileListPanel({
   extractedGlossaryTerms = [],
   onOpenScannedGlossary
 }) {
+
   const fileInputRef = useRef(null);
   const folderInputRef = useRef(null);
   const zipInputRef = useRef(null);
@@ -442,14 +445,33 @@ export default function FileListPanel({
                 </div>
               )}
 
+              {setTranslateBatchSize && (
+                <div className="select-with-icon select-batch-size" title="Số dòng phụ đề gửi trong 1 request AI để tối ưu chi phí và số lượng request">
+                  <Layers size={14} className="text-purple" />
+                  <select
+                    value={translateBatchSize}
+                    onChange={e => setTranslateBatchSize(Number(e.target.value))}
+                    className="input-field select-field input-sm font-bold text-purple"
+                    style={{ background: 'rgba(168, 85, 247, 0.12)', borderColor: 'rgba(168, 85, 247, 0.35)', minWidth: '150px' }}
+                  >
+                    <option value={30}>30 Dòng / Request</option>
+                    <option value={45}>45 Dòng / Request</option>
+                    <option value={60}>⭐ 60 Dòng (Khuyên Dùng)</option>
+                    <option value={80}>🚀 80 Dòng (Giảm 70% Reqs)</option>
+                    <option value={100}>🔥 100 Dòng (Tối Đa)</option>
+                  </select>
+                </div>
+              )}
+
               <button
                 className="btn btn-purple btn-sm font-bold"
                 onClick={() => onBatchTranslateAI(effectiveTargetIds)}
                 disabled={isBatchProcessing || isExtractingGlossary}
-                title={`Dịch ${targetLabel} bằng AI`}
+                title={`Dịch ${targetLabel} bằng AI (${concurrency} Luồng, ${translateBatchSize} Dòng/Request)`}
               >
-                <Sparkles size={16} /> Dịch AI {targetLabel} ({concurrency} Luồng)
+                <Sparkles size={16} /> Dịch AI {targetLabel} ({concurrency} Luồng, {translateBatchSize} dòng/req)
               </button>
+
 
               {onExtractGlossary && (
                 <button

@@ -25,10 +25,11 @@ export default function SubtitleEditor({
   aiProvider = 'orimise',
   orimiseKey,
   orimiseBaseUrl,
-  geminiKey,
   aiModel,
   concurrency = 4,
   setConcurrency,
+  translateBatchSize = 60,
+  setTranslateBatchSize,
   customPrompt,
   setCustomPrompt,
   activePresetId,
@@ -39,6 +40,7 @@ export default function SubtitleEditor({
   extractedGlossaryTerms = [],
   onOpenScannedGlossary
 }) {
+
 
 
 
@@ -253,7 +255,7 @@ export default function SubtitleEditor({
         systemPrompt: customPrompt,
         glossary,
         model: aiModel,
-        batchSize: 60, // 60 lines per request
+        batchSize: Number(translateBatchSize) || 60, // User selectable (30, 45, 60, 80, 100)
         concurrency: concurrency,
         onProgress: (doneChunks, totalChunks, doneLines, total) => {
           setTranslationProgress(
@@ -261,6 +263,7 @@ export default function SubtitleEditor({
           );
         }
       });
+
 
 
       setSubtitles(subtitles.map(sub => {
@@ -610,14 +613,33 @@ export default function SubtitleEditor({
                 </div>
               )}
 
+              {setTranslateBatchSize && (
+                <div className="select-with-icon select-batch-size" title="Số dòng phụ đề gửi trong 1 request AI để tối ưu chi phí và số lượng request">
+                  <Layers size={14} className="text-purple" />
+                  <select
+                    value={translateBatchSize}
+                    onChange={e => setTranslateBatchSize(Number(e.target.value))}
+                    className="input-field select-field input-sm font-bold text-purple"
+                    style={{ background: 'rgba(168, 85, 247, 0.12)', borderColor: 'rgba(168, 85, 247, 0.35)', minWidth: '145px' }}
+                  >
+                    <option value={30}>30 Dòng / Request</option>
+                    <option value={45}>45 Dòng / Request</option>
+                    <option value={60}>⭐ 60 Dòng (Khuyên Dùng)</option>
+                    <option value={80}>🚀 80 Dòng (Giảm 70% Reqs)</option>
+                    <option value={100}>🔥 100 Dòng (Tối Đa)</option>
+                  </select>
+                </div>
+              )}
+
               <button
                 className="btn btn-purple btn-sm font-bold"
                 onClick={handleAIBatchTranslate}
                 disabled={isTranslating}
-                title={`Dịch bằng AI ${aiProvider === 'orimise' ? `Orimise (${aiModel})` : `Gemini (${aiModel})`}`}
+                title={`Dịch bằng AI ${aiProvider === 'orimise' ? `Orimise (${aiModel})` : `Gemini (${aiModel})`} - ${translateBatchSize} dòng/request`}
               >
-                <Sparkles size={16} /> Dịch AI {selectedIds.length > 0 ? `${selectedIds.length} Dòng Đã Chọn` : `File Này (${subtitles.length} dòng)`} ({concurrency} Luồng)
+                <Sparkles size={16} /> Dịch AI {selectedIds.length > 0 ? `${selectedIds.length} Dòng Đã Chọn` : `File Này (${subtitles.length} dòng)`} ({concurrency} Luồng, {translateBatchSize} dòng/req)
               </button>
+
 
 
               {/* Red/Green Diff Toggle Button */}
